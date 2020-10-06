@@ -3,4 +3,4 @@ project(Autoscaling_Paxos)
 
 set(CMAKE_CXX_STANDARD 17)
 
-add_executable(Autoscaling_Paxos main.cpp main.hpp acceptor.cpp acceptor.hpp proposer.cpp proposer.hpp utils/networkNode.cpp utils/networkNode.hpp)
+add_executable(Autoscaling_Paxos main.cpp main.hpp acceptor.cpp acceptor.hpp proposer.cpp proposer.hpp utils/networkNode.cpp utils/networkNode.hpp utils/config.hpp)

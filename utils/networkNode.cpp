@@ -3,11 +3,12 @@
 //
 #include <sys/socket.h>
 #include <arpa/inet.h>
+#include <unistd.h>
 #include <thread>
 #include <vector>
 #include "networkNode.hpp"
 
-[[noreturn]] void network::startServerAtPort(const int port, void(*onClientConnected)(int)) {
+[[noreturn]] void network::startServerAtPort(const int port, std::function<void(int)> onClientConnected) {
     auto [socketId, serverAddress] = listenToPort(port);
     std::vector<std::thread> clientThreads {};
     while (true) {
@@ -42,9 +43,9 @@ int network::connectToServerAtAddress(const std::string& address, const int port
     serverAddress.sin_port = htons(port);
     inet_pton(AF_INET, address.c_str(), &serverAddress.sin_addr);
 
-    int connectResult = connect(socketId, (sockaddr *) &serverAddress, sizeof(serverAddress));
-    if (connectResult < 0)
-        return -1;
+    int connectResult = -1;
+    while (connectResult < 0)
+        connectResult = connect(socketId, (sockaddr *) &serverAddress, sizeof(serverAddress));
     return socketId;
 }
 
@@ -57,4 +58,14 @@ int network::createSocket() {
     const int opt = 1;
     setsockopt(socketId, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt));
     return socketId;
+}
+
+void network::sendPayload(const int socketId, const std::string& payload) {
+    send(socketId, payload.c_str(), payload.length(), 0);
+}
+
+std::string network::receivePayload(const int socketId) {
+    char buffer[config::TCP_READ_BUFFER_SIZE] = {0};
+    read(socketId, buffer, config::TCP_READ_BUFFER_SIZE);
+    return std::string(buffer);
 }

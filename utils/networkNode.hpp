@@ -8,6 +8,7 @@
 #define MAX_CONNECTIONS 5
 
 #include <netinet/in.h>
+#include "config.hpp"
 
 namespace network {
     /**
@@ -18,7 +19,7 @@ namespace network {
      * @param port Port of server
      * @param onClientConnected Callback that accepts the socket ID of a client connection
      */
-    [[noreturn]] void startServerAtPort(int port, void(*onClientConnected)(int));
+    [[noreturn]] void startServerAtPort(int port, std::function<void(int)> onClientConnected);
     /**
      * Creates a local server at the given port and listens.
      *
@@ -28,10 +29,11 @@ namespace network {
     std::tuple<int, sockaddr_in> listenToPort(int port);
     /**
      * Creates a connection to the server at the given IP address and port.
+     * Blocks until connection is made.
      *
      * @param address IP address of server
      * @param port Port of server
-     * @return Socket ID, or -1 if connection failed
+     * @return Socket ID
      */
     int connectToServerAtAddress(const std::string& address, int port);
     /**
@@ -40,6 +42,10 @@ namespace network {
      * @return Socket ID
      */
     int createSocket();
+
+    void sendPayload(int socketId, const std::string& payload);
+
+    std::string receivePayload(int socketId);
 };
 
 class networkNode {
