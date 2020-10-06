@@ -9,7 +9,7 @@
 #include <vector>
 #include "utils/networkNode.hpp"
 
-class proposer: networkNode {
+class proposer {
 public:
     explicit proposer(int id);
 private:
@@ -23,9 +23,9 @@ private:
     [[noreturn]] void listenToMain();
     void startServer();
     void connectToProposers();
-    [[noreturn]] void listenToProposers();
+    [[noreturn]] void listenToProposer(int socket);
     void connectToAcceptors();
-    [[noreturn]] void listenToAcceptors();
+    [[noreturn]] void listenToAcceptor(int socket);
 };
 
 

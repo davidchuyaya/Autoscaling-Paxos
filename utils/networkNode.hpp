@@ -17,7 +17,8 @@ namespace network {
      * Blocking.
      *
      * @param port Port of server
-     * @param onClientConnected Callback that accepts the socket ID of a client connection
+     * @param onClientConnected Callback that accepts the socket ID of a client connection. Started in new thread, so
+     * this is allowed to block.
      */
     [[noreturn]] void startServerAtPort(int port, std::function<void(int)> onClientConnected);
     /**
@@ -46,10 +47,6 @@ namespace network {
     void sendPayload(int socketId, const std::string& payload);
 
     std::string receivePayload(int socketId);
-};
-
-class networkNode {
-};
-
+}
 
 #endif //C__PAXOS_NETWORKNODE_HPP

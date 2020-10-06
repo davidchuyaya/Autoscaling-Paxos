@@ -29,7 +29,9 @@ void paxos::startProposers() {
 }
 
 void paxos::startAcceptors() {
-    std::vector<acceptor> acceptors (2*config::F+1);
+    for (int i = 0; i < 2 * config::F + 1; i++) {
+        participants.emplace_back(std::thread([i]{acceptor {i};}));
+    }
 }
 
 void paxos::startServer() {

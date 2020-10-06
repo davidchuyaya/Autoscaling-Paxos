@@ -10,6 +10,7 @@ proposer::proposer(const int id) : id(id) {
     printf("Proposer is live!\n");
     std::thread server([&] {startServer(); });
     connectToProposers();
+    connectToAcceptors();
     listenToMain();
 }
 
@@ -26,9 +27,7 @@ void proposer::listenToMain() {
 
 void proposer::startServer() {
     network::startServerAtPort(config::PROPOSER_PORT_START + id, [&](int proposerSocketId) {
-        printf("Proposer server received client: %d\n", proposerSocketId);
-        std::lock_guard<std::mutex> lock(proposerMutex);
-        proposerSockets.emplace_back(proposerSocketId);
+        listenToProposer(proposerSocketId);
     });
 }
 
@@ -38,9 +37,35 @@ void proposer::connectToProposers() {
         int proposerPort = config::PROPOSER_PORT_START + i;
         threads.emplace_back(std::thread([&, proposerPort]{
             int proposerSocket = network::connectToServerAtAddress(config::LOCALHOST, proposerPort);
-            std::lock_guard<std::mutex> lock(proposerMutex);
-            proposerSockets.emplace_back(proposerSocket);
+            listenToProposer(proposerSocket);
         }));
+    }
+}
+
+[[noreturn]]
+void proposer::listenToProposer(int socket) {
+    {std::lock_guard<std::mutex> lock(proposerMutex);
+        proposerSockets.emplace_back(socket);}
+    while (true) {
+        std::string payload = network::receivePayload(socket);
+    }
+}
+
+void proposer::connectToAcceptors() {
+    for (int i = 0; i < 2*config::F + 1; i++) {
+        int acceptorPort = config::ACCEPTOR_PORT_START + i;
+        threads.emplace_back(std::thread([&, acceptorPort]{
+            int acceptorSocket = network::connectToServerAtAddress(config::LOCALHOST, acceptorPort);
+            listenToAcceptor(acceptorSocket);
+        }));
+    }
+}
+
+void proposer::listenToAcceptor(int socket) {
+    {std::lock_guard<std::mutex> lock(acceptorMutex);
+        acceptorSockets.emplace_back(socket);}
+    while (true) {
+        std::string payload = network::receivePayload(socket);
     }
 }
 

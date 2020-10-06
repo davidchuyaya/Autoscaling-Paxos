@@ -8,7 +8,11 @@
 
 class acceptor {
 public:
-    acceptor();
+    acceptor(int id);
+private:
+    const int id;
+    void startServer();
+    [[noreturn]] void listenToProposer(int socket);
 };
 
 
