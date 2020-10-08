@@ -7,11 +7,12 @@
 
 #include <string>
 #include "message.pb.h"
-#include "../log.hpp"
+#include "../models/log.hpp"
+#include "../models/ballot.hpp"
 
 namespace message {
     ProposerToAcceptor createP1A(int id, int ballotNum);
-    AcceptorToProposer createP1B(int id, int ballotNum);
+    AcceptorToProposer createP1B(ballot highestBallot);
     ProposerToAcceptor createP2A(int id, int ballotNum, const std::string& payload);
     AcceptorToProposer createP2B(int id, int ballotNum, Log log);
 }

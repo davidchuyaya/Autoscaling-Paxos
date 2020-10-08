@@ -73,8 +73,20 @@ void proposer::connectToAcceptors() {
 }
 
 void proposer::listenToAcceptor(int socket) {
+    AcceptorToProposer payload;
     while (true) {
-        std::string payload = network::receivePayload(socket);
+        payload.ParseFromString(network::receivePayload(socket));
+        printf("Proposer %d received payload: [%s]\n", id, payload.DebugString().c_str());
+
+        switch (payload.type()) {
+            case AcceptorToProposer_Type_p1b: {
+                break;
+            }
+            case AcceptorToProposer_Type_p2b: {
+                break;
+            }
+        }
+        payload.Clear();
     }
 }
 

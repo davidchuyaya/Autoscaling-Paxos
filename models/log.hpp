@@ -7,10 +7,10 @@
 
 #include <vector>
 #include <string>
+#include "ballot.hpp"
 
 struct logEntry {
-    int id;
-    int ballotNum;
+    ballot ballotOfEntry;
     std::string payload;
 };
 

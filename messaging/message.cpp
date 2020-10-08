@@ -12,8 +12,12 @@ ProposerToAcceptor message::createP1A(int id, int ballotNum) {
     return p1a;
 }
 
-AcceptorToProposer message::createP1B(int id, int ballotNum) {
-    return AcceptorToProposer();
+AcceptorToProposer message::createP1B(ballot highestBallot) {
+    AcceptorToProposer p1b;
+    p1b.set_type(AcceptorToProposer_Type_p1b);
+    p1b.set_id(highestBallot.id);
+    p1b.set_ballot(highestBallot.ballotNum);
+    return p1b;
 }
 
 ProposerToAcceptor message::createP2A(int id, int ballotNum, const std::string& payload) {
