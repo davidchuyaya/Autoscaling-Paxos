@@ -61,11 +61,12 @@ int network::createSocket() {
 }
 
 void network::sendPayload(const int socketId, const std::string& payload) {
-    send(socketId, payload.c_str(), payload.length(), 0);
+    write(socketId, payload.c_str(), payload.length());
 }
 
 std::string network::receivePayload(const int socketId) {
     char buffer[config::TCP_READ_BUFFER_SIZE] = {0};
-    read(socketId, buffer, config::TCP_READ_BUFFER_SIZE);
+    auto size = read(socketId, buffer, config::TCP_READ_BUFFER_SIZE);
+    buffer[size] = '\0';
     return std::string(buffer);
 }
