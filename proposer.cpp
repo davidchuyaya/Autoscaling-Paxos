@@ -1,11 +1,10 @@
 //
 // Created by David Chu on 10/4/20.
 //
-#include <iostream>
 #include <thread>
 #include "proposer.hpp"
 #include "utils/config.hpp"
-#include "messaging/message.hpp"
+#include "models/message.hpp"
 
 proposer::proposer(const int id) : id(id) {
     printf("Proposer is live!\n");

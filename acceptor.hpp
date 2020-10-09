@@ -7,7 +7,6 @@
 #include <vector>
 #include "models/log.hpp"
 #include "message.pb.h"
-#include "models/ballot.hpp"
 
 class acceptor {
 public:
@@ -15,11 +14,11 @@ public:
 private:
     const int id;
     std::mutex ballotMutex;
-    ballot highestBallot = {0,0}; //id, ballotNum
+    Ballot highestBallot;
     Log log;
     void startServer();
     [[noreturn]] void listenToProposer(int socket);
-    ballot setAndReturnHighestBallot(ballot newBallot);
+    Ballot setAndReplaceHighestBallot(const Ballot& proposerBallot);
 };
 
 

@@ -7,15 +7,13 @@
 
 #include <vector>
 #include <string>
-#include "ballot.hpp"
-
-struct logEntry {
-    ballot ballotOfEntry;
-    std::string payload;
-};
+#include <mutex>
+#include <message.pb.h>
 
 class Log {
-    std::vector<logEntry> log = {};
+public:
+    std::mutex logMutex;
+    std::vector<PValue> pValues = {};
 };
 
 

@@ -4,7 +4,7 @@
 
 #include "acceptor.hpp"
 #include "utils/networkNode.hpp"
-#include "messaging/message.hpp"
+#include "models/message.hpp"
 
 acceptor::acceptor(int id) : id(id) {
     startServer();
@@ -26,8 +26,9 @@ void acceptor::listenToProposer(int socket) {
 
         switch (payload.type()) {
             case ProposerToAcceptor_Type_p1a: {
-                ballot newBallot = {payload.id(), payload.ballot()};
-                AcceptorToProposer p1b = message::createP1B(newBallot);
+                Ballot newBallot = setAndReplaceHighestBallot(payload.ballot());
+                std::lock_guard<std::mutex> lock(log.logMutex);
+                AcceptorToProposer p1b = message::createP1B(newBallot, log);
                 network::sendPayload(socket, p1b.SerializeAsString());
                 break;
             }
@@ -39,8 +40,13 @@ void acceptor::listenToProposer(int socket) {
     }
 }
 
-ballot acceptor::setAndReturnHighestBallot(ballot newBallot) {
+Ballot acceptor::setAndReplaceHighestBallot(const Ballot& proposerBallot) {
+    //TODO could replace with read/write mutex
     std::lock_guard<std::mutex> lock(ballotMutex);
-    highestBallot = std::max(highestBallot, newBallot);
-    return highestBallot;
+    if (highestBallot.ballotnum() > proposerBallot.ballotnum() ||
+        (highestBallot.ballotnum() == proposerBallot.ballotnum() && highestBallot.id() > proposerBallot.id()))
+        return highestBallot;
+
+    highestBallot = proposerBallot;
+    return proposerBallot;
 }
