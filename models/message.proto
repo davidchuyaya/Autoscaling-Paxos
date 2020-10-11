@@ -1,15 +1,15 @@
-syntax = "proto2";
+syntax = "proto3";
 
 /**
 Data structures
  */
 message Ballot {
-    required int32 id = 1;
-    required int32 ballotNum = 2;
+    int32 id = 1;
+    int32 ballotNum = 2;
 }
 message PValue {
-    required Ballot ballot = 1;
-    required string payload = 2;
+    Ballot ballot = 1;
+    string payload = 2;
 }
 
 /**
@@ -17,26 +17,27 @@ Official Paxos protocol messages: p1a, p1b, p2a, p2b
  */
 message ProposerToAcceptor {
     enum Type {
-        p1a = 1;
-        p2a = 2;
+        p1a = 0;
+        p2a = 1;
     }
 
-    required Type type = 1;
-    required Ballot ballot = 2;
-    optional int32 slot = 3;
-    optional string payload = 4;
+    Type type = 1;
+    Ballot ballot = 2;
+    int32 slot = 3;
+    string payload = 4;
 }
 message AcceptorToProposer {
     enum Type {
-        p1b = 1;
-        p2b = 2;
+        p1b = 0;
+        p2b = 1;
     }
 
-    required Type type = 1;
-    required Ballot ballot = 2;
-    repeated PValue log = 3; //TODO Acceptors send back whole log in P1B. Could be bad for bandwidth
+    Type type = 1;
+    Ballot ballot = 2;
+    int32 slot = 3;
+    repeated PValue log = 4; //TODO Acceptors send back whole log in P1B. Could be bad for bandwidth
 }
 
 message IAmLeader {
-    required int32 id = 1;
+    int32 id = 1;
 }

@@ -7,14 +7,14 @@
 
 #include <vector>
 #include <string>
-#include <mutex>
 #include <message.pb.h>
 
-class Log {
-public:
-    std::mutex logMutex;
-    std::vector<PValue> pValues = {};
-};
+namespace Log {
+    std::tuple<std::vector<std::string>, std::unordered_map<int, std::string>>
+    committedAndUncommittedLog(const std::vector<std::vector<PValue>>& acceptorLogs);
+    void printLog(const std::vector<PValue>& log);
+    bool isBallotGreaterThan(const Ballot& ballotLeft, const Ballot& ballotRight);
+}
 
 
 #endif //AUTOSCALING_PAXOS_LOG_HPP

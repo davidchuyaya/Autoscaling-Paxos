@@ -14,11 +14,11 @@ public:
 private:
     const int id;
     std::mutex ballotMutex;
-    Ballot highestBallot;
-    Log log;
+    Ballot highestBallot = {};
+    std::mutex logMutex;
+    std::vector<PValue> log = {};
     void startServer();
     [[noreturn]] void listenToProposer(int socket);
-    Ballot setAndReplaceHighestBallot(const Ballot& proposerBallot);
 };
 
 

@@ -16,6 +16,7 @@ paxos::paxos() {}
 [[noreturn]]
 void paxos::start() {
     std::cout << "F: " << config::F << std::endl;
+    setbuf(stdout, nullptr); //TODO force flush to stdout. Disable when doing metrics or in prod
     std::thread server([&]{startServer();});
     startProposers();
     startAcceptors();
@@ -45,7 +46,6 @@ void paxos::startServer() {
 void paxos::readInput() {
     while (true) {
         std::string input;
-        std::cout << "Enter a string to commit: ";
         std::cin >> input;
         broadcastToProposers(input);
     }
