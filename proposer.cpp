@@ -216,31 +216,35 @@ void proposer::sendCommanders(const int slot, const std::string &payload) {
 
 void proposer::checkCommanders() {
     std::scoped_lock lock(commanderMutex, unproposedPayloadsMutex);
-    std::vector<int> slotsToRemove = {};
-    for (const auto& [slot, payload] : uncommittedProposals) {
+    // loop over iterator since we need to remove committed proposals as we go
+    for (auto iterator = uncommittedProposals.begin(); iterator != uncommittedProposals.end();) {
+        const int slot = iterator->first;
+        const std::string& payload = iterator->second;
         const int numApproved = slotToApprovedCommanders[slot];
         const int numPreempted = slotToPreemptedCommanders[slot];
 
-        if (numApproved + numPreempted <= config::F)
+        if (numApproved + numPreempted <= config::F) {
+            iterator++;
             continue;
+        }
         if (numApproved > config::F) {
             // proposal is committed
             if (log.size() <= slot)
                 log.resize(slot + 1);
             log[slot] = payload;
-            slotsToRemove.emplace_back(slot);
+            // remove from uncommitted proposals
+            iterator = uncommittedProposals.erase(iterator);
         }
         // we've been preempted by a new leader
         else {
             shouldSendScouts = true;
             isLeader = false;
+            iterator++;
         }
 
         slotToApprovedCommanders.erase(slot);
         slotToPreemptedCommanders.erase(slot);
     }
-
-    //TODO clear uncommittedProposals
 
     if (!isLeader) {
         slotToPreemptedCommanders.clear();
