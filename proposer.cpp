@@ -148,14 +148,14 @@ void proposer::sendScouts() {
 }
 
 void proposer::checkScouts() {
-    std::scoped_lock lock(scoutMutex, commanderMutex, acceptorLogsMutex, unproposedPayloadsMutex); //TODO fix locking clusterf*ck?
+    std::unique_lock<std::mutex> lock(scoutMutex);
     if (numApprovedScouts + numPreemptedScouts <= config::F)
         return;
 
     //leader election complete
     if (numApprovedScouts > config::F) {
         isLeader = true;
-        printf("Proposer %d is leader, unproposed payloads size: %lu\n", id, unproposedPayloads.size());
+        printf("Proposer %d is leader\n", id);
     }
     else {
         isLeader = false;
@@ -164,10 +164,18 @@ void proposer::checkScouts() {
     }
     numApprovedScouts = 0;
     numPreemptedScouts = 0;
+    lock.unlock();
 
+    mergeLogs();
+}
+
+void proposer::mergeLogs() {
+    acceptorLogsMutex.lock();
     const auto& [committedLog, uncommittedLog] = Log::committedAndUncommittedLog(acceptorLogs);
     acceptorLogs.clear();
+    acceptorLogsMutex.unlock();
 
+    std::lock_guard<std::mutex> lock(unproposedPayloadsMutex);
     log = committedLog; //TODO prevent already committed item from being uncommitted?
 
     for (const std::string& committedPayload : log) {

@@ -79,6 +79,12 @@ private:
      */
     void checkScouts();
     /**
+     * Update log with newly committed slots from acceptors. Remove committed proposals from unproposedPayloads.
+     * Propose uncommitted slots, add to uncommittedProposals
+     * @invariant acceptorLogs contains F+1 acceptors' logs, uncommittedProposals.empty()
+     */
+    void mergeLogs();
+    /**
      * Assign the next available slots to unproposedPayloads and send p2a messages for them.
      * @invariant isLeader = true
      */
