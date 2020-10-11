@@ -3,13 +3,14 @@
 //
 
 #include "acceptor.hpp"
-#include "utils/networkNode.hpp"
+#include "utils/network.hpp"
 #include "models/message.hpp"
 
 acceptor::acceptor(const int id) : id(id) {
     startServer();
 }
 
+[[noreturn]]
 void acceptor::startServer() {
     network::startServerAtPort(config::ACCEPTOR_PORT_START + id, [&](const int proposerSocketId) {
         printf("Acceptor %d connected to proposer\n", id);

@@ -30,9 +30,11 @@ void proposer::listenToMain() {
     }
 }
 
+[[noreturn]]
 void proposer::startServer() {
     network::startServerAtPort(config::PROPOSER_PORT_START + id, [&](const int proposerSocketId) {
-        storeProposerSocket(proposerSocketId);
+        {std::lock_guard<std::mutex> lock(proposerMutex);
+            proposerSockets.emplace_back(proposerSocketId);}
         listenToProposer(proposerSocketId);
     });
 }
@@ -44,15 +46,11 @@ void proposer::connectToProposers() {
         threads.emplace_back(std::thread([&, proposerPort]{
             const int proposerSocket = network::connectToServerAtAddress(config::LOCALHOST, proposerPort);
             printf("Proposer %d connected to other proposer", id);
-            storeProposerSocket(proposerSocket);
+            {std::lock_guard<std::mutex> lock(proposerMutex);
+                proposerSockets.emplace_back(proposerSocket);}
             listenToProposer(proposerSocket);
         }));
     }
-}
-
-void proposer::storeProposerSocket(const int socket) {
-    std::lock_guard<std::mutex> lock(proposerMutex);
-    proposerSockets.emplace_back(socket);
 }
 
 [[noreturn]]
@@ -68,15 +66,11 @@ void proposer::connectToAcceptors() {
         const int acceptorPort = config::ACCEPTOR_PORT_START + i;
         threads.emplace_back(std::thread([&, acceptorPort]{
             const int acceptorSocket = network::connectToServerAtAddress(config::LOCALHOST, acceptorPort);
-            storeAcceptorSocket(acceptorSocket);
+            {std::lock_guard<std::mutex> lock(acceptorMutex);
+                acceptorSockets.emplace_back(acceptorSocket);}
             listenToAcceptor(acceptorSocket);
         }));
     }
-}
-
-void proposer::storeAcceptorSocket(const int socket) {
-    std::lock_guard<std::mutex> lock(acceptorMutex);
-    acceptorSockets.emplace_back(socket);
 }
 
 void proposer::listenToAcceptor(const int socket) {

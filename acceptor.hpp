@@ -10,14 +10,19 @@
 
 class acceptor {
 public:
-    acceptor(int id);
+    explicit acceptor(int id);
 private:
     const int id;
     std::mutex ballotMutex;
     Ballot highestBallot = {};
     std::mutex logMutex;
     std::vector<PValue> log = {};
-    void startServer();
+
+    [[noreturn]] void startServer();
+    /**
+     * Process p1a and p2a messages from proposers.
+     * @param socket Socket ID of proposer
+     */
     [[noreturn]] void listenToProposer(int socket);
 };
 

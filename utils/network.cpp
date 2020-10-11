@@ -6,7 +6,7 @@
 #include <unistd.h>
 #include <thread>
 #include <vector>
-#include "networkNode.hpp"
+#include "network.hpp"
 
 [[noreturn]] void network::startServerAtPort(const int port, const std::function<void(int)>& onClientConnected) {
     const auto& [socketId, serverAddress] = listenToPort(port);

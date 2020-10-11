@@ -14,11 +14,11 @@ namespace network {
     /**
      * Creates a local server at the given port, waiting for clients to connect.
      * Triggers the callback function with a socket ID for each client connection.
-     * Blocking.
+     * @note Runs forever.
      *
      * @param port Port of server
      * @param onClientConnected Callback that accepts the socket ID of a client connection. Started in new thread, so
-     * this is allowed to block.
+     * this is allowed to block
      */
     [[noreturn]] void startServerAtPort(int port, const std::function<void(int)>& onClientConnected);
     /**
@@ -30,7 +30,7 @@ namespace network {
     std::tuple<int, sockaddr_in> listenToPort(int port);
     /**
      * Creates a connection to the server at the given IP address and port.
-     * Blocks until connection is made.
+     * @note Blocks until connection is made.
      *
      * @param address IP address of server
      * @param port Port of server
@@ -43,9 +43,19 @@ namespace network {
      * @return Socket ID
      */
     int createSocket();
-
+    /**
+     * Sends the payload to the socket.
+     * @param socketId Socket ID of recipient
+     * @param payload Payload to send
+     */
     void sendPayload(int socketId, const std::string& payload);
-
+    /**
+     * Waits for a payload from the socket.
+     * @note Blocks until a payload arrives.
+     *
+     * @param socketId Socket ID of sender
+     * @return Payload
+     */
     std::string receivePayload(int socketId);
 }
 
