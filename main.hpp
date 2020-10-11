@@ -10,16 +10,15 @@
 
 class paxos {
 public:
-    paxos();
-    [[noreturn]] void start();
+    [[noreturn]] paxos();
 private:
     std::vector<std::thread> participants {};  // A place to put threads so they don't get freed
     std::mutex clientsMutex;
     std::vector<int> clientSockets {};
 
+    void startServer();
     void startProposers();
     void startAcceptors();
-    void startServer();
     [[noreturn]] void readInput();
     void broadcastToProposers(const std::string& payload);
 };

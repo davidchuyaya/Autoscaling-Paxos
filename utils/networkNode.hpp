@@ -20,7 +20,7 @@ namespace network {
      * @param onClientConnected Callback that accepts the socket ID of a client connection. Started in new thread, so
      * this is allowed to block.
      */
-    [[noreturn]] void startServerAtPort(int port, std::function<void(int)> onClientConnected);
+    [[noreturn]] void startServerAtPort(int port, const std::function<void(int)>& onClientConnected);
     /**
      * Creates a local server at the given port and listens.
      *

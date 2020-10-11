@@ -8,17 +8,17 @@
 #include "models/message.hpp"
 
 proposer::proposer(const int id) : id(id) {
-    std::thread server([&] {startServer(); });
+    const std::thread server([&] {startServer(); });
     connectToProposers();
     connectToAcceptors();
-    std::thread connectionToMain([&] {listenToMain(); });
+    const std::thread connectionToMain([&] {listenToMain(); });
     std::this_thread::sleep_for(std::chrono::seconds(1)); //TODO loop to see we're connected to F+1 acceptors
     mainLoop();
 }
 
 [[noreturn]]
 void proposer::listenToMain() {
-    int serverSocket = network::connectToServerAtAddress(config::LOCALHOST, config::MAIN_PORT);
+    const int serverSocket = network::connectToServerAtAddress(config::LOCALHOST, config::MAIN_PORT);
     printf("Proposer %d connected to main\n", id);
 
     while (true) {
@@ -31,7 +31,7 @@ void proposer::listenToMain() {
 }
 
 void proposer::startServer() {
-    network::startServerAtPort(config::PROPOSER_PORT_START + id, [&](int proposerSocketId) {
+    network::startServerAtPort(config::PROPOSER_PORT_START + id, [&](const int proposerSocketId) {
         storeProposerSocket(proposerSocketId);
         listenToProposer(proposerSocketId);
     });
@@ -40,9 +40,9 @@ void proposer::startServer() {
 void proposer::connectToProposers() {
     //Protocol is "connect to servers with a higher id than yourself, so we don't end up as both server & client for anyone
     for (int i = id + 1; i < config::F + 1; i++) {
-        int proposerPort = config::PROPOSER_PORT_START + i;
+        const int proposerPort = config::PROPOSER_PORT_START + i;
         threads.emplace_back(std::thread([&, proposerPort]{
-            int proposerSocket = network::connectToServerAtAddress(config::LOCALHOST, proposerPort);
+            const int proposerSocket = network::connectToServerAtAddress(config::LOCALHOST, proposerPort);
             printf("Proposer %d connected to other proposer", id);
             storeProposerSocket(proposerSocket);
             listenToProposer(proposerSocket);
@@ -50,13 +50,13 @@ void proposer::connectToProposers() {
     }
 }
 
-void proposer::storeProposerSocket(int socket) {
+void proposer::storeProposerSocket(const int socket) {
     std::lock_guard<std::mutex> lock(proposerMutex);
     proposerSockets.emplace_back(socket);
 }
 
 [[noreturn]]
-void proposer::listenToProposer(int socket) {
+void proposer::listenToProposer(const int socket) {
     while (true) {
         std::string payload = network::receivePayload(socket);
         //TODO stable leader
@@ -65,21 +65,21 @@ void proposer::listenToProposer(int socket) {
 
 void proposer::connectToAcceptors() {
     for (int i = 0; i < 2*config::F + 1; i++) {
-        int acceptorPort = config::ACCEPTOR_PORT_START + i;
+        const int acceptorPort = config::ACCEPTOR_PORT_START + i;
         threads.emplace_back(std::thread([&, acceptorPort]{
-            int acceptorSocket = network::connectToServerAtAddress(config::LOCALHOST, acceptorPort);
+            const int acceptorSocket = network::connectToServerAtAddress(config::LOCALHOST, acceptorPort);
             storeAcceptorSocket(acceptorSocket);
             listenToAcceptor(acceptorSocket);
         }));
     }
 }
 
-void proposer::storeAcceptorSocket(int socket) {
+void proposer::storeAcceptorSocket(const int socket) {
     std::lock_guard<std::mutex> lock(acceptorMutex);
     acceptorSockets.emplace_back(socket);
 }
 
-void proposer::listenToAcceptor(int socket) {
+void proposer::listenToAcceptor(const int socket) {
     AcceptorToProposer payload;
     while (true) {
         payload.ParseFromString(network::receivePayload(socket));
@@ -96,8 +96,7 @@ void proposer::listenToAcceptor(int socket) {
                 else
                     numPreemptedScouts += 1;}
                 std::lock_guard<std::mutex> lock(acceptorLogsMutex);
-                std::vector<PValue> acceptorLog = {payload.log().begin(), payload.log().end()};
-                acceptorLogs.emplace_back(acceptorLog);
+                acceptorLogs.emplace_back(payload.log().begin(), payload.log().end());
                 break;
             }
             case AcceptorToProposer_Type_p2b: {
@@ -119,10 +118,10 @@ void proposer::listenToAcceptor(int socket) {
 }
 
 void proposer::broadcastToAcceptors(const google::protobuf::Message& message) {
-    std::string serializedMessage = message.SerializeAsString();
+    const std::string& serializedMessage = message.SerializeAsString();
 
     std::lock_guard<std::mutex> lock(acceptorMutex);
-    for (int socket : acceptorSockets) {
+    for (const int socket : acceptorSockets) {
         network::sendPayload(socket, serializedMessage);
     }
 }
@@ -148,7 +147,7 @@ void proposer::sendScouts() {
     {std::lock_guard<std::mutex> lock(ballotMutex);
         ballotNum += 1;
         currentBallotNum = ballotNum;}
-    ProposerToAcceptor p1a = message::createP1A(id, currentBallotNum);
+    const ProposerToAcceptor& p1a = message::createP1A(id, currentBallotNum);
     printf("P1A blasting out: id = %d, ballotNum = %d\n", id, currentBallotNum);
     broadcastToAcceptors(p1a);
     shouldSendScouts = false;
@@ -172,7 +171,7 @@ void proposer::checkScouts() {
     numApprovedScouts = 0;
     numPreemptedScouts = 0;
 
-    auto [committedLog, uncommittedLog] = Log::committedAndUncommittedLog(acceptorLogs);
+    const auto& [committedLog, uncommittedLog] = Log::committedAndUncommittedLog(acceptorLogs);
     acceptorLogs.clear();
 
     log = committedLog; //TODO prevent already committed item from being uncommitted?
@@ -184,7 +183,7 @@ void proposer::checkScouts() {
         unproposedPayloads.erase(std::remove(unproposedPayloads.begin(), unproposedPayloads.end(), committedPayload),
                                  unproposedPayloads.end());
     }
-    for (const auto&[slot, payload] : uncommittedLog) {
+    for (const auto& [slot, payload] : uncommittedLog) {
         if (payload.empty())
             continue;
         unproposedPayloads.erase(std::remove(unproposedPayloads.begin(), unproposedPayloads.end(), payload),
@@ -203,7 +202,7 @@ void proposer::sendCommandersForPayloads() {
 
     //calculate the next unused slot
     auto nextSlot = log.size();
-    for (auto [slot, proposal] : uncommittedProposals)
+    for (const auto& [slot, proposal] : uncommittedProposals)
         if (slot >= nextSlot)
             nextSlot = slot + 1;
 
@@ -215,18 +214,18 @@ void proposer::sendCommandersForPayloads() {
     unproposedPayloads.clear();
 }
 
-void proposer::sendCommanders(int slot, const std::string &payload) {
+void proposer::sendCommanders(const int slot, const std::string &payload) {
     std::lock_guard<std::mutex> lock(ballotMutex);
-    ProposerToAcceptor p2a = message::createP2A(id, ballotNum, slot, payload);
+    const ProposerToAcceptor& p2a = message::createP2A(id, ballotNum, slot, payload);
     broadcastToAcceptors(p2a);
 }
 
 void proposer::checkCommanders() {
-    std::scoped_lock lock(commanderMutex);
+    std::scoped_lock lock(commanderMutex, unproposedPayloadsMutex);
     std::vector<int> slotsToRemove = {};
-    for (auto[slot, payload] : uncommittedProposals) {
-        int numApproved = slotToApprovedCommanders[slot];
-        int numPreempted = slotToPreemptedCommanders[slot];
+    for (const auto& [slot, payload] : uncommittedProposals) {
+        const int numApproved = slotToApprovedCommanders[slot];
+        const int numPreempted = slotToPreemptedCommanders[slot];
 
         if (numApproved + numPreempted <= config::F)
             continue;
@@ -255,7 +254,7 @@ void proposer::checkCommanders() {
 
         std::vector<std::string> unslottedProposals = {};
         unslottedProposals.reserve(uncommittedProposals.size());
-        for (const auto&[slot, payload] : uncommittedProposals) {
+        for (const auto& [slot, payload] : uncommittedProposals) {
             unslottedProposals.emplace_back(payload);
         }
         unproposedPayloads.insert(unproposedPayloads.begin(), unslottedProposals.begin(), unslottedProposals.end());

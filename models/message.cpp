@@ -4,7 +4,7 @@
 
 #include "message.hpp"
 
-ProposerToAcceptor message::createP1A(int id, int ballotNum) {
+ProposerToAcceptor message::createP1A(const int id, const int ballotNum) {
     ProposerToAcceptor p1a;
     p1a.set_type(ProposerToAcceptor_Type_p1a);
     Ballot* ballot = p1a.mutable_ballot();
@@ -13,7 +13,7 @@ ProposerToAcceptor message::createP1A(int id, int ballotNum) {
     return p1a;
 }
 
-AcceptorToProposer message::createP1B(Ballot& highestBallot, const std::vector<PValue>& log) {
+AcceptorToProposer message::createP1B(const Ballot& highestBallot, const std::vector<PValue>& log) {
     AcceptorToProposer p1b;
     p1b.set_type(AcceptorToProposer_Type_p1b);
     *p1b.mutable_ballot() = highestBallot;
@@ -21,7 +21,7 @@ AcceptorToProposer message::createP1B(Ballot& highestBallot, const std::vector<P
     return p1b;
 }
 
-ProposerToAcceptor message::createP2A(int id, int ballotNum, int slot, const std::string& payload) {
+ProposerToAcceptor message::createP2A(const int id, const int ballotNum, const int slot, const std::string& payload) {
     ProposerToAcceptor p2a;
     p2a.set_type(ProposerToAcceptor_Type_p2a);
     Ballot* ballot = p2a.mutable_ballot();
@@ -32,7 +32,7 @@ ProposerToAcceptor message::createP2A(int id, int ballotNum, int slot, const std
     return p2a;
 }
 
-AcceptorToProposer message::createP2B(Ballot& highestBallot, int slot) {
+AcceptorToProposer message::createP2B(const Ballot& highestBallot, const int slot) {
     AcceptorToProposer p2b;
     p2b.set_type(AcceptorToProposer_Type_p2b);
     *p2b.mutable_ballot() = highestBallot;

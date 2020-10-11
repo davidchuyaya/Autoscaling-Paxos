@@ -8,19 +8,23 @@
 
 int main() {
     paxos p{};
-    p.start();
 }
 
-paxos::paxos() {}
-
 [[noreturn]]
-void paxos::start() {
+paxos::paxos() {
     std::cout << "F: " << config::F << std::endl;
     setbuf(stdout, nullptr); //TODO force flush to stdout. Disable when doing metrics or in prod
     std::thread server([&]{startServer();});
     startProposers();
     startAcceptors();
     readInput();
+}
+
+void paxos::startServer() {
+    network::startServerAtPort(config::MAIN_PORT, [&](int clientSocketId) {
+        std::lock_guard<std::mutex> lock(clientsMutex);
+        clientSockets.emplace_back(clientSocketId);
+    });
 }
 
 void paxos::startProposers() {
@@ -33,13 +37,6 @@ void paxos::startAcceptors() {
     for (int i = 0; i < 2 * config::F + 1; i++) {
         participants.emplace_back(std::thread([i]{acceptor {i};}));
     }
-}
-
-void paxos::startServer() {
-    network::startServerAtPort(config::MAIN_PORT, [&](int clientSocketId) {
-        std::lock_guard<std::mutex> lock(clientsMutex);
-        clientSockets.emplace_back(clientSocketId);
-    });
 }
 
 [[noreturn]]

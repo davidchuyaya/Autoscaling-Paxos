@@ -11,9 +11,9 @@
 
 namespace message {
     ProposerToAcceptor createP1A(int id, int ballotNum);
-    AcceptorToProposer createP1B(Ballot& highestBallot, const std::vector<PValue>& log);
+    AcceptorToProposer createP1B(const Ballot& highestBallot, const std::vector<PValue>& log);
     ProposerToAcceptor createP2A(int id, int ballotNum, int slot, const std::string& payload);
-    AcceptorToProposer createP2B(Ballot& highestBallot, int slot);
+    AcceptorToProposer createP2B(const Ballot& highestBallot, int slot);
 }
 
 #endif //AUTOSCALING_PAXOS_MESSAGE_HPP

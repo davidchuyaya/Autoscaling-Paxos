@@ -8,8 +8,8 @@
 #include <vector>
 #include "networkNode.hpp"
 
-[[noreturn]] void network::startServerAtPort(const int port, std::function<void(int)> onClientConnected) {
-    auto [socketId, serverAddress] = listenToPort(port);
+[[noreturn]] void network::startServerAtPort(const int port, const std::function<void(int)>& onClientConnected) {
+    const auto& [socketId, serverAddress] = listenToPort(port);
     std::vector<std::thread> clientThreads {};
     while (true) {
         socklen_t serverAddressSize = sizeof(serverAddress);
@@ -19,7 +19,7 @@
 }
 
 std::tuple<int, sockaddr_in> network::listenToPort(const int port) {
-    int socketId = createSocket();
+    const int socketId = createSocket();
 
     sockaddr_in serverAddress {};
     serverAddress.sin_family = AF_INET;
@@ -36,7 +36,7 @@ std::tuple<int, sockaddr_in> network::listenToPort(const int port) {
 }
 
 int network::connectToServerAtAddress(const std::string& address, const int port) {
-    int socketId = createSocket();
+    const int socketId = createSocket();
 
     sockaddr_in serverAddress {};
     serverAddress.sin_family = AF_INET;
@@ -66,7 +66,7 @@ void network::sendPayload(const int socketId, const std::string& payload) {
 
 std::string network::receivePayload(const int socketId) {
     char buffer[config::TCP_READ_BUFFER_SIZE] = {0};
-    auto size = read(socketId, buffer, config::TCP_READ_BUFFER_SIZE);
+    const auto size = read(socketId, buffer, config::TCP_READ_BUFFER_SIZE);
     buffer[size] = '\0';
     return std::string(buffer);
 }

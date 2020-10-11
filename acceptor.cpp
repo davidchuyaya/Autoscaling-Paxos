@@ -6,12 +6,12 @@
 #include "utils/networkNode.hpp"
 #include "models/message.hpp"
 
-acceptor::acceptor(int id) : id(id) {
+acceptor::acceptor(const int id) : id(id) {
     startServer();
 }
 
 void acceptor::startServer() {
-    network::startServerAtPort(config::ACCEPTOR_PORT_START + id, [&](int proposerSocketId) {
+    network::startServerAtPort(config::ACCEPTOR_PORT_START + id, [&](const int proposerSocketId) {
         printf("Acceptor %d connected to proposer\n", id);
         listenToProposer(proposerSocketId);
     });
