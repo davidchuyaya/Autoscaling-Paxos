@@ -3,6 +3,7 @@
 //
 #include <thread>
 #include <algorithm>
+#include <google/protobuf/message.h>
 #include "proposer.hpp"
 #include "utils/config.hpp"
 #include "models/message.hpp"
