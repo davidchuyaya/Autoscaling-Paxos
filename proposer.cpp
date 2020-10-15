@@ -12,23 +12,8 @@ proposer::proposer(const int id) : id(id) {
     const std::thread server([&] {startServer(); });
     connectToProposers();
     connectToAcceptors();
-    const std::thread connectionToMain([&] {listenToMain(); });
     std::this_thread::sleep_for(std::chrono::seconds(1)); //TODO loop to see we're connected to F+1 acceptors
     mainLoop();
-}
-
-[[noreturn]]
-void proposer::listenToMain() {
-    const int serverSocket = network::connectToServerAtAddress(config::LOCALHOST, config::MAIN_PORT);
-    printf("Proposer %d connected to main\n", id);
-
-    while (true) {
-        std::string payload = network::receivePayload(serverSocket);
-        printf("Proposer %d received payload: [%s]\n", id, payload.c_str());
-
-        std::lock_guard<std::mutex> lock(unproposedPayloadsMutex);
-        unproposedPayloads.emplace_back(payload);
-    }
 }
 
 [[noreturn]]
@@ -56,8 +41,17 @@ void proposer::connectToProposers() {
 
 [[noreturn]]
 void proposer::listenToProposer(const int socket) {
+    ProposerReceiver payload;
     while (true) {
-        std::string payload = network::receivePayload(socket);
+        payload.ParseFromString(network::receivePayload(socket));
+        switch (payload.sender()){
+            case ProposerReceiver_Sender_batcher:
+                printf("Proposer %d received a batch request\n", id);
+                {std::lock_guard<std::mutex> lock(unproposedPayloadsMutex);
+                unproposedPayloads.emplace_back(payload.requests().begin(), payload.requests().end());}
+            default:
+                printf("Not valid option");
+        }
         //TODO stable leader
     }
 }

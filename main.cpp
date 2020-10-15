@@ -27,6 +27,12 @@ void paxos::startServer() {
     });
 }
 
+void paxos::startBatchers() {
+    for (int i = 0; i < config::F + 1; i++) {
+        participants.emplace_back(std::thread([i]{proposer {i};}));
+    }
+}
+
 void paxos::startProposers() {
     for (int i = 0; i < config::F + 1; i++) {
         participants.emplace_back(std::thread([i]{proposer {i};}));
@@ -48,7 +54,7 @@ void paxos::readInput() {
     }
 }
 
-void paxos::broadcastToProposers(const std::string& payload) {
+void paxos::broadcastToBatchers(const std::string& payload) {
     std::lock_guard<std::mutex> lock(clientsMutex);
     for (int clientId : clientSockets) {
         network::sendPayload(clientId, payload);

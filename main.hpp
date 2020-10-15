@@ -17,6 +17,7 @@ private:
     std::vector<int> clientSockets {};
 
     void startServer();
+    void startBatchers();
     void startProposers();
     void startAcceptors();
     [[noreturn]] void readInput();

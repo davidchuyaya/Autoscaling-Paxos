@@ -41,12 +41,7 @@ private:
     std::vector<int> proposerSockets = {};
     std::mutex acceptorMutex;
     std::vector<int> acceptorSockets = {};
-    std::vector<std::thread> threads = {}; // A place to put threads so they don't get freed
-
-    /**
-     * Load new messages into unproposedPayloads, newest last.
-     */
-    [[noreturn]] void listenToMain();
+    std::vector<std::thread> threads = {}; // A place to put threads so they don't get freedrequests
 
     [[noreturn]] void startServer();
     void connectToProposers();
