@@ -7,11 +7,13 @@
 
 #include "proposer.hpp"
 #include "acceptor.hpp"
+#include "batcher.hpp"
 
 class paxos {
 public:
     [[noreturn]] paxos();
 private:
+    int batcherIndex;
     std::vector<std::thread> participants {};  // A place to put threads so they don't get freed
     std::mutex clientsMutex;
     std::vector<int> clientSockets {};
@@ -21,7 +23,7 @@ private:
     void startProposers();
     void startAcceptors();
     [[noreturn]] void readInput();
-    void broadcastToProposers(const std::string& payload);
+    void broadcastToBatchers(const std::string& payload);
 };
 
 #endif //C__PAXOS_MAIN_HPP

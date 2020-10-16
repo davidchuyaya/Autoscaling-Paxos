@@ -38,8 +38,13 @@ void batcher::broadcastToProposers(const google::protobuf::Message& message) {
 }
 
 void batcher::connectToProposers() {
-    for (int i = 0; i < config::F + 1; i++) {
-        const int proposerSocketId = network::connectToServerAtAddress(config::LOCALHOST, config::PROPOSER_PORT_START + id);
-        proposerSockets.emplace_back(proposerSocketId);
+    for (int i = 0; i < 2*config::F + 1; i++) {
+        const int proposerPort = config::PROPOSER_PORT_START + i;
+        threads.emplace_back(std::thread([&, proposerPort]{
+            const int proposerSocketId = network::connectToServerAtAddress(config::LOCALHOST, proposerPort);
+            {std::lock_guard<std::mutex> lock(proposerMutex);
+            proposerSockets.emplace_back(proposerSocketId);}
+            printf("Batcher %d connected to proposer %d\n", id, i);
+        }));
     }
 }

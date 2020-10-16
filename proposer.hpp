@@ -11,6 +11,8 @@
 #include "utils/network.hpp"
 #include "message.pb.h"
 #include "models/log.hpp"
+#include "utils/config.hpp"
+#include "models/message.hpp"
 
 class proposer {
 public:

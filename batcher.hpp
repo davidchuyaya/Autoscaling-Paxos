@@ -24,6 +24,8 @@ private:
     
     std::vector<std::string> unproposedPayloads = {};
 
+    std::vector<std::thread> threads = {}; // A place to put threads so they don't get freedrequests
+
     std::mutex proposerMutex;
     std::vector<int> proposerSockets = {};
 

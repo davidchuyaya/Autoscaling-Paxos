@@ -5,8 +5,6 @@
 #include <algorithm>
 #include <google/protobuf/message.h>
 #include "proposer.hpp"
-#include "utils/config.hpp"
-#include "models/message.hpp"
 
 proposer::proposer(const int id) : id(id) {
     const std::thread server([&] {startServer(); });
@@ -31,7 +29,7 @@ void proposer::connectToProposers() {
         const int proposerPort = config::PROPOSER_PORT_START + i;
         threads.emplace_back(std::thread([&, proposerPort]{
             const int proposerSocket = network::connectToServerAtAddress(config::LOCALHOST, proposerPort);
-            printf("Proposer %d connected to other proposer", id);
+            printf("Proposer %d connected to other proposer\n", id);
             {std::lock_guard<std::mutex> lock(proposerMutex);
                 proposerSockets.emplace_back(proposerSocket);}
             listenToProposer(proposerSocket);
@@ -47,10 +45,13 @@ void proposer::listenToProposer(const int socket) {
         switch (payload.sender()){
             case ProposerReceiver_Sender_batcher:
                 printf("Proposer %d received a batch request\n", id);
-                {std::lock_guard<std::mutex> lock(unproposedPayloadsMutex);
-                unproposedPayloads.emplace_back(payload.requests().begin(), payload.requests().end());}
-            default:
-                printf("Not valid option");
+                {
+                    std::lock_guard<std::mutex> lock(unproposedPayloadsMutex);
+                    for (const auto &request: payload.requests()) {
+                        unproposedPayloads.push_back(request);
+                    }
+                }
+            default: {}
         }
         //TODO stable leader
     }
