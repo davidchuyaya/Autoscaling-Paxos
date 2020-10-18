@@ -41,6 +41,13 @@ AcceptorToProposer message::createP2B(const Ballot& highestBallot, const int slo
     return p2b;
 }
 
+ProposerReceiver message::createIamLeader() {
+    ProposerReceiver iAmLeader;
+    iAmLeader.set_sender(ProposerReceiver_Sender_proposer);
+    iAmLeader.set_iamleader(true);
+    return iAmLeader;
+}
+
 ProposerReceiver message::createBatchMessage(const std::vector<std::string>& requests) {
     ProposerReceiver receiverMessage;
     receiverMessage.set_sender(ProposerReceiver_Sender_batcher);

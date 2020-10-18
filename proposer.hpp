@@ -11,8 +11,6 @@
 #include "utils/network.hpp"
 #include "message.pb.h"
 #include "models/log.hpp"
-#include "utils/config.hpp"
-#include "models/message.hpp"
 
 class proposer {
 public:
@@ -21,9 +19,11 @@ private:
     const int id; // 0 indexed, no gaps
     std::mutex ballotMutex;
     int ballotNum = 0;
-    bool isLeader = false;
+    std::atomic<bool> isLeader = false;
+    std::mutex leaderHeartbeatMutex;
+    time_t lastLeaderHeartbeat;
 
-    bool shouldSendScouts = true;
+    std::atomic<bool> shouldSendScouts = true;
     std::mutex scoutMutex;
     int numApprovedScouts = 0;
     int numPreemptedScouts = 0;
@@ -45,9 +45,12 @@ private:
     std::vector<int> acceptorSockets = {};
     std::vector<std::thread> threads = {}; // A place to put threads so they don't get freed
 
+    [[noreturn]] void broadcastIAmLeader();
+
     [[noreturn]] void startServer();
     void connectToProposers();
     [[noreturn]] void listenToProposer(int socket);
+    void broadcastToProposers(const google::protobuf::Message& message);
 
     void connectToAcceptors();
     /**

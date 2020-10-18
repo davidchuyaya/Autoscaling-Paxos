@@ -20,6 +20,8 @@ namespace config {
 
     const static inline std::string LOCALHOST = "127.0.0.1";
     const static int TCP_READ_BUFFER_SIZE = 1024;
+    const static int LEADER_TIMEOUT_SEC = 5; // this - LEADER_HEARTBEAT_SLEEP_SEC = time allowed between message send & receive
+    const static int LEADER_HEARTBEAT_SLEEP_SEC = 3;
 }
 
 #endif //AUTOSCALING_PAXOS_CONFIG_HPP

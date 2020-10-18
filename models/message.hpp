@@ -14,6 +14,7 @@ namespace message {
     AcceptorToProposer createP1B(const Ballot& highestBallot, const std::vector<PValue>& log);
     ProposerToAcceptor createP2A(int id, int ballotNum, int slot, const std::string& payload);
     AcceptorToProposer createP2B(const Ballot& highestBallot, int slot);
+    ProposerReceiver createIamLeader();
     ProposerReceiver createBatchMessage(const std::vector<std::string>& requests);
 }
 

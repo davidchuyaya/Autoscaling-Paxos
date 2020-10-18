@@ -46,9 +46,6 @@ message ProposerReceiver {
     }
 
     Sender sender = 1;
-    repeated string requests = 2;
-}
-
-message IAmLeader {
-    int32 id = 1;
+    bool iAmLeader = 2;
+    repeated string requests = 3;
 }

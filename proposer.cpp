@@ -5,13 +5,29 @@
 #include <algorithm>
 #include <google/protobuf/message.h>
 #include "proposer.hpp"
+#include "utils/config.hpp"
+#include "models/message.hpp"
 
 proposer::proposer(const int id) : id(id) {
     const std::thread server([&] {startServer(); });
     connectToProposers();
     connectToAcceptors();
+    const std::thread broadcastLeader([&] {broadcastIAmLeader(); });
     std::this_thread::sleep_for(std::chrono::seconds(1)); //TODO loop to see we're connected to F+1 acceptors
     mainLoop();
+}
+
+[[noreturn]]
+void proposer::broadcastIAmLeader() {
+    while (true) {
+        if (isLeader) {
+            time_t t;
+            time(&t);
+            printf("%d = leader, sending at time: %s\n", id, std::asctime(std::localtime(&t)));
+            broadcastToProposers(message::createIamLeader());
+        }
+        std::this_thread::sleep_for(std::chrono::seconds(config::LEADER_HEARTBEAT_SLEEP_SEC));
+    }
 }
 
 [[noreturn]]
@@ -43,17 +59,36 @@ void proposer::listenToProposer(const int socket) {
     while (true) {
         payload.ParseFromString(network::receivePayload(socket));
         switch (payload.sender()){
-            case ProposerReceiver_Sender_batcher:
+            case ProposerReceiver_Sender_batcher: {
                 printf("Proposer %d received a batch request\n", id);
                 {
                     std::lock_guard<std::mutex> lock(unproposedPayloadsMutex);
-                    for (const auto &request: payload.requests()) {
+                    for (const auto& request: payload.requests()) {
                         unproposedPayloads.push_back(request);
                     }
                 }
+            }
+            case ProposerReceiver_Sender_proposer: {
+                std::scoped_lock lock(leaderHeartbeatMutex, scoutMutex);
+                printf("%d received leader heartbeat for time: %s\n", id,
+                       std::asctime(std::localtime(&lastLeaderHeartbeat)));
+                time(&lastLeaderHeartbeat); // store the time we received the heartbeat
+                isLeader = false;
+                shouldSendScouts = true;
+                numPreemptedScouts = 0;
+                numApprovedScouts = 0;
+            }
             default: {}
         }
-        //TODO stable leader
+    }
+}
+
+void proposer::broadcastToProposers(const google::protobuf::Message& message) {
+    const std::string& serializedMessage = message.SerializeAsString();
+
+    std::lock_guard<std::mutex> lock(proposerMutex);
+    for (const int socket : proposerSockets) {
+        network::sendPayload(socket, serializedMessage);
     }
 }
 
@@ -118,7 +153,18 @@ void proposer::broadcastToAcceptors(const google::protobuf::Message& message) {
 
 [[noreturn]]
 void proposer::mainLoop() {
+    time_t now;
+
     while (true) {
+        //go back to sleep if leader heartbeat detected
+        {time(&now);
+        std::unique_lock lock(leaderHeartbeatMutex);
+        if (difftime(now, lastLeaderHeartbeat) < config::LEADER_TIMEOUT_SEC) {
+            lock.unlock();
+            std::this_thread::sleep_for(std::chrono::seconds(config::LEADER_TIMEOUT_SEC));
+            continue;
+        }}
+
         if (shouldSendScouts)
             sendScouts();
         if (isLeader) {
@@ -127,7 +173,6 @@ void proposer::mainLoop() {
         }
         else
             checkScouts();
-        std::this_thread::sleep_for(std::chrono::seconds(1));
     }
 }
 
@@ -151,6 +196,7 @@ void proposer::checkScouts() {
     //leader election complete
     if (numApprovedScouts > config::F) {
         isLeader = true;
+        broadcastToProposers(message::createIamLeader());
         printf("Proposer %d is leader\n", id);
     }
     else {
