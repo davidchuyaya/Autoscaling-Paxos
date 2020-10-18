@@ -26,6 +26,7 @@ message ProposerToAcceptor {
     int32 slot = 3;
     string payload = 4;
 }
+
 message AcceptorToProposer {
     enum Type {
         p1b = 0;
@@ -36,6 +37,16 @@ message AcceptorToProposer {
     Ballot ballot = 2;
     int32 slot = 3;
     repeated PValue log = 4; //TODO Acceptors send back whole log in P1B. Could be bad for bandwidth
+}
+
+message ProposerReceiver {
+    enum Sender {
+        proposer = 0;
+        batcher = 1;
+    }
+
+    Sender sender = 1;
+    repeated string requests = 2;
 }
 
 message IAmLeader {

@@ -5,30 +5,13 @@
 #include <algorithm>
 #include <google/protobuf/message.h>
 #include "proposer.hpp"
-#include "utils/config.hpp"
-#include "models/message.hpp"
 
 proposer::proposer(const int id) : id(id) {
     const std::thread server([&] {startServer(); });
     connectToProposers();
     connectToAcceptors();
-    const std::thread connectionToMain([&] {listenToMain(); });
     std::this_thread::sleep_for(std::chrono::seconds(1)); //TODO loop to see we're connected to F+1 acceptors
     mainLoop();
-}
-
-[[noreturn]]
-void proposer::listenToMain() {
-    const int serverSocket = network::connectToServerAtAddress(config::LOCALHOST, config::MAIN_PORT);
-    printf("Proposer %d connected to main\n", id);
-
-    while (true) {
-        std::string payload = network::receivePayload(serverSocket);
-        printf("Proposer %d received payload: [%s]\n", id, payload.c_str());
-
-        std::lock_guard<std::mutex> lock(unproposedPayloadsMutex);
-        unproposedPayloads.emplace_back(payload);
-    }
 }
 
 [[noreturn]]
@@ -46,7 +29,7 @@ void proposer::connectToProposers() {
         const int proposerPort = config::PROPOSER_PORT_START + i;
         threads.emplace_back(std::thread([&, proposerPort]{
             const int proposerSocket = network::connectToServerAtAddress(config::LOCALHOST, proposerPort);
-            printf("Proposer %d connected to other proposer", id);
+            printf("Proposer %d connected to other proposer\n", id);
             {std::lock_guard<std::mutex> lock(proposerMutex);
                 proposerSockets.emplace_back(proposerSocket);}
             listenToProposer(proposerSocket);
@@ -56,8 +39,20 @@ void proposer::connectToProposers() {
 
 [[noreturn]]
 void proposer::listenToProposer(const int socket) {
+    ProposerReceiver payload;
     while (true) {
-        std::string payload = network::receivePayload(socket);
+        payload.ParseFromString(network::receivePayload(socket));
+        switch (payload.sender()){
+            case ProposerReceiver_Sender_batcher:
+                printf("Proposer %d received a batch request\n", id);
+                {
+                    std::lock_guard<std::mutex> lock(unproposedPayloadsMutex);
+                    for (const auto &request: payload.requests()) {
+                        unproposedPayloads.push_back(request);
+                    }
+                }
+            default: {}
+        }
         //TODO stable leader
     }
 }

@@ -2,6 +2,7 @@
 // Created by David Chu on 10/6/20.
 //
 
+#include <message.pb.h>
 #include "message.hpp"
 
 ProposerToAcceptor message::createP1A(const int id, const int ballotNum) {
@@ -38,4 +39,11 @@ AcceptorToProposer message::createP2B(const Ballot& highestBallot, const int slo
     *p2b.mutable_ballot() = highestBallot;
     p2b.set_slot(slot);
     return p2b;
+}
+
+ProposerReceiver message::createBatchMessage(const std::vector<std::string>& requests) {
+    ProposerReceiver receiverMessage;
+    receiverMessage.set_sender(ProposerReceiver_Sender_batcher);
+    *receiverMessage.mutable_requests() = {requests.begin(), requests.end()};
+    return receiverMessage;
 }

@@ -11,6 +11,8 @@
 #include "utils/network.hpp"
 #include "message.pb.h"
 #include "models/log.hpp"
+#include "utils/config.hpp"
+#include "models/message.hpp"
 
 class proposer {
 public:
@@ -42,11 +44,6 @@ private:
     std::mutex acceptorMutex;
     std::vector<int> acceptorSockets = {};
     std::vector<std::thread> threads = {}; // A place to put threads so they don't get freed
-
-    /**
-     * Load new messages into unproposedPayloads, newest last.
-     */
-    [[noreturn]] void listenToMain();
 
     [[noreturn]] void startServer();
     void connectToProposers();
