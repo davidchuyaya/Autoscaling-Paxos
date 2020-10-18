@@ -12,7 +12,6 @@ int main() {
 [[noreturn]]
 paxos::paxos() {
     std::cout << "F: " << config::F << std::endl;
-    batcherIndex = 0;
     setbuf(stdout, nullptr); //TODO force flush to stdout. Disable when doing metrics or in prod
     std::thread server([&]{startServer();});
     startAcceptors();
@@ -29,8 +28,9 @@ void paxos::startServer() {
 }
 
 void paxos::startBatchers() {
-    int i = 0;
-    participants.emplace_back(std::thread([i]{batcher {i};}));
+    for (int i = 0; i < config::F + 1; i++) {
+        participants.emplace_back(std::thread([i]{batcher {i};}));
+    }
 }
 
 void paxos::startProposers() {
@@ -50,12 +50,12 @@ void paxos::readInput() {
     while (true) {
         std::string input;
         std::cin >> input;
-        broadcastToBatchers(input);
+        sendToBatcher(input);
     }
 }
 
 // TODO: Make sure that the client broadcasts to the same batcher every single time.
-void paxos::broadcastToBatchers(const std::string& payload) {
+void paxos::sendToBatcher(const std::string& payload) {
     std::lock_guard<std::mutex> lock(clientsMutex);
     network::sendPayload(clientSockets[batcherIndex], payload);
     batcherIndex = (batcherIndex + 1) % (clientSockets.size());

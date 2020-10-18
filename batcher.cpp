@@ -38,9 +38,9 @@ void batcher::broadcastToProposers(const google::protobuf::Message& message) {
 }
 
 void batcher::connectToProposers() {
-    for (int i = 0; i < 2*config::F + 1; i++) {
+    for (int i = 0; i < config::F + 1; i++) {
         const int proposerPort = config::PROPOSER_PORT_START + i;
-        threads.emplace_back(std::thread([&, proposerPort]{
+        threads.emplace_back(std::thread([&, proposerPort, i]{
             const int proposerSocketId = network::connectToServerAtAddress(config::LOCALHOST, proposerPort);
             {std::lock_guard<std::mutex> lock(proposerMutex);
             proposerSockets.emplace_back(proposerSocketId);}

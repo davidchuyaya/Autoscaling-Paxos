@@ -43,7 +43,7 @@ private:
     std::vector<int> proposerSockets = {};
     std::mutex acceptorMutex;
     std::vector<int> acceptorSockets = {};
-    std::vector<std::thread> threads = {}; // A place to put threads so they don't get freedrequests
+    std::vector<std::thread> threads = {}; // A place to put threads so they don't get freed
 
     [[noreturn]] void startServer();
     void connectToProposers();

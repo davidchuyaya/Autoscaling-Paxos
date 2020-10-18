@@ -6,21 +6,18 @@
 #define AUTOSCALING_PAXOS_BATCHER_HPP
 
 #include <vector>
-#include <deque>
-#include <algorithm>
 #include <thread>
 #include <google/protobuf/message.h>
 #include "utils/config.hpp"
 #include "models/message.hpp"
 #include "utils/network.hpp"
 #include "message.pb.h"
-#include "models/log.hpp"
 
 class batcher {
 public:
     explicit batcher(int id);
 private:
-    int id;
+    int id = 0;
     
     std::vector<std::string> unproposedPayloads = {};
 
