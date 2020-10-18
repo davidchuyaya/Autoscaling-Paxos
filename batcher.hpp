@@ -28,9 +28,6 @@ private:
 
     [[noreturn]] void listenToMain();
     void connectToProposers();
-
-    void broadcastToProposers(const google::protobuf::Message& message);
-
 };
 
 #endif //AUTOSCALING_PAXOS_BATCHER_HPP

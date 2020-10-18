@@ -6,13 +6,14 @@
 #include "utils/network.hpp"
 #include "models/message.hpp"
 
-acceptor::acceptor(const int id) : id(id) {
+acceptor::acceptor(const int id, const int acceptorGroupId) : id(id), acceptorGroupId(acceptorGroupId) {
     startServer();
 }
 
 [[noreturn]]
 void acceptor::startServer() {
-    network::startServerAtPort(config::ACCEPTOR_PORT_START + id, [&](const int proposerSocketId) {
+    const int acceptorGroupPortOffset = config::ACCEPTOR_GROUP_PORT_OFFSET * acceptorGroupId;
+    network::startServerAtPort(config::ACCEPTOR_PORT_START + acceptorGroupPortOffset + id, [&](const int proposerSocketId) {
         printf("Acceptor %d connected to proposer\n", id);
         listenToProposer(proposerSocketId);
     });
@@ -31,7 +32,7 @@ void acceptor::listenToProposer(int socket) {
                        payload.ballot().ballotnum(), highestBallot.id(), highestBallot.ballotnum());
                 if (Log::isBallotGreaterThan(payload.ballot(), highestBallot))
                     highestBallot = payload.ballot();
-                network::sendPayload(socket, message::createP1B(highestBallot, log).SerializeAsString());
+                network::sendPayload(socket, message::createP1B(acceptorGroupId, highestBallot, log).SerializeAsString());
                 break;
             case ProposerToAcceptor_Type_p2a:
                 printf("Acceptor %d received p2a: [%s]\n", id, payload.DebugString().c_str());
@@ -45,7 +46,7 @@ void acceptor::listenToProposer(int socket) {
                     printf("New log: ");
                     Log::printLog(log);
                 }
-                network::sendPayload(socket, message::createP2B(highestBallot, payload.slot()).SerializeAsString());
+                network::sendPayload(socket, message::createP2B(highestBallot, acceptorGroupId, payload.slot()).SerializeAsString());
                 break;
             default: {}
         }

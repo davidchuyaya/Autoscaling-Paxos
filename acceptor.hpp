@@ -10,9 +10,10 @@
 
 class acceptor {
 public:
-    explicit acceptor(int id);
+    acceptor(int id, int acceptorGroupId);
 private:
     const int id;
+    const int acceptorGroupId;
     std::mutex ballotMutex;
     Ballot highestBallot = {};
     std::mutex logMutex;

@@ -25,8 +25,8 @@ private:
 
     std::atomic<bool> shouldSendScouts = true;
     std::mutex scoutMutex;
-    int numApprovedScouts = 0;
-    int numPreemptedScouts = 0;
+    std::unordered_map<int, int> numApprovedScouts = {};
+    std::unordered_map<int, int> numPreemptedScouts = {};
 
     std::mutex commanderMutex;
     std::unordered_map<int, int> slotToApprovedCommanders = {};
@@ -34,15 +34,21 @@ private:
 
     std::mutex unproposedPayloadsMutex;
     std::vector<std::string> unproposedPayloads = {};
+
     std::unordered_map<int, std::string> uncommittedProposals = {}; //invariant: empty until we are leader
     std::vector<std::string> log; //TODO don't store the entire log
+    int nextAcceptorGroup = 0;
+
     std::mutex acceptorLogsMutex;
-    std::vector<std::vector<PValue>> acceptorLogs = {};
+    std::unordered_map<int, std::vector<std::vector<PValue>>> acceptorLogs = {};
 
     std::mutex proposerMutex;
     std::vector<int> proposerSockets = {};
+
     std::mutex acceptorMutex;
-    std::vector<int> acceptorSockets = {};
+    std::unordered_map<int, std::vector<int>> acceptorSockets = {};
+    std::vector<int> acceptorGroupIds = {};
+
     std::vector<std::thread> threads = {}; // A place to put threads so they don't get freed
 
     [[noreturn]] void broadcastIAmLeader();
@@ -50,7 +56,6 @@ private:
     [[noreturn]] void startServer();
     void connectToProposers();
     [[noreturn]] void listenToProposer(int socket);
-    void broadcastToProposers(const google::protobuf::Message& message);
 
     void connectToAcceptors();
     /**
@@ -58,7 +63,6 @@ private:
      * @param socket Socket ID of acceptor
      */
     [[noreturn]] void listenToAcceptor(int socket);
-    void broadcastToAcceptors(const google::protobuf::Message& message);
 
     /**
      * Execute all scout/commander logic.
@@ -94,7 +98,12 @@ private:
      * @param slot
      * @param payload
      */
-    void sendCommanders(int slot, const std::string &payload);
+    void sendCommanders(int acceptorGroupId, int slot, const std::string& payload);
+    /**
+     * Increments (round robin) the next acceptor group a payload will be proposed to.
+     * @return The acceptor group to propose to.
+     */
+    int fetchNextAcceptorGroup();
     /**
      * Check if more than F p2b's have been received, once for each uncommitted slot. If yes, then confirm that slot
      * as committed. If we've been preempted, then that means another has become the leader. Move all uncommittedProposals

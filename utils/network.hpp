@@ -8,6 +8,7 @@
 #define MAX_CONNECTIONS 5
 
 #include <netinet/in.h>
+#include <google/protobuf/message.h>
 #include "config.hpp"
 
 namespace network {
@@ -57,6 +58,8 @@ namespace network {
      * @return Payload
      */
     std::string receivePayload(int socketId);
+
+    void broadcastProtobuf(const google::protobuf::Message& message, const std::vector<int>& destSockets);
 }
 
 #endif //C__PAXOS_NETWORKNODE_HPP

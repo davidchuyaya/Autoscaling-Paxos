@@ -13,12 +13,12 @@ namespace Log {
     /**
      * Determines which values in logs of acceptors are committed (held by all acceptors) and which are not.
      *
-     * @param acceptorLogs List of logs received from acceptors
+     * @param acceptorGroupLogs List of logs received from acceptors
      * @invariant Size of acceptorLogs > F
      * @return Committed log, slot => payload; Uncommitted log, slot => payload
      */
-    std::tuple<std::vector<std::string>, std::unordered_map<int, std::string>>
-    committedAndUncommittedLog(const std::vector<std::vector<PValue>>& acceptorLogs);
+    std::tuple<std::vector<std::string>, std::unordered_map<int, PValue>, std::unordered_map<int, int>>
+    committedAndUncommittedLog(const std::unordered_map<int, std::vector<std::vector<PValue>>>& acceptorGroupLogs);
     /**
      * Print the payloads in the log in order. Used for debugging.
      *

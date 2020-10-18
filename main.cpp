@@ -40,8 +40,10 @@ void paxos::startProposers() {
 }
 
 void paxos::startAcceptors() {
-    for (int i = 0; i < 2 * config::F + 1; i++) {
-        participants.emplace_back(std::thread([i]{acceptor {i};}));
+    for (int acceptorGroupId = 0; acceptorGroupId < config::NUM_ACCEPTOR_GROUPS; acceptorGroupId++) {
+        for (int i = 0; i < 2 * config::F + 1; i++) {
+            participants.emplace_back(std::thread([i, acceptorGroupId]{acceptor(i, acceptorGroupId);}));
+        }
     }
 }
 
@@ -55,6 +57,7 @@ void paxos::readInput() {
 }
 
 // TODO: Make sure that the client broadcasts to the same batcher every single time.
+// TODO retry on timeout with different batcher
 void paxos::sendToBatcher(const std::string& payload) {
     std::lock_guard<std::mutex> lock(clientsMutex);
     network::sendPayload(clientSockets[batcherIndex], payload);
