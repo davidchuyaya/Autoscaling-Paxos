@@ -216,14 +216,14 @@ void proposer::mergeLogs() {
     std::unique_lock<std::mutex> lock(unproposedPayloadsMutex);
     log = committedLog; //TODO prevent already committed item from being uncommitted?
 
-    for (const std::string& committedPayload : log) {
+    for (const auto&[slot, committedPayload] : log) {
         if (committedPayload.empty())
             continue;
         //TODO this is O(log.length * unproposedPayloads.length), not great
         unproposedPayloads.erase(std::remove(unproposedPayloads.begin(), unproposedPayloads.end(), committedPayload),
                                  unproposedPayloads.end());
     }
-    for (const auto& [slot, pValue] : uncommittedLog) {
+    for (const auto&[slot, pValue] : uncommittedLog) {
         if (pValue.payload().empty())
             continue;
         unproposedPayloads.erase(std::remove(unproposedPayloads.begin(), unproposedPayloads.end(), pValue.payload()),
@@ -291,8 +291,6 @@ void proposer::checkCommanders() {
         }
         if (numApproved > config::F) {
             // proposal is committed
-            if (log.size() <= slot)
-                log.resize(slot + 1);
             log[slot] = payload;
             // remove from uncommitted proposals
             iterator = uncommittedProposals.erase(iterator);

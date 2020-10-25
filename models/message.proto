@@ -37,7 +37,7 @@ message AcceptorToProposer {
     int32 acceptorGroupId = 2;
     Ballot ballot = 3;
     int32 slot = 4;
-    repeated PValue log = 5; //TODO Acceptors send back whole log in P1B. Could be bad for bandwidth
+    map<int32, PValue> log = 5; //TODO Acceptors send back whole log in P1B. Could be bad for bandwidth
 }
 
 message ProposerReceiver {

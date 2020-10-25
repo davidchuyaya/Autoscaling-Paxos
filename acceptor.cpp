@@ -40,8 +40,6 @@ void acceptor::listenToProposer(int socket) {
                     PValue pValue;
                     pValue.set_payload(payload.payload());
                     *pValue.mutable_ballot() = payload.ballot();
-                    if (log.size() <= payload.slot())
-                        log.resize(payload.slot() + 1);
                     log[payload.slot()] = pValue;
                     printf("New log: ");
                     Log::printLog(log);

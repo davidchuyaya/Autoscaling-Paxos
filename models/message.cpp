@@ -15,7 +15,7 @@ ProposerToAcceptor message::createP1A(const int id, const int ballotNum) {
 }
 
 AcceptorToProposer
-message::createP1B(const int acceptorGroupId, const Ballot& highestBallot, const std::vector<PValue>& log) {
+message::createP1B(const int acceptorGroupId, const Ballot& highestBallot, const Log::pValueLog& log) {
     AcceptorToProposer p1b;
     p1b.set_type(AcceptorToProposer_Type_p1b);
     p1b.set_acceptorgroupid(acceptorGroupId);

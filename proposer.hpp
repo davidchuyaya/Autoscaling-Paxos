@@ -25,28 +25,28 @@ private:
 
     std::atomic<bool> shouldSendScouts = true;
     std::mutex scoutMutex;
-    std::unordered_map<int, int> numApprovedScouts = {};
+    std::unordered_map<int, int> numApprovedScouts = {}; //key = acceptor group ID
     std::unordered_map<int, int> numPreemptedScouts = {};
 
     std::mutex commanderMutex;
-    std::unordered_map<int, int> slotToApprovedCommanders = {};
+    std::unordered_map<int, int> slotToApprovedCommanders = {}; //key = slot
     std::unordered_map<int, int> slotToPreemptedCommanders = {};
 
     std::mutex unproposedPayloadsMutex;
     std::vector<std::string> unproposedPayloads = {};
 
-    std::unordered_map<int, std::string> uncommittedProposals = {}; //invariant: empty until we are leader
-    std::vector<std::string> log; //TODO don't store the entire log
+    Log::stringLog uncommittedProposals = {}; //invariant: empty until we are leader. Key = slot
+    Log::stringLog log; //TODO don't store the entire log
     int nextAcceptorGroup = 0;
 
     std::mutex acceptorLogsMutex;
-    std::unordered_map<int, std::vector<std::vector<PValue>>> acceptorLogs = {};
+    Log::allAcceptorGroupLogs acceptorLogs = {};
 
     std::mutex proposerMutex;
     std::vector<int> proposerSockets = {};
 
     std::mutex acceptorMutex;
-    std::unordered_map<int, std::vector<int>> acceptorSockets = {};
+    std::unordered_map<int, std::vector<int>> acceptorSockets = {}; //key = acceptor group ID
     std::vector<int> acceptorGroupIds = {};
 
     std::vector<std::thread> threads = {}; // A place to put threads so they don't get freed

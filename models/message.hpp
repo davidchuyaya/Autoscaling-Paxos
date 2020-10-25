@@ -11,7 +11,7 @@
 
 namespace message {
     ProposerToAcceptor createP1A(int id, int ballotNum);
-    AcceptorToProposer createP1B(int acceptorGroupId, const Ballot& highestBallot, const std::vector<PValue>& log);
+    AcceptorToProposer createP1B(int acceptorGroupId, const Ballot& highestBallot, const Log::pValueLog& log);
     ProposerToAcceptor createP2A(int id, int ballotNum, int slot, const std::string& payload);
     AcceptorToProposer createP2B(const Ballot& highestBallot, int acceptorGroupId, int slot);
     ProposerReceiver createIamLeader();
