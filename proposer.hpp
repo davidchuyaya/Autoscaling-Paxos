@@ -95,12 +95,14 @@ private:
     void sendCommandersForPayloads();
     /**
      * Send p2a messages for a given payload.
+     * @warning Does NOT lock acceptorMutex or ballotMutex. The caller MUST lock both.
      * @param slot
      * @param payload
      */
     void sendCommanders(int acceptorGroupId, int slot, const std::string& payload);
     /**
      * Increments (round robin) the next acceptor group a payload will be proposed to.
+     * @warning Does NOT lock acceptorMutex. The caller MUST lock it.
      * @return The acceptor group to propose to.
      */
     int fetchNextAcceptorGroup();
@@ -111,6 +113,10 @@ private:
      * @invariant isLeader = true
      */
     void checkCommanders();
+    /**
+     * Reset all values when this proposer learns that it is no longer the leader.
+     */
+    void noLongerLeader();
 };
 
 

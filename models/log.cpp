@@ -58,11 +58,11 @@ Log::committedAndUncommittedLog(const allAcceptorGroupLogs& acceptorGroupLogs) {
     return {bestCommittedValueForSlotInAllGroups, bestUncommittedValueForSlotInAllGroups, acceptorGroupForSlot};
 }
 
-void Log::printLog(const pValueLog& log) {
+std::string Log::printLog(const pValueLog& log) {
     std::stringstream out;
     for (const auto&[slot, pValue] : log)
-        out << slot << ") " << pValue.payload().c_str() << '\n';
-    std::cout << out.str() << std::endl;
+        out << slot << ") " << pValue.payload().c_str() << ", ";
+    return out.str();
 }
 
 bool Log::isBallotGreaterThan(const Ballot& ballotLeft, const Ballot& ballotRight) {

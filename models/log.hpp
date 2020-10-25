@@ -25,11 +25,12 @@ namespace Log {
     std::tuple<stringLog, pValueLog, std::unordered_map<int, int>>
     committedAndUncommittedLog(const allAcceptorGroupLogs & acceptorGroupLogs);
     /**
-     * Print the payloads in the log in order. Used for debugging.
+     * Returns string version of log for pretty printing. Used for debugging.
      *
      * @param log Log to print
+     * @return String representation of log
      */
-    void printLog(const pValueLog& log);
+    std::string printLog(const pValueLog& log);
     /**
      * Compare ballots by partial order of ballot num, then ID.
      *

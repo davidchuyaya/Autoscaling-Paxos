@@ -62,22 +62,17 @@ void proposer::listenToProposer(const int socket) {
         switch (payload.sender()){
             case ProposerReceiver_Sender_batcher: {
                 printf("Proposer %d received a batch request\n", id);
-                {
-                    std::lock_guard<std::mutex> lock(unproposedPayloadsMutex);
-                    for (const auto& request: payload.requests()) {
-                        unproposedPayloads.push_back(request);
-                    }
-                }
+                {std::lock_guard<std::mutex> lock(unproposedPayloadsMutex);
+                    unproposedPayloads.insert(unproposedPayloads.end(), payload.requests().begin(),
+                                              payload.requests().end());}
+                //TODO use this info to prevent broadcasting "IamLeader" to batchers, which are not differentiated from proposers
             }
             case ProposerReceiver_Sender_proposer: {
-                std::scoped_lock lock(leaderHeartbeatMutex, scoutMutex);
-                printf("%d received leader heartbeat for time: %s\n", id,
-                       std::asctime(std::localtime(&lastLeaderHeartbeat)));
-                time(&lastLeaderHeartbeat); // store the time we received the heartbeat
-                isLeader = false;
-                shouldSendScouts = true;
-                numPreemptedScouts.clear();
-                numApprovedScouts.clear();
+                {std::lock_guard<std::mutex> lock(leaderHeartbeatMutex);
+                    printf("%d received leader heartbeat for time: %s\n", id,
+                           std::asctime(std::localtime(&lastLeaderHeartbeat)));
+                    time(&lastLeaderHeartbeat);} // store the time we received the heartbeat
+                noLongerLeader();
             }
             default: {}
         }
@@ -109,21 +104,22 @@ void proposer::listenToAcceptor(const int socket) {
 
         switch (payload.type()) {
             case AcceptorToProposer_Type_p1b: {
-                printf("Proposer %d received p1b, highest ballot: [%d, %d], log length: %d\n", id,  payload.ballot().id(),
+                printf("Proposer %d received p1b from acceptor group: %d, highest ballot: [%d, %d], log length: %d\n", id,
+                       payload.acceptorgroupid(), payload.ballot().id(),
                        payload.ballot().ballotnum(), payload.log_size());
                 {std::scoped_lock lock(scoutMutex, ballotMutex);
                 if (payload.ballot().id() == id) {
                     if (payload.ballot().ballotnum() == ballotNum)
                         numApprovedScouts[payload.acceptorgroupid()] += 1;
                 }
-                else
+                else if (payload.ballot().ballotnum() >= ballotNum) //preempted only if other ballot is at least equal
                     numPreemptedScouts[payload.acceptorgroupid()] += 1;}
                 std::lock_guard<std::mutex> lock(acceptorLogsMutex);
                 acceptorLogs[payload.acceptorgroupid()].emplace_back(payload.log().begin(), payload.log().end());
                 break;
             }
             case AcceptorToProposer_Type_p2b: {
-                printf("Proposer %d received p2b, highest ballot: [%d, %d]\n", id,  payload.ballot().id(),
+                printf("Proposer %d received p2b, highest ballot: [%d, %d]\n", id, payload.ballot().id(),
                     payload.ballot().ballotnum());
                 std::scoped_lock lock(commanderMutex, ballotMutex);
                 if (payload.ballot().id() == id) {
@@ -162,6 +158,7 @@ void proposer::mainLoop() {
         }
         else
             checkScouts();
+        std::this_thread::sleep_for(std::chrono::seconds(id)); //TODO figure out a better sleeping scheme, or don't sleep
     }
 }
 
@@ -181,28 +178,30 @@ void proposer::sendScouts() {
 }
 
 void proposer::checkScouts() {
+    {std::scoped_lock locks(acceptorMutex, scoutMutex);
+        if (numApprovedScouts.size() < acceptorGroupIds.size()) //not all acceptor groups responded
+            return;}
+
     std::unique_lock<std::mutex> lock(scoutMutex);
     for (const auto&[acceptorGroupId, approvedScoutsForAcceptorGroup] : numApprovedScouts) {
         int preemptedScoutsForAcceptorGroup = numPreemptedScouts[acceptorGroupId];
         if (approvedScoutsForAcceptorGroup + preemptedScoutsForAcceptorGroup < config::F)
             return;
         else if (preemptedScoutsForAcceptorGroup > 0) {
-            isLeader = false;
-            shouldSendScouts = true;
-            printf("Proposer %d failed to become the leader\n", id);
-            numApprovedScouts.clear();
-            numPreemptedScouts.clear();
+            lock.unlock();
+            noLongerLeader();
+            return;
         }
     }
 
     //leader election complete
     isLeader = true;
-    {std::lock_guard<std::mutex> proposerLock(proposerMutex);
-    network::broadcastProtobuf(message::createIamLeader(), proposerSockets);}
     printf("Proposer %d is leader\n", id);
     numApprovedScouts.clear();
     numPreemptedScouts.clear();
     lock.unlock();
+    {std::lock_guard<std::mutex> proposerLock(proposerMutex);
+    network::broadcastProtobuf(message::createIamLeader(), proposerSockets);}
 
     mergeLogs();
 }
@@ -213,8 +212,8 @@ void proposer::mergeLogs() {
     acceptorLogs.clear();
     acceptorLogsMutex.unlock();
 
-    std::unique_lock<std::mutex> lock(unproposedPayloadsMutex);
     log = committedLog; //TODO prevent already committed item from being uncommitted?
+    std::unique_lock<std::mutex> lock(unproposedPayloadsMutex);
 
     for (const auto&[slot, committedPayload] : log) {
         if (committedPayload.empty())
@@ -232,7 +231,7 @@ void proposer::mergeLogs() {
     lock.unlock();
 
     if (isLeader) {
-        std::lock_guard<std::mutex> acceptorLock(acceptorMutex);
+        std::scoped_lock locks(ballotMutex, acceptorMutex);
 
         for (const auto& [slot, pValue] : uncommittedLog) {
             uncommittedProposals[slot] = pValue.payload();
@@ -251,8 +250,11 @@ void proposer::sendCommandersForPayloads() {
     if (unproposedPayloads.empty())
         return;}
 
-    //calculate the next unused slot
-    auto nextSlot = log.size();
+    //calculate the next unused slot (log is 1-indexed, because 0 = null in protobuf & will be ignored)
+    auto nextSlot = 1;
+    for (const auto& [slot, payload] : log)
+        if (slot >= nextSlot)
+            nextSlot = slot + 1;
     for (const auto& [slot, proposal] : uncommittedProposals)
         if (slot >= nextSlot)
             nextSlot = slot + 1;
@@ -277,7 +279,7 @@ int proposer::fetchNextAcceptorGroup() {
 }
 
 void proposer::checkCommanders() {
-    std::scoped_lock lock(commanderMutex, unproposedPayloadsMutex);
+    std::unique_lock lock(commanderMutex);
     // loop over iterator since we need to remove committed proposals as we go
     for (auto iterator = uncommittedProposals.begin(); iterator != uncommittedProposals.end();) {
         const int slot = iterator->first;
@@ -297,25 +299,31 @@ void proposer::checkCommanders() {
         }
         // we've been preempted by a new leader
         else {
-            shouldSendScouts = true;
-            isLeader = false;
-            iterator++;
+            lock.unlock();
+            noLongerLeader();
+            return;
         }
 
         slotToApprovedCommanders.erase(slot);
         slotToPreemptedCommanders.erase(slot);
     }
-
-    if (!isLeader) {
-        slotToApprovedCommanders.clear();
-        slotToPreemptedCommanders.clear();
-
-        std::vector<std::string> unslottedProposals = {};
-        unslottedProposals.reserve(uncommittedProposals.size());
-        for (const auto& [slot, payload] : uncommittedProposals) {
-            unslottedProposals.emplace_back(payload);
-        }
-        unproposedPayloads.insert(unproposedPayloads.begin(), unslottedProposals.begin(), unslottedProposals.end());
-        uncommittedProposals.clear();
-    }
 }
+
+void proposer::noLongerLeader() {
+    printf("Proposer %d is no longer the leader\n", id);
+    std::scoped_lock lock(scoutMutex, commanderMutex, unproposedPayloadsMutex);
+    isLeader = false;
+    shouldSendScouts = true;
+    numApprovedScouts.clear();
+    numPreemptedScouts.clear();
+    slotToApprovedCommanders.clear();
+    slotToPreemptedCommanders.clear();
+
+    std::vector<std::string> unslottedProposals = {};
+    unslottedProposals.reserve(uncommittedProposals.size());
+    for (const auto& [slot, payload] : uncommittedProposals)
+        unslottedProposals.emplace_back(payload);
+    unproposedPayloads.insert(unproposedPayloads.begin(), unslottedProposals.begin(), unslottedProposals.end());
+    uncommittedProposals.clear();
+}
+
