@@ -1,5 +1,16 @@
 syntax = "proto3";
 
+message WhoIsThis {
+    enum Sender {
+        null = 0; //this value is not to be used. Protobuf will ignore this entire message if the only value (sender) is 0.
+        proposer = 1;
+        batcher = 2;
+        proxyLeader = 3;
+    }
+
+    Sender sender = 1;
+}
+
 /**
 Data structures
  */
@@ -21,13 +32,29 @@ message ProposerToAcceptor {
         p2a = 1;
     }
 
-    Type type = 1;
-    Ballot ballot = 2;
-    int32 slot = 3;
-    string payload = 4;
+    int32 messageId = 1;
+    Type type = 2;
+    int32 acceptorGroupId = 3; //Acceptor group ID of recipient
+    Ballot ballot = 4;
+    int32 slot = 5;
+    string payload = 6;
 }
 
-message AcceptorToProposer {
+message AcceptorToProxyLeader {
+    enum Type {
+        p1b = 0;
+        p2b = 1;
+    }
+
+    int32 messageId = 1;
+    Type type = 2;
+    int32 acceptorGroupId = 3;
+    Ballot ballot = 4;
+    int32 slot = 5;
+    map<int32, PValue> log = 6; //TODO Acceptors send back whole log in P1B. Could be bad for bandwidth
+}
+
+message ProxyLeaderToProposer {
     enum Type {
         p1b = 0;
         p2b = 1;
@@ -37,16 +64,14 @@ message AcceptorToProposer {
     int32 acceptorGroupId = 2;
     Ballot ballot = 3;
     int32 slot = 4;
-    map<int32, PValue> log = 5; //TODO Acceptors send back whole log in P1B. Could be bad for bandwidth
+    map<int32, string> committedLog = 5;
+    map<int32, PValue> uncommittedLog = 6;
 }
 
-message ProposerReceiver {
-    enum Sender {
-        proposer = 0;
-        batcher = 1;
-    }
+message BatcherToProposer {
+    repeated string requests = 1;
+}
 
-    Sender sender = 1;
-    bool iAmLeader = 2;
-    repeated string requests = 3;
+message ProposerToProposer {
+    bool iAmLeader = 1;
 }

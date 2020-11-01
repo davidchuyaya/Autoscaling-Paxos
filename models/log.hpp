@@ -13,17 +13,14 @@ namespace Log {
     using stringLog = std::unordered_map<int, std::string>; //key = slot
     using pValueLog = std::unordered_map<int, PValue>;
     using acceptorGroupLog = std::vector<pValueLog>;
-    using allAcceptorGroupLogs = std::unordered_map<int, acceptorGroupLog>; //key = acceptor group ID
 
-    /**
-     * Determines which values in logs of acceptors are committed (held by all acceptors) and which are not.
-     *
-     * @param acceptorGroupLogs List of logs received from acceptors
-     * @invariant Size of acceptorLogs > F
-     * @return Committed log, slot => payload; Uncommitted log, slot => payload; Acceptor group for slot, slot => acceptor group ID
-     */
-    std::tuple<stringLog, pValueLog, std::unordered_map<int, int>>
-    committedAndUncommittedLog(const allAcceptorGroupLogs & acceptorGroupLogs);
+    stringLog mergeCommittedLogs(const std::vector<stringLog>& committedLogs);
+
+    std::tuple<pValueLog, std::unordered_map<int, int>>
+    mergeUncommittedLogs(const std::unordered_map<int, pValueLog>& uncommittedLogs);
+
+    std::tuple<stringLog, pValueLog>
+    mergeLogsOfAcceptorGroup(const acceptorGroupLog& logs);
     /**
      * Returns string version of log for pretty printing. Used for debugging.
      *

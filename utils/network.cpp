@@ -60,7 +60,12 @@ int network::createSocket() {
     return socketId;
 }
 
-void network::sendPayload(const int socketId, const std::string& payload) {
+void network::sendPayload(const int socketId, const google::protobuf::Message& payload) {
+    const std::string& serializedMessage = payload.SerializeAsString();
+    write(socketId, serializedMessage.c_str(), serializedMessage.length());
+}
+
+void network::sendPayload(int socketId, const std::string& payload) {
     write(socketId, payload.c_str(), payload.length());
 }
 
@@ -69,10 +74,4 @@ std::string network::receivePayload(const int socketId) {
     const auto size = read(socketId, buffer, config::TCP_READ_BUFFER_SIZE);
     buffer[size] = '\0';
     return std::string(buffer);
-}
-
-void network::broadcastProtobuf(const google::protobuf::Message& message, const std::vector<int>& destSockets) {
-    const std::string& serializedMessage = message.SerializeAsString();
-    for (const int socket : destSockets)
-        network::sendPayload(socket, serializedMessage);
 }
