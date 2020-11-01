@@ -58,9 +58,10 @@ AcceptorToProxyLeader message::createP2B(const int messageId, const int acceptor
     return p2b;
 }
 
-ProxyLeaderToProposer message::createProxyP1B(const int acceptorGroupId, const Ballot& highestBallot, const Log::stringLog& committedLog,
-                                              const Log::pValueLog& uncommittedLog) {
+ProxyLeaderToProposer message::createProxyP1B(const int messageId, const int acceptorGroupId, const Ballot& highestBallot,
+                                              const Log::stringLog& committedLog, const Log::pValueLog& uncommittedLog) {
     ProxyLeaderToProposer p1b;
+    p1b.set_messageid(messageId);
     p1b.set_type(ProxyLeaderToProposer_Type_p1b);
     p1b.set_acceptorgroupid(acceptorGroupId);
     *p1b.mutable_ballot() = highestBallot;
@@ -69,13 +70,21 @@ ProxyLeaderToProposer message::createProxyP1B(const int acceptorGroupId, const B
     return p1b;
 }
 
-ProxyLeaderToProposer message::createProxyP2B(const int acceptorGroupId, const Ballot& highestBallot, const int slot) {
+ProxyLeaderToProposer message::createProxyP2B(const int messageId, const int acceptorGroupId, const Ballot& highestBallot,
+                                              const int slot) {
     ProxyLeaderToProposer p2b;
+    p2b.set_messageid(messageId);
     p2b.set_type(ProxyLeaderToProposer_Type_p2b);
     p2b.set_acceptorgroupid(acceptorGroupId);
     *p2b.mutable_ballot() = highestBallot;
     p2b.set_slot(slot);
     return p2b;
+}
+
+ProxyLeaderToProposer message::createProxyLeaderHeartbeat() {
+    ProxyLeaderToProposer heartbeat;
+    heartbeat.set_type(ProxyLeaderToProposer_Type_heartbeat);
+    return heartbeat;
 }
 
 ProposerToProposer message::createIamLeader() {

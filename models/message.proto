@@ -58,14 +58,16 @@ message ProxyLeaderToProposer {
     enum Type {
         p1b = 0;
         p2b = 1;
+        heartbeat = 2;
     }
 
-    Type type = 1;
-    int32 acceptorGroupId = 2;
-    Ballot ballot = 3;
-    int32 slot = 4;
-    map<int32, string> committedLog = 5;
-    map<int32, PValue> uncommittedLog = 6;
+    int32 messageId = 1;
+    Type type = 2;
+    int32 acceptorGroupId = 3;
+    Ballot ballot = 4;
+    int32 slot = 5;
+    map<int32, string> committedLog = 6;
+    map<int32, PValue> uncommittedLog = 7;
 }
 
 message BatcherToProposer {

@@ -35,12 +35,13 @@ private:
 
     void connectToProposers();
     [[noreturn]] void listenToProposer(int socket);
-
     void connectToAcceptors();
     [[noreturn]] void listenToAcceptor(int socket);
 
     void handleP1B(const AcceptorToProxyLeader& payload);
     void handleP2B(const AcceptorToProxyLeader& payload);
+
+    [[noreturn]] void sendHeartbeat();
 };
 
 

@@ -22,8 +22,9 @@ namespace config {
 
     const static inline std::string LOCALHOST = "127.0.0.1";
     const static int TCP_READ_BUFFER_SIZE = 1024;
-    const static int LEADER_TIMEOUT_SEC = 5; // this - LEADER_HEARTBEAT_SLEEP_SEC = time allowed between message send & receive
-    const static int LEADER_HEARTBEAT_SLEEP_SEC = 3;
+    const static int HEARTBEAT_TIMEOUT_SEC = 20; // this - HEARTBEAT_SLEEP_SEC = time allowed between message send & receive
+    const static int HEARTBEAT_SLEEP_SEC = 5;
+    const static int ID_SCOUT_DELAY_MULTIPLIER = 5; // this * proposer ID = number of seconds to delay before sending scouts
 }
 
 #endif //AUTOSCALING_PAXOS_CONFIG_HPP

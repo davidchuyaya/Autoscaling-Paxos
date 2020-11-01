@@ -22,8 +22,9 @@ private:
     int ballotNum = 0; // must be at least 1 the first time it is sent
 
     std::atomic<bool> isLeader = false;
-    std::mutex leaderHeartbeatMutex;
+    std::mutex heartbeatMutex;
     time_t lastLeaderHeartbeat;
+    std::unordered_map<int, time_t> proxyLeaderHeartbeats = {}; //key = socket
 
     std::atomic<bool> shouldSendScouts = true;
     std::mutex remainingAcceptorGroupsForScoutsMutex;
@@ -47,10 +48,13 @@ private:
 
     std::mutex acceptorMutex;
     std::vector<int> acceptorGroupIds = {};
+
     int nextAcceptorGroup = 0;
 
     std::mutex proxyLeaderMutex;
     std::vector<int> proxyLeaders = {};
+    std::unordered_map<int, std::unordered_map<int, ProposerToAcceptor>> proxyLeaderSentMessages = {}; //{socket: {messageID: message}}
+
     int nextProxyLeader = 0;
 
     std::vector<std::thread> threads = {}; // A place to put threads so they don't get freed
@@ -58,6 +62,7 @@ private:
     void findAcceptorGroupIds();
 
     [[noreturn]] void broadcastIAmLeader();
+    [[noreturn]] void checkHeartbeats();
 
     [[noreturn]] void startServer();
     [[noreturn]] void listenToBatcher(int socket);
@@ -120,6 +125,8 @@ private:
     int fetchNextAcceptorGroup();
     //TODO documentation
     int fetchNextProxyLeader();
+
+    void sendToProxyLeader(const int proxyLeaderSocket, const ProposerToAcceptor& message);
 };
 
 

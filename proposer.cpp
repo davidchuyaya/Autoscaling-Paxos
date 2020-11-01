@@ -12,7 +12,8 @@ proposer::proposer(const int id) : id(id) {
     findAcceptorGroupIds();
     const std::thread server([&] {startServer(); });
     connectToProposers();
-    const std::thread broadcastLeader([&] {broadcastIAmLeader(); });
+    const std::thread broadcastLeader([&] { broadcastIAmLeader(); });
+    const std::thread heartbeatChecker([&] { checkHeartbeats(); });
     std::this_thread::sleep_for(std::chrono::seconds(1)); //TODO loop to see we're connected to F+1 proxy leaders
     mainLoop();
 }
@@ -35,7 +36,44 @@ void proposer::broadcastIAmLeader() {
             for (const int proposerSocket: proposerSockets)
                 network::sendPayload(proposerSocket, iAmLeader);}
         }
-        std::this_thread::sleep_for(std::chrono::seconds(config::LEADER_HEARTBEAT_SLEEP_SEC));
+        std::this_thread::sleep_for(std::chrono::seconds(config::HEARTBEAT_SLEEP_SEC));
+    }
+}
+
+[[noreturn]]
+void proposer::checkHeartbeats() {
+    time_t now;
+    while (true) {
+        std::this_thread::sleep_for(std::chrono::seconds(config::HEARTBEAT_TIMEOUT_SEC));
+
+        time(&now);
+
+        std::scoped_lock lock(heartbeatMutex, proxyLeaderMutex);
+        if (difftime(now, lastLeaderHeartbeat) > config::HEARTBEAT_TIMEOUT_SEC && !isLeader)
+            shouldSendScouts = true;
+
+        //remove proxy leaders that have no heartbeat
+        auto iterator = proxyLeaders.begin();
+        while (iterator != proxyLeaders.end()) {
+            const int socket = *iterator;
+            if (difftime(now, proxyLeaderHeartbeats[socket]) > config::HEARTBEAT_TIMEOUT_SEC) {
+                printf("Proxy leader failed to heartbeat to proposer %d, it is pronounced dead.\n", id);
+                proxyLeaderHeartbeats.erase(socket);
+
+                //resend what was sent to this proxy leader to another. Won't loop forever, assuming at least 1 proxy leader is alive
+                //will be inefficient if multiple proxy leaders fail simultaneously, and we just handed off to another failed one.
+                int otherProxyLeaderSocket;
+                do otherProxyLeaderSocket = fetchNextProxyLeader();
+                while (otherProxyLeaderSocket == socket);
+                for (const auto& [messageId, message] : proxyLeaderSentMessages[socket])
+                    sendToProxyLeader(otherProxyLeaderSocket, message);
+                proxyLeaderSentMessages.erase(socket);
+
+                iterator = proxyLeaders.erase(iterator);
+            }
+            else
+                ++iterator;
+        }
     }
 }
 
@@ -81,7 +119,10 @@ void proposer::listenToProxyLeader(int socket) {
 
     while (true) {
         payload.ParseFromString(network::receivePayload(socket));
-        //TODO proxy leader heartbeats
+        if (payload.type() != ProxyLeaderToProposer_Type_heartbeat) {
+            std::lock_guard<std::mutex> lock(proxyLeaderMutex);
+            proxyLeaderSentMessages[socket].erase(payload.messageid());
+        }
 
         switch (payload.type()) {
             case ProxyLeaderToProposer_Type_p1b:
@@ -90,6 +131,11 @@ void proposer::listenToProxyLeader(int socket) {
             case ProxyLeaderToProposer_Type_p2b:
                 handleP2B(payload);
                 break;
+            case ProxyLeaderToProposer_Type_heartbeat: { //store the time we received this heartbeat
+                std::lock_guard<std::mutex> lock(heartbeatMutex);
+                time(&proxyLeaderHeartbeats[socket]);
+                break;
+            }
             default: {}
         }
         payload.Clear();
@@ -117,11 +163,12 @@ void proposer::listenToProposer(const int socket) {
     while (true) {
         payload.ParseFromString(network::receivePayload(socket));
 
-        {std::lock_guard<std::mutex> lock(leaderHeartbeatMutex);
+        {std::lock_guard<std::mutex> lock(heartbeatMutex);
             printf("%d received leader heartbeat for time: %s\n", id,
                    std::asctime(std::localtime(&lastLeaderHeartbeat)));
             time(&lastLeaderHeartbeat);} // store the time we received the heartbeat
         noLongerLeader();
+        shouldSendScouts = false; // disable scouts until the leader's heartbeat times out
 
         payload.Clear();
     }
@@ -129,28 +176,20 @@ void proposer::listenToProposer(const int socket) {
 
 [[noreturn]]
 void proposer::mainLoop() {
-    time_t now;
-
     while (true) {
-        //go back to sleep if leader heartbeat detected
-        {time(&now);
-        std::unique_lock lock(leaderHeartbeatMutex);
-        if (difftime(now, lastLeaderHeartbeat) < config::LEADER_TIMEOUT_SEC) {
-            lock.unlock();
-            std::this_thread::sleep_for(std::chrono::seconds(config::LEADER_TIMEOUT_SEC));
-            continue;
-        }}
-
         if (shouldSendScouts)
             sendScouts();
         if (isLeader)
             sendCommandersForPayloads();
-        std::this_thread::sleep_for(std::chrono::seconds(id)); //TODO figure out a better sleeping scheme, or don't sleep
     }
 }
 
 void proposer::sendScouts() {
-    //TODO set random timeout so a leader is easily elected
+    // random timeout so a leader is easily elected
+    std::this_thread::sleep_for(std::chrono::seconds(id * config::ID_SCOUT_DELAY_MULTIPLIER));
+    if (!shouldSendScouts)
+        return;
+
     int currentBallotNum;
     {std::lock_guard<std::mutex> lock(ballotMutex);
         ballotNum += 1;
@@ -161,8 +200,7 @@ void proposer::sendScouts() {
     for (const int acceptorGroupId : acceptorGroupIds) {
         remainingAcceptorGroupsForScouts.emplace(acceptorGroupId);
         const ProposerToAcceptor& p1a = message::createP1A(id, currentBallotNum, acceptorGroupId);
-        //TODO store on list of things to wait for timeout on
-        network::sendPayload(proxyLeaders[fetchNextProxyLeader()], p1a);
+        sendToProxyLeader(proxyLeaders[fetchNextProxyLeader()], p1a);
     }
     shouldSendScouts = false;
 }
@@ -172,7 +210,10 @@ void proposer::handleP1B(const ProxyLeaderToProposer& message) {
            message.acceptorgroupid(), message.committedlog_size());
 
     if (message.ballot().id() != id) { //we lost the election
-        noLongerLeader(); //TODO store the largest ballot we last saw so we can immediately catch up
+        //store the largest ballot we last saw so we can immediately catch up
+        {std::lock_guard lock(ballotMutex);
+        ballotNum = message.ballot().ballotnum();}
+        noLongerLeader();
         return;
     }
 
@@ -215,7 +256,7 @@ void proposer::mergeLogs() {
         unproposedPayloads.erase(std::remove(unproposedPayloads.begin(), unproposedPayloads.end(), pValue.payload()),unproposedPayloads.end());}
 
     if (isLeader) {
-        std::scoped_lock locks(ballotMutex, acceptorMutex, uncommittedProposalsMutex);
+        std::scoped_lock locks(ballotMutex, acceptorMutex, uncommittedProposalsMutex, proxyLeaderMutex);
 
         for (const auto& [slot, pValue] : uncommittedLog) {
             uncommittedProposals[slot] = pValue.payload();
@@ -243,7 +284,7 @@ void proposer::sendCommandersForPayloads() {
         if (slot >= nextSlot)
             nextSlot = slot + 1;
 
-    std::scoped_lock lock(unproposedPayloadsMutex, ballotMutex, acceptorMutex);
+    std::scoped_lock lock(unproposedPayloadsMutex, ballotMutex, acceptorMutex, proxyLeaderMutex);
     for (const std::string& payload : unproposedPayloads) {
         uncommittedProposals[nextSlot] = payload;
         sendCommanders(fetchNextAcceptorGroup(), nextSlot, payload);
@@ -254,8 +295,7 @@ void proposer::sendCommandersForPayloads() {
 
 void proposer::sendCommanders(int acceptorGroupId, int slot, const std::string& payload) {
     const ProposerToAcceptor& p2a = message::createP2A(id, ballotNum, slot, payload, acceptorGroupId);
-    //TODO store on list of things to wait for timeout on
-    network::sendPayload(proxyLeaders[fetchNextProxyLeader()], p2a);
+    sendToProxyLeader(proxyLeaders[fetchNextProxyLeader()], p2a);
 }
 
 void proposer::handleP2B(const ProxyLeaderToProposer& message) {
@@ -276,6 +316,9 @@ void proposer::noLongerLeader() {
     printf("Proposer %d is no longer the leader\n", id);
     isLeader = false;
     shouldSendScouts = true;
+
+    {std::lock_guard<std::mutex> lock(proxyLeaderMutex);
+    proxyLeaderSentMessages.clear();}
 
     std::scoped_lock lock(acceptorGroupLogsMutex, remainingAcceptorGroupsForScoutsMutex, unproposedPayloadsMutex);
     acceptorGroupCommittedLogs.clear();
@@ -298,4 +341,9 @@ int proposer::fetchNextAcceptorGroup() {
 int proposer::fetchNextProxyLeader() {
     nextProxyLeader = (nextProxyLeader + 1) % proxyLeaders.size();
     return nextProxyLeader;
+}
+
+void proposer::sendToProxyLeader(const int proxyLeaderSocket, const ProposerToAcceptor& message) {
+    proxyLeaderSentMessages[proxyLeaderSocket][message.messageid()] = message;
+    network::sendPayload(proxyLeaderSocket, message);
 }

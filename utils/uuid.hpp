@@ -13,7 +13,7 @@ namespace uuid {
     static std::mutex randomNumMutex;
     static std::random_device rd;
     static std::default_random_engine rng(rd());
-    static std::uniform_int_distribution<int32_t> random(INT32_MIN, INT32_MAX);
+    static std::uniform_int_distribution<int32_t> randomInt32(INT32_MIN, INT32_MAX);
 
     int generate();
 };

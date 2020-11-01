@@ -11,9 +11,7 @@
 proxy_leader::proxy_leader(int id) : id(id) {
     connectToProposers();
     connectToAcceptors();
-    //since proxy leader doesn't create a server, it mustn't return unless all its child threads are dead
-    for (auto& thread : threads)
-        thread.join();
+    sendHeartbeat();
 }
 
 void proxy_leader::connectToProposers() {
@@ -93,7 +91,7 @@ void proxy_leader::handleP1B(const AcceptorToProxyLeader& payload) {
 
     if (Log::isBallotGreaterThan(payload.ballot(), sentValue.ballot())) {
         //yikes, the proposer got preempted
-        const ProxyLeaderToProposer& messageToProposer = message::createProxyP1B(payload.acceptorgroupid(),
+        const ProxyLeaderToProposer& messageToProposer = message::createProxyP1B(payload.messageid(), payload.acceptorgroupid(),
                                                                                  payload.ballot(), {}, {});
         network::sendPayload(proposerSockets[sentValue.ballot().id()], messageToProposer);
         sentMessages.erase(payload.messageid());
@@ -106,8 +104,8 @@ void proxy_leader::handleP1B(const AcceptorToProxyLeader& payload) {
         if (unmergedLogs[payload.messageid()].size() >= config::F + 1) {
             //we have f+1 good logs, merge them & tell the proposer
             const auto&[committedLog, uncommittedLog] = Log::mergeLogsOfAcceptorGroup(unmergedLogs[payload.messageid()]);
-            const ProxyLeaderToProposer& messageToProposer = message::createProxyP1B(payload.acceptorgroupid(), payload.ballot(),
-                                                                                     committedLog, uncommittedLog);
+            const ProxyLeaderToProposer& messageToProposer = message::createProxyP1B(payload.messageid(), payload.acceptorgroupid(),
+                                                                                     payload.ballot(), committedLog, uncommittedLog);
             network::sendPayload(proposerSockets[sentValue.ballot().id()], messageToProposer);
             sentMessages.erase(payload.messageid());
             unmergedLogs.erase(payload.messageid());
@@ -125,7 +123,7 @@ void proxy_leader::handleP2B(const AcceptorToProxyLeader& payload) {
 
     if (Log::isBallotGreaterThan(payload.ballot(), sentValue.ballot())) {
         //yikes, the proposer got preempted
-        const ProxyLeaderToProposer& messageToProposer = message::createProxyP2B(payload.acceptorgroupid(),
+        const ProxyLeaderToProposer& messageToProposer = message::createProxyP2B(payload.messageid(), payload.acceptorgroupid(),
                                                                                 payload.ballot(), payload.slot());
         network::sendPayload(proposerSockets[sentValue.ballot().id()], messageToProposer);
         sentMessages.erase(payload.messageid());
@@ -137,11 +135,22 @@ void proxy_leader::handleP2B(const AcceptorToProxyLeader& payload) {
 
         if (approvedCommanders[payload.messageid()] >= config::F + 1) {
             //we have f+1 approved commanders, tell the proposer
-            const ProxyLeaderToProposer& messageToProposer = message::createProxyP2B(payload.acceptorgroupid(),
+            const ProxyLeaderToProposer& messageToProposer = message::createProxyP2B(payload.messageid(), payload.acceptorgroupid(),
                                                                                      payload.ballot(), payload.slot());
             network::sendPayload(proposerSockets[sentValue.ballot().id()], messageToProposer);
             sentMessages.erase(payload.messageid());
             approvedCommanders.erase(payload.messageid());
         }
+    }
+}
+
+[[noreturn]]
+void proxy_leader::sendHeartbeat() {
+    ProxyLeaderToProposer heartbeat = message::createProxyLeaderHeartbeat();
+    while (true) {
+        std::this_thread::sleep_for(std::chrono::seconds(config::HEARTBEAT_SLEEP_SEC));
+        std::lock_guard<std::mutex> lock(proposerMutex);
+        for (const auto&[id, socket] : proposerSockets)
+            network::sendPayload(socket, heartbeat);
     }
 }
