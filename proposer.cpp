@@ -9,12 +9,19 @@
 #include "models/message.hpp"
 
 proposer::proposer(const int id) : id(id) {
+    findAcceptorGroupIds();
     const std::thread server([&] {startServer(); });
     connectToProposers();
-    connectToAcceptors();
-    const std::thread broadcastLeader([&] {broadcastIAmLeader(); });
-    std::this_thread::sleep_for(std::chrono::seconds(1)); //TODO loop to see we're connected to 2F+1 acceptors
+    const std::thread broadcastLeader([&] { broadcastIAmLeader(); });
+    const std::thread heartbeatChecker([&] { checkHeartbeats(); });
+    std::this_thread::sleep_for(std::chrono::seconds(1)); //TODO loop to see we're connected to F+1 proxy leaders
     mainLoop();
+}
+
+void proposer::findAcceptorGroupIds() {
+    std::lock_guard<std::mutex> lock(acceptorMutex);
+    for (int acceptorGroupId = 0; acceptorGroupId < config::NUM_ACCEPTOR_GROUPS; acceptorGroupId++)
+        acceptorGroupIds.emplace_back(acceptorGroupId);
 }
 
 [[noreturn]]
@@ -24,20 +31,115 @@ void proposer::broadcastIAmLeader() {
             time_t t;
             time(&t);
             printf("%d = leader, sending at time: %s\n", id, std::asctime(std::localtime(&t)));
+            const ProposerToProposer& iAmLeader = message::createIamLeader();
             {std::lock_guard<std::mutex> lock(proposerMutex);
-                network::broadcastProtobuf(message::createIamLeader(), proposerSockets);}
+            for (const int proposerSocket: proposerSockets)
+                network::sendPayload(proposerSocket, iAmLeader);}
         }
-        std::this_thread::sleep_for(std::chrono::seconds(config::LEADER_HEARTBEAT_SLEEP_SEC));
+        std::this_thread::sleep_for(std::chrono::seconds(config::HEARTBEAT_SLEEP_SEC));
+    }
+}
+
+[[noreturn]]
+void proposer::checkHeartbeats() {
+    time_t now;
+    while (true) {
+        std::this_thread::sleep_for(std::chrono::seconds(config::HEARTBEAT_TIMEOUT_SEC));
+
+        time(&now);
+
+        std::scoped_lock lock(heartbeatMutex, proxyLeaderMutex);
+        if (difftime(now, lastLeaderHeartbeat) > config::HEARTBEAT_TIMEOUT_SEC && !isLeader)
+            shouldSendScouts = true;
+
+        //remove proxy leaders that have no heartbeat
+        auto iterator = proxyLeaders.begin();
+        while (iterator != proxyLeaders.end()) {
+            const int socket = *iterator;
+            if (difftime(now, proxyLeaderHeartbeats[socket]) > config::HEARTBEAT_TIMEOUT_SEC) {
+                printf("Proxy leader failed to heartbeat to proposer %d, it is pronounced dead.\n", id);
+                proxyLeaderHeartbeats.erase(socket);
+
+                //resend what was sent to this proxy leader to another. Won't loop forever, assuming at least 1 proxy leader is alive
+                //will be inefficient if multiple proxy leaders fail simultaneously, and we just handed off to another failed one.
+                int otherProxyLeaderSocket;
+                do otherProxyLeaderSocket = fetchNextProxyLeader();
+                while (otherProxyLeaderSocket == socket);
+                for (const auto& [messageId, message] : proxyLeaderSentMessages[socket])
+                    sendToProxyLeader(otherProxyLeaderSocket, message);
+                proxyLeaderSentMessages.erase(socket);
+
+                iterator = proxyLeaders.erase(iterator);
+            }
+            else
+                ++iterator;
+        }
     }
 }
 
 [[noreturn]]
 void proposer::startServer() {
-    network::startServerAtPort(config::PROPOSER_PORT_START + id, [&](const int proposerSocketId) {
-        {std::lock_guard<std::mutex> lock(proposerMutex);
-            proposerSockets.emplace_back(proposerSocketId);}
-        listenToProposer(proposerSocketId);
+    network::startServerAtPort(config::PROPOSER_PORT_START + id, [&](const int clientSocket) {
+        //read first incoming message to tell who the connecting node is
+        WhoIsThis whoIsThis;
+        whoIsThis.ParseFromString(network::receivePayload(clientSocket));
+        switch (whoIsThis.sender()) {
+            case WhoIsThis_Sender_batcher:
+                listenToBatcher(clientSocket);
+            case WhoIsThis_Sender_proxyLeader:
+                listenToProxyLeader(clientSocket);
+            case WhoIsThis_Sender_proposer:
+                printf("Server %d connected to proposer\n", id);
+                {std::lock_guard<std::mutex> lock(proposerMutex);
+                    proposerSockets.emplace_back(clientSocket);}
+                listenToProposer(clientSocket);
+            default: {}
+        }
     });
+}
+
+[[noreturn]]
+void proposer::listenToBatcher(int socket) {
+    BatcherToProposer payload;
+    while (true) {
+        payload.ParseFromString(network::receivePayload(socket));
+        printf("Proposer %d received a batch request\n", id);
+        std::lock_guard<std::mutex> lock(unproposedPayloadsMutex);
+        unproposedPayloads.insert(unproposedPayloads.end(), payload.requests().begin(), payload.requests().end());
+
+        payload.Clear();
+    }
+}
+
+[[noreturn]]
+void proposer::listenToProxyLeader(int socket) {
+    {std::lock_guard<std::mutex> lock(proxyLeaderMutex);
+    proxyLeaders.emplace_back(socket);}
+    ProxyLeaderToProposer payload;
+
+    while (true) {
+        payload.ParseFromString(network::receivePayload(socket));
+        if (payload.type() != ProxyLeaderToProposer_Type_heartbeat) {
+            std::lock_guard<std::mutex> lock(proxyLeaderMutex);
+            proxyLeaderSentMessages[socket].erase(payload.messageid());
+        }
+
+        switch (payload.type()) {
+            case ProxyLeaderToProposer_Type_p1b:
+                handleP1B(payload);
+                break;
+            case ProxyLeaderToProposer_Type_p2b:
+                handleP2B(payload);
+                break;
+            case ProxyLeaderToProposer_Type_heartbeat: { //store the time we received this heartbeat
+                std::lock_guard<std::mutex> lock(heartbeatMutex);
+                time(&proxyLeaderHeartbeats[socket]);
+                break;
+            }
+            default: {}
+        }
+        payload.Clear();
+    }
 }
 
 void proposer::connectToProposers() {
@@ -46,6 +148,7 @@ void proposer::connectToProposers() {
         const int proposerPort = config::PROPOSER_PORT_START + i;
         threads.emplace_back(std::thread([&, proposerPort]{
             const int proposerSocket = network::connectToServerAtAddress(config::LOCALHOST, proposerPort);
+            network::sendPayload(proposerSocket, message::createWhoIsThis(WhoIsThis_Sender_proposer));
             printf("Proposer %d connected to other proposer\n", id);
             {std::lock_guard<std::mutex> lock(proposerMutex);
                 proposerSockets.emplace_back(proposerSocket);}
@@ -56,182 +159,104 @@ void proposer::connectToProposers() {
 
 [[noreturn]]
 void proposer::listenToProposer(const int socket) {
-    ProposerReceiver payload;
-    while (true) {
-        payload.ParseFromString(network::receivePayload(socket));
-        switch (payload.sender()){
-            case ProposerReceiver_Sender_batcher: {
-                printf("Proposer %d received a batch request\n", id);
-                {std::lock_guard<std::mutex> lock(unproposedPayloadsMutex);
-                    unproposedPayloads.insert(unproposedPayloads.end(), payload.requests().begin(),
-                                              payload.requests().end());}
-                //TODO use this info to prevent broadcasting "IamLeader" to batchers, which are not differentiated from proposers
-            }
-            case ProposerReceiver_Sender_proposer: {
-                {std::lock_guard<std::mutex> lock(leaderHeartbeatMutex);
-                    printf("%d received leader heartbeat for time: %s\n", id,
-                           std::asctime(std::localtime(&lastLeaderHeartbeat)));
-                    time(&lastLeaderHeartbeat);} // store the time we received the heartbeat
-                noLongerLeader();
-            }
-            default: {}
-        }
-    }
-}
-
-void proposer::connectToAcceptors() {
-    for (int acceptorGroupId = 0; acceptorGroupId < config::NUM_ACCEPTOR_GROUPS; acceptorGroupId++) {
-        const int acceptorGroupPortOffset = config::ACCEPTOR_GROUP_PORT_OFFSET * acceptorGroupId;
-        {std::lock_guard<std::mutex> lock(acceptorMutex);
-        acceptorGroupIds.emplace_back(acceptorGroupId);}
-
-        for (int i = 0; i < 2 * config::F + 1; i++) {
-            const int acceptorPort = config::ACCEPTOR_PORT_START + acceptorGroupPortOffset + i;
-            threads.emplace_back(std::thread([&, acceptorPort, acceptorGroupId]{
-                const int acceptorSocket = network::connectToServerAtAddress(config::LOCALHOST, acceptorPort);
-                {std::lock_guard<std::mutex> lock(acceptorMutex);
-                acceptorSockets[acceptorGroupId].emplace_back(acceptorSocket);}
-                listenToAcceptor(acceptorSocket);
-            }));
-        }
-    }
-}
-
-void proposer::listenToAcceptor(const int socket) {
-    AcceptorToProposer payload;
+    ProposerToProposer payload;
     while (true) {
         payload.ParseFromString(network::receivePayload(socket));
 
-        switch (payload.type()) {
-            case AcceptorToProposer_Type_p1b: {
-                printf("Proposer %d received p1b from acceptor group: %d, highest ballot: [%d, %d], log length: %d\n", id,
-                       payload.acceptorgroupid(), payload.ballot().id(),
-                       payload.ballot().ballotnum(), payload.log_size());
-                {std::scoped_lock lock(scoutMutex, ballotMutex);
-                if (payload.ballot().id() == id) {
-                    if (payload.ballot().ballotnum() == ballotNum)
-                        numApprovedScouts[payload.acceptorgroupid()] += 1;
-                }
-                else if (payload.ballot().ballotnum() >= ballotNum) //preempted only if other ballot is at least equal
-                    numPreemptedScouts[payload.acceptorgroupid()] += 1;}
-                std::lock_guard<std::mutex> lock(acceptorLogsMutex);
-                acceptorLogs[payload.acceptorgroupid()].emplace_back(payload.log().begin(), payload.log().end());
-                break;
-            }
-            case AcceptorToProposer_Type_p2b: {
-                printf("Proposer %d received p2b, highest ballot: [%d, %d]\n", id, payload.ballot().id(),
-                    payload.ballot().ballotnum());
-                std::scoped_lock lock(commanderMutex, ballotMutex);
-                if (payload.ballot().id() == id) {
-                    if (payload.ballot().ballotnum() == ballotNum)
-                        slotToApprovedCommanders[payload.slot()] += 1;
-                }
-                else
-                    slotToPreemptedCommanders[payload.slot()] += 1;
-                break;
-            }
-            default: {}
-        }
+        {std::lock_guard<std::mutex> lock(heartbeatMutex);
+            printf("%d received leader heartbeat for time: %s\n", id,
+                   std::asctime(std::localtime(&lastLeaderHeartbeat)));
+            time(&lastLeaderHeartbeat);} // store the time we received the heartbeat
+        noLongerLeader();
+        shouldSendScouts = false; // disable scouts until the leader's heartbeat times out
+
         payload.Clear();
     }
 }
 
 [[noreturn]]
 void proposer::mainLoop() {
-    time_t now;
-
     while (true) {
-        //go back to sleep if leader heartbeat detected
-        {time(&now);
-        std::unique_lock lock(leaderHeartbeatMutex);
-        if (difftime(now, lastLeaderHeartbeat) < config::LEADER_TIMEOUT_SEC) {
-            lock.unlock();
-            std::this_thread::sleep_for(std::chrono::seconds(config::LEADER_TIMEOUT_SEC));
-            continue;
-        }}
-
         if (shouldSendScouts)
             sendScouts();
-        if (isLeader) {
+        if (isLeader)
             sendCommandersForPayloads();
-            checkCommanders();
-        }
-        else
-            checkScouts();
-        std::this_thread::sleep_for(std::chrono::seconds(id)); //TODO figure out a better sleeping scheme, or don't sleep
     }
 }
 
 void proposer::sendScouts() {
-    //TODO set random timeout so a leader is easily elected
+    // random timeout so a leader is easily elected
+    std::this_thread::sleep_for(std::chrono::seconds(id * config::ID_SCOUT_DELAY_MULTIPLIER));
+    if (!shouldSendScouts)
+        return;
+
     int currentBallotNum;
     {std::lock_guard<std::mutex> lock(ballotMutex);
         ballotNum += 1;
         currentBallotNum = ballotNum;}
-    const ProposerToAcceptor& p1a = message::createP1A(id, currentBallotNum);
     printf("P1A blasting out: id = %d, ballotNum = %d\n", id, currentBallotNum);
 
-    std::lock_guard<std::mutex> acceptorLock(acceptorMutex);
-    for (const auto&[acceptorGroupId, sockets] : acceptorSockets)
-        network::broadcastProtobuf(p1a, sockets);
+    std::scoped_lock lock(acceptorMutex, proxyLeaderMutex, remainingAcceptorGroupsForScoutsMutex);
+    for (const int acceptorGroupId : acceptorGroupIds) {
+        remainingAcceptorGroupsForScouts.emplace(acceptorGroupId);
+        const ProposerToAcceptor& p1a = message::createP1A(id, currentBallotNum, acceptorGroupId);
+        sendToProxyLeader(proxyLeaders[fetchNextProxyLeader()], p1a);
+    }
     shouldSendScouts = false;
 }
 
-void proposer::checkScouts() {
-    {std::scoped_lock locks(acceptorMutex, scoutMutex);
-        if (numApprovedScouts.size() < acceptorGroupIds.size()) //not all acceptor groups responded
-            return;}
+void proposer::handleP1B(const ProxyLeaderToProposer& message) {
+    printf("Proposer %d received p1b from acceptor group: %d, committed log length: %d\n", id,
+           message.acceptorgroupid(), message.committedlog_size());
 
-    std::unique_lock<std::mutex> lock(scoutMutex);
-    for (const auto&[acceptorGroupId, approvedScoutsForAcceptorGroup] : numApprovedScouts) {
-        int preemptedScoutsForAcceptorGroup = numPreemptedScouts[acceptorGroupId];
-        if (approvedScoutsForAcceptorGroup + preemptedScoutsForAcceptorGroup < config::F)
-            return;
-        else if (preemptedScoutsForAcceptorGroup > 0) {
-            lock.unlock();
-            noLongerLeader();
-            return;
-        }
+    if (message.ballot().id() != id) { //we lost the election
+        //store the largest ballot we last saw so we can immediately catch up
+        {std::lock_guard lock(ballotMutex);
+        ballotNum = message.ballot().ballotnum();}
+        noLongerLeader();
+        return;
     }
+
+    {std::scoped_lock lock(acceptorGroupLogsMutex, remainingAcceptorGroupsForScoutsMutex);
+    acceptorGroupCommittedLogs.emplace_back(message.committedlog().begin(), message.committedlog().end());
+    acceptorGroupUncommittedLogs[message.acceptorgroupid()] =
+            {message.uncommittedlog().begin(), message.uncommittedlog().end()};
+    remainingAcceptorGroupsForScouts.erase(message.acceptorgroupid());
+
+    if (!remainingAcceptorGroupsForScouts.empty()) //we're still waiting for other acceptor groups to respond
+        return;}
 
     //leader election complete
     isLeader = true;
     printf("Proposer %d is leader\n", id);
-    numApprovedScouts.clear();
-    numPreemptedScouts.clear();
-    lock.unlock();
+    const ProposerToProposer& iAmLeader = message::createIamLeader();
     {std::lock_guard<std::mutex> proposerLock(proposerMutex);
-    network::broadcastProtobuf(message::createIamLeader(), proposerSockets);}
+    for (const int proposerSocket: proposerSockets)
+        network::sendPayload(proposerSocket, iAmLeader);}
 
     mergeLogs();
 }
 
 void proposer::mergeLogs() {
-    acceptorLogsMutex.lock();
-    const auto& [committedLog, uncommittedLog, acceptorGroupForSlot] = Log::committedAndUncommittedLog(acceptorLogs);
-    acceptorLogs.clear();
-    acceptorLogsMutex.unlock();
+    //TODO all this locking & unlocking breaks up the critical section & makes it unsafe. Consider giant scoped_locks
+    std::unique_lock logsLock(acceptorGroupLogsMutex);
+    //use tempLog because "log" must be locked. Then we must use a scoped_lock instead, & they don't support unlock()
+    const auto& tempLog = Log::mergeCommittedLogs(acceptorGroupCommittedLogs);
+    const auto& [uncommittedLog, acceptorGroupForSlot] = Log::mergeUncommittedLogs(acceptorGroupUncommittedLogs);
+    acceptorGroupCommittedLogs.clear();
+    acceptorGroupUncommittedLogs.clear();
+    logsLock.unlock();
 
-    log = committedLog; //TODO prevent already committed item from being uncommitted?
-    std::unique_lock<std::mutex> lock(unproposedPayloadsMutex);
-
-    for (const auto&[slot, committedPayload] : log) {
-        if (committedPayload.empty())
-            continue;
+    {std::scoped_lock lock(logMutex, unproposedPayloadsMutex);
+    log = tempLog; //TODO prevent already committed item from being uncommitted
+    for (const auto&[slot, committedPayload] : log)
         //TODO this is O(log.length * unproposedPayloads.length), not great
-        unproposedPayloads.erase(std::remove(unproposedPayloads.begin(), unproposedPayloads.end(), committedPayload),
-                                 unproposedPayloads.end());
-    }
-    for (const auto&[slot, pValue] : uncommittedLog) {
-        if (pValue.payload().empty())
-            continue;
-        unproposedPayloads.erase(std::remove(unproposedPayloads.begin(), unproposedPayloads.end(), pValue.payload()),
-                                 unproposedPayloads.end());
-    }
-    lock.unlock();
+        unproposedPayloads.erase(std::remove(unproposedPayloads.begin(), unproposedPayloads.end(), committedPayload),unproposedPayloads.end());
+    for (const auto&[slot, pValue] : uncommittedLog)
+        unproposedPayloads.erase(std::remove(unproposedPayloads.begin(), unproposedPayloads.end(), pValue.payload()),unproposedPayloads.end());}
 
     if (isLeader) {
-        std::scoped_lock locks(ballotMutex, acceptorMutex);
+        std::scoped_lock locks(ballotMutex, acceptorMutex, uncommittedProposalsMutex, proxyLeaderMutex);
 
         for (const auto& [slot, pValue] : uncommittedLog) {
             uncommittedProposals[slot] = pValue.payload();
@@ -259,7 +284,7 @@ void proposer::sendCommandersForPayloads() {
         if (slot >= nextSlot)
             nextSlot = slot + 1;
 
-    std::scoped_lock lock(unproposedPayloadsMutex, ballotMutex, acceptorMutex);
+    std::scoped_lock lock(unproposedPayloadsMutex, ballotMutex, acceptorMutex, proxyLeaderMutex);
     for (const std::string& payload : unproposedPayloads) {
         uncommittedProposals[nextSlot] = payload;
         sendCommanders(fetchNextAcceptorGroup(), nextSlot, payload);
@@ -269,55 +294,36 @@ void proposer::sendCommandersForPayloads() {
 }
 
 void proposer::sendCommanders(int acceptorGroupId, int slot, const std::string& payload) {
-    const ProposerToAcceptor& p2a = message::createP2A(id, ballotNum, slot, payload);
-    network::broadcastProtobuf(p2a, acceptorSockets[acceptorGroupId]);
+    const ProposerToAcceptor& p2a = message::createP2A(id, ballotNum, slot, payload, acceptorGroupId);
+    sendToProxyLeader(proxyLeaders[fetchNextProxyLeader()], p2a);
 }
 
-int proposer::fetchNextAcceptorGroup() {
-    nextAcceptorGroup = (nextAcceptorGroup + 1) % acceptorSockets.size();
-    return nextAcceptorGroup;
-}
+void proposer::handleP2B(const ProxyLeaderToProposer& message) {
+    printf("Proposer %d received p2b, highest ballot: [%d, %d]\n", id, message.ballot().id(), message.ballot().ballotnum());
 
-void proposer::checkCommanders() {
-    std::unique_lock lock(commanderMutex);
-    // loop over iterator since we need to remove committed proposals as we go
-    for (auto iterator = uncommittedProposals.begin(); iterator != uncommittedProposals.end();) {
-        const int slot = iterator->first;
-        const std::string& payload = iterator->second;
-        const int numApproved = slotToApprovedCommanders[slot];
-        const int numPreempted = slotToPreemptedCommanders[slot];
-
-        if (numApproved + numPreempted <= config::F) {
-            iterator++;
-            continue;
-        }
-        if (numApproved > config::F) {
-            // proposal is committed
-            log[slot] = payload;
-            // remove from uncommitted proposals
-            iterator = uncommittedProposals.erase(iterator);
-        }
-        // we've been preempted by a new leader
-        else {
-            lock.unlock();
-            noLongerLeader();
-            return;
-        }
-
-        slotToApprovedCommanders.erase(slot);
-        slotToPreemptedCommanders.erase(slot);
+    if (message.ballot().id() != id) { //yikes, we got preempted
+        noLongerLeader();
+        return;
     }
+
+    // proposal is committed
+    std::scoped_lock lock(logMutex, uncommittedProposalsMutex);
+    log[message.slot()] = uncommittedProposals[message.slot()];
+    uncommittedProposals.erase(message.slot());
 }
 
 void proposer::noLongerLeader() {
     printf("Proposer %d is no longer the leader\n", id);
-    std::scoped_lock lock(scoutMutex, commanderMutex, unproposedPayloadsMutex);
     isLeader = false;
     shouldSendScouts = true;
-    numApprovedScouts.clear();
-    numPreemptedScouts.clear();
-    slotToApprovedCommanders.clear();
-    slotToPreemptedCommanders.clear();
+
+    {std::lock_guard<std::mutex> lock(proxyLeaderMutex);
+    proxyLeaderSentMessages.clear();}
+
+    std::scoped_lock lock(acceptorGroupLogsMutex, remainingAcceptorGroupsForScoutsMutex, unproposedPayloadsMutex);
+    acceptorGroupCommittedLogs.clear();
+    acceptorGroupUncommittedLogs.clear();
+    remainingAcceptorGroupsForScouts.clear();
 
     std::vector<std::string> unslottedProposals = {};
     unslottedProposals.reserve(uncommittedProposals.size());
@@ -327,3 +333,17 @@ void proposer::noLongerLeader() {
     uncommittedProposals.clear();
 }
 
+int proposer::fetchNextAcceptorGroup() {
+    nextAcceptorGroup = (nextAcceptorGroup + 1) % acceptorGroupIds.size();
+    return nextAcceptorGroup;
+}
+
+int proposer::fetchNextProxyLeader() {
+    nextProxyLeader = (nextProxyLeader + 1) % proxyLeaders.size();
+    return nextProxyLeader;
+}
+
+void proposer::sendToProxyLeader(const int proxyLeaderSocket, const ProposerToAcceptor& message) {
+    proxyLeaderSentMessages[proxyLeaderSocket][message.messageid()] = message;
+    network::sendPayload(proxyLeaderSocket, message);
+}

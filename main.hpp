@@ -19,9 +19,10 @@ private:
     std::vector<int> clientSockets {};
 
     void startServer();
-    void startBatchers();
     void startProposers();
     void startAcceptors();
+    void startBatchers();
+    void startProxyLeaders();
     [[noreturn]] void readInput();
     void sendToBatcher(const std::string& payload);
 };

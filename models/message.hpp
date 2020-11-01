@@ -6,16 +6,22 @@
 #define AUTOSCALING_PAXOS_MESSAGE_HPP
 
 #include <string>
+#include <random>
 #include "message.pb.h"
 #include "log.hpp"
 
 namespace message {
-    ProposerToAcceptor createP1A(int id, int ballotNum);
-    AcceptorToProposer createP1B(int acceptorGroupId, const Ballot& highestBallot, const Log::pValueLog& log);
-    ProposerToAcceptor createP2A(int id, int ballotNum, int slot, const std::string& payload);
-    AcceptorToProposer createP2B(const Ballot& highestBallot, int acceptorGroupId, int slot);
-    ProposerReceiver createIamLeader();
-    ProposerReceiver createBatchMessage(const std::vector<std::string>& requests);
+    WhoIsThis createWhoIsThis(const WhoIsThis_Sender& sender);
+    ProposerToAcceptor createP1A(int id, int ballotNum, int acceptorGroupId);
+    AcceptorToProxyLeader createP1B(int messageId, int acceptorGroupId, const Ballot& highestBallot, const Log::pValueLog& log);
+    ProposerToAcceptor createP2A(int id, int ballotNum, int slot, const std::string& payload, int acceptorGroupId);
+    AcceptorToProxyLeader createP2B(int messageId, int acceptorGroupId, const Ballot& highestBallot, int slot);
+    ProxyLeaderToProposer createProxyP1B(int messageId, int acceptorGroupId, const Ballot& highestBallot,
+                                         const Log::stringLog& committedLog, const Log::pValueLog& uncommittedLog);
+    ProxyLeaderToProposer createProxyP2B(int messageId, int acceptorGroupId, const Ballot& highestBallot, int slot);
+    ProxyLeaderToProposer createProxyLeaderHeartbeat();
+    ProposerToProposer createIamLeader();
+    BatcherToProposer createBatchMessage(const std::vector<std::string>& requests);
 }
 
 #endif //AUTOSCALING_PAXOS_MESSAGE_HPP

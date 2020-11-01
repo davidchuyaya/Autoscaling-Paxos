@@ -4,56 +4,97 @@
 
 #include <message.pb.h>
 #include "message.hpp"
+#include "../utils/uuid.hpp"
 
-ProposerToAcceptor message::createP1A(const int id, const int ballotNum) {
+WhoIsThis message::createWhoIsThis(const WhoIsThis_Sender& sender) {
+    WhoIsThis whoIsThis;
+    whoIsThis.set_sender(sender);
+    return whoIsThis;
+}
+
+ProposerToAcceptor message::createP1A(const int id, const int ballotNum, const int acceptorGroupId) {
     ProposerToAcceptor p1a;
+    p1a.set_messageid(uuid::generate());
     p1a.set_type(ProposerToAcceptor_Type_p1a);
+    p1a.set_acceptorgroupid(acceptorGroupId);
     Ballot* ballot = p1a.mutable_ballot();
     ballot->set_id(id);
     ballot->set_ballotnum(ballotNum);
     return p1a;
 }
 
-AcceptorToProposer
-message::createP1B(const int acceptorGroupId, const Ballot& highestBallot, const Log::pValueLog& log) {
-    AcceptorToProposer p1b;
-    p1b.set_type(AcceptorToProposer_Type_p1b);
+AcceptorToProxyLeader
+message::createP1B(const int messageId, const int acceptorGroupId, const Ballot& highestBallot, const Log::pValueLog& log) {
+    AcceptorToProxyLeader p1b;
+    p1b.set_messageid(messageId);
+    p1b.set_type(AcceptorToProxyLeader_Type_p1b);
     p1b.set_acceptorgroupid(acceptorGroupId);
     *p1b.mutable_ballot() = highestBallot;
     *p1b.mutable_log() = {log.begin(), log.end()};
     return p1b;
 }
 
-ProposerToAcceptor message::createP2A(const int id, const int ballotNum, const int slot, const std::string& payload) {
+ProposerToAcceptor message::createP2A(const int id, const int ballotNum, const int slot, const std::string& payload,
+                                      const int acceptorGroupId) {
     ProposerToAcceptor p2a;
+    p2a.set_messageid(uuid::generate());
     p2a.set_type(ProposerToAcceptor_Type_p2a);
     Ballot* ballot = p2a.mutable_ballot();
     ballot->set_id(id);
     ballot->set_ballotnum(ballotNum);
     p2a.set_slot(slot);
     p2a.set_payload(payload);
+    p2a.set_acceptorgroupid(acceptorGroupId);
     return p2a;
 }
 
-AcceptorToProposer message::createP2B(const Ballot& highestBallot, const int acceptorGroupId, const int slot) {
-    AcceptorToProposer p2b;
-    p2b.set_type(AcceptorToProposer_Type_p2b);
+AcceptorToProxyLeader message::createP2B(const int messageId, const int acceptorGroupId, const Ballot& highestBallot, const int slot) {
+    AcceptorToProxyLeader p2b;
+    p2b.set_messageid(messageId);
+    p2b.set_type(AcceptorToProxyLeader_Type_p2b);
     p2b.set_acceptorgroupid(acceptorGroupId);
     *p2b.mutable_ballot() = highestBallot;
     p2b.set_slot(slot);
     return p2b;
 }
 
-ProposerReceiver message::createIamLeader() {
-    ProposerReceiver iAmLeader;
-    iAmLeader.set_sender(ProposerReceiver_Sender_proposer);
+ProxyLeaderToProposer message::createProxyP1B(const int messageId, const int acceptorGroupId, const Ballot& highestBallot,
+                                              const Log::stringLog& committedLog, const Log::pValueLog& uncommittedLog) {
+    ProxyLeaderToProposer p1b;
+    p1b.set_messageid(messageId);
+    p1b.set_type(ProxyLeaderToProposer_Type_p1b);
+    p1b.set_acceptorgroupid(acceptorGroupId);
+    *p1b.mutable_ballot() = highestBallot;
+    *p1b.mutable_committedlog() = {committedLog.begin(), committedLog.end()};
+    *p1b.mutable_uncommittedlog() = {uncommittedLog.begin(), uncommittedLog.end()};
+    return p1b;
+}
+
+ProxyLeaderToProposer message::createProxyP2B(const int messageId, const int acceptorGroupId, const Ballot& highestBallot,
+                                              const int slot) {
+    ProxyLeaderToProposer p2b;
+    p2b.set_messageid(messageId);
+    p2b.set_type(ProxyLeaderToProposer_Type_p2b);
+    p2b.set_acceptorgroupid(acceptorGroupId);
+    *p2b.mutable_ballot() = highestBallot;
+    p2b.set_slot(slot);
+    return p2b;
+}
+
+ProxyLeaderToProposer message::createProxyLeaderHeartbeat() {
+    ProxyLeaderToProposer heartbeat;
+    heartbeat.set_type(ProxyLeaderToProposer_Type_heartbeat);
+    return heartbeat;
+}
+
+ProposerToProposer message::createIamLeader() {
+    ProposerToProposer iAmLeader;
     iAmLeader.set_iamleader(true);
     return iAmLeader;
 }
 
-ProposerReceiver message::createBatchMessage(const std::vector<std::string>& requests) {
-    ProposerReceiver receiverMessage;
-    receiverMessage.set_sender(ProposerReceiver_Sender_batcher);
+BatcherToProposer message::createBatchMessage(const std::vector<std::string>& requests) {
+    BatcherToProposer receiverMessage;
     *receiverMessage.mutable_requests() = {requests.begin(), requests.end()};
     return receiverMessage;
 }

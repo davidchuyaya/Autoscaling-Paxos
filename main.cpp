@@ -4,6 +4,7 @@
 #include "main.hpp"
 #include "proposer.hpp"
 #include "utils/config.hpp"
+#include "proxy_leader.hpp"
 
 int main() {
     paxos p{};
@@ -14,9 +15,10 @@ paxos::paxos() {
     std::cout << "F: " << config::F << std::endl;
     setbuf(stdout, nullptr); //TODO force flush to stdout. Disable when doing metrics or in prod
     std::thread server([&]{startServer();});
-    startAcceptors();
     startProposers();
+    startAcceptors();
     startBatchers();
+    startProxyLeaders();
     readInput();
 }
 
@@ -25,12 +27,6 @@ void paxos::startServer() {
         std::lock_guard<std::mutex> lock(clientsMutex);
         clientSockets.emplace_back(clientSocketId);
     });
-}
-
-void paxos::startBatchers() {
-    for (int i = 0; i < config::F + 1; i++) {
-        participants.emplace_back(std::thread([i]{batcher {i};}));
-    }
 }
 
 void paxos::startProposers() {
@@ -44,6 +40,18 @@ void paxos::startAcceptors() {
         for (int i = 0; i < 2 * config::F + 1; i++) {
             participants.emplace_back(std::thread([i, acceptorGroupId]{acceptor(i, acceptorGroupId);}));
         }
+    }
+}
+
+void paxos::startBatchers() {
+    for (int i = 0; i < config::F + 1; i++) {
+        participants.emplace_back(std::thread([i]{batcher {i};}));
+    }
+}
+
+void paxos::startProxyLeaders() {
+    for (int i = 0; i < config::F + 1; i++) {
+        participants.emplace_back(std::thread([i]{proxy_leader {i};}));
     }
 }
 

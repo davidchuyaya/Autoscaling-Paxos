@@ -17,52 +17,58 @@ public:
     explicit proposer(int id);
 private:
     const int id; // 0 indexed, no gaps
+
     std::mutex ballotMutex;
-    int ballotNum = 0;
+    int ballotNum = 0; // must be at least 1 the first time it is sent
+
     std::atomic<bool> isLeader = false;
-    std::mutex leaderHeartbeatMutex;
+    std::mutex heartbeatMutex;
     time_t lastLeaderHeartbeat;
+    std::unordered_map<int, time_t> proxyLeaderHeartbeats = {}; //key = socket
 
     std::atomic<bool> shouldSendScouts = true;
-    std::mutex scoutMutex;
-    std::unordered_map<int, int> numApprovedScouts = {}; //key = acceptor group ID
-    std::unordered_map<int, int> numPreemptedScouts = {};
-
-    std::mutex commanderMutex;
-    std::unordered_map<int, int> slotToApprovedCommanders = {}; //key = slot
-    std::unordered_map<int, int> slotToPreemptedCommanders = {};
+    std::mutex remainingAcceptorGroupsForScoutsMutex;
+    std::unordered_set<int> remainingAcceptorGroupsForScouts = {};
 
     std::mutex unproposedPayloadsMutex;
     std::vector<std::string> unproposedPayloads = {};
 
-    Log::stringLog uncommittedProposals = {}; //invariant: empty until we are leader. Key = slot
-    Log::stringLog log; //TODO don't store the entire log
-    int nextAcceptorGroup = 0;
+    std::mutex logMutex;
+    Log::stringLog log;
 
-    std::mutex acceptorLogsMutex;
-    Log::allAcceptorGroupLogs acceptorLogs = {};
+    std::mutex uncommittedProposalsMutex;
+    Log::stringLog uncommittedProposals = {}; //invariant: empty until we are leader. Key = slot
+
+    std::mutex acceptorGroupLogsMutex;
+    std::vector<Log::stringLog> acceptorGroupCommittedLogs = {};
+    std::unordered_map<int, Log::pValueLog> acceptorGroupUncommittedLogs = {}; //key = acceptor group ID
 
     std::mutex proposerMutex;
     std::vector<int> proposerSockets = {};
 
     std::mutex acceptorMutex;
-    std::unordered_map<int, std::vector<int>> acceptorSockets = {}; //key = acceptor group ID
     std::vector<int> acceptorGroupIds = {};
+
+    int nextAcceptorGroup = 0;
+
+    std::mutex proxyLeaderMutex;
+    std::vector<int> proxyLeaders = {};
+    std::unordered_map<int, std::unordered_map<int, ProposerToAcceptor>> proxyLeaderSentMessages = {}; //{socket: {messageID: message}}
+
+    int nextProxyLeader = 0;
 
     std::vector<std::thread> threads = {}; // A place to put threads so they don't get freed
 
+    void findAcceptorGroupIds();
+
     [[noreturn]] void broadcastIAmLeader();
+    [[noreturn]] void checkHeartbeats();
 
     [[noreturn]] void startServer();
+    [[noreturn]] void listenToBatcher(int socket);
+    [[noreturn]] void listenToProxyLeader(int socket);
     void connectToProposers();
     [[noreturn]] void listenToProposer(int socket);
-
-    void connectToAcceptors();
-    /**
-     * Process p1b and p2b messages from acceptors.
-     * @param socket Socket ID of acceptor
-     */
-    [[noreturn]] void listenToAcceptor(int socket);
 
     /**
      * Execute all scout/commander logic.
@@ -81,7 +87,7 @@ private:
      *
      * @invariant isLeader = false, shouldSendScouts = false, uncommittedProposals.empty()
      */
-    void checkScouts();
+    void handleP1B(const ProxyLeaderToProposer& message);
     /**
      * Update log with newly committed slots from acceptors. Remove committed proposals from unproposedPayloads.
      * Propose uncommitted slots, add to uncommittedProposals
@@ -101,22 +107,26 @@ private:
      */
     void sendCommanders(int acceptorGroupId, int slot, const std::string& payload);
     /**
-     * Increments (round robin) the next acceptor group a payload will be proposed to.
-     * @warning Does NOT lock acceptorMutex. The caller MUST lock it.
-     * @return The acceptor group to propose to.
-     */
-    int fetchNextAcceptorGroup();
-    /**
      * Check if more than F p2b's have been received, once for each uncommitted slot. If yes, then confirm that slot
      * as committed. If we've been preempted, then that means another has become the leader. Move all uncommittedProposals
      * back into unproposedPayloads.
      * @invariant isLeader = true
      */
-    void checkCommanders();
+    void handleP2B(const ProxyLeaderToProposer& message);
     /**
      * Reset all values when this proposer learns that it is no longer the leader.
      */
     void noLongerLeader();
+    /**
+ * Increments (round robin) the next acceptor group a payload will be proposed to.
+ * @warning Does NOT lock acceptorMutex. The caller MUST lock it.
+ * @return The acceptor group to propose to.
+ */
+    int fetchNextAcceptorGroup();
+    //TODO documentation
+    int fetchNextProxyLeader();
+
+    void sendToProxyLeader(const int proxyLeaderSocket, const ProposerToAcceptor& message);
 };
 
 

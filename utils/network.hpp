@@ -49,6 +49,7 @@ namespace network {
      * @param socketId Socket ID of recipient
      * @param payload Payload to send
      */
+    void sendPayload(int socketId, const google::protobuf::Message& payload);
     void sendPayload(int socketId, const std::string& payload);
     /**
      * Waits for a payload from the socket.
@@ -58,8 +59,6 @@ namespace network {
      * @return Payload
      */
     std::string receivePayload(int socketId);
-
-    void broadcastProtobuf(const google::protobuf::Message& message, const std::vector<int>& destSockets);
 }
 
 #endif //C__PAXOS_NETWORKNODE_HPP

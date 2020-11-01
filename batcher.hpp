@@ -18,10 +18,8 @@ public:
     explicit batcher(int id);
 private:
     int id = 0;
-    
     std::vector<std::string> unproposedPayloads = {};
-
-    std::vector<std::thread> threads = {}; // A place to put threads so they don't get freedrequests
+    std::vector<std::thread> threads = {}; // A place to put threads so they don't get freed
 
     std::mutex proposerMutex;
     std::vector<int> proposerSockets = {};
