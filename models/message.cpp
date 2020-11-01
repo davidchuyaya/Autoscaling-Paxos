@@ -14,9 +14,11 @@ ProposerToAcceptor message::createP1A(const int id, const int ballotNum) {
     return p1a;
 }
 
-AcceptorToProposer message::createP1B(const Ballot& highestBallot, const std::vector<PValue>& log) {
+AcceptorToProposer
+message::createP1B(const int acceptorGroupId, const Ballot& highestBallot, const Log::pValueLog& log) {
     AcceptorToProposer p1b;
     p1b.set_type(AcceptorToProposer_Type_p1b);
+    p1b.set_acceptorgroupid(acceptorGroupId);
     *p1b.mutable_ballot() = highestBallot;
     *p1b.mutable_log() = {log.begin(), log.end()};
     return p1b;
@@ -33,9 +35,10 @@ ProposerToAcceptor message::createP2A(const int id, const int ballotNum, const i
     return p2a;
 }
 
-AcceptorToProposer message::createP2B(const Ballot& highestBallot, const int slot) {
+AcceptorToProposer message::createP2B(const Ballot& highestBallot, const int acceptorGroupId, const int slot) {
     AcceptorToProposer p2b;
     p2b.set_type(AcceptorToProposer_Type_p2b);
+    p2b.set_acceptorgroupid(acceptorGroupId);
     *p2b.mutable_ballot() = highestBallot;
     p2b.set_slot(slot);
     return p2b;

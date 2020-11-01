@@ -3,64 +3,66 @@
 //
 
 #include <google/protobuf/util/message_differencer.h>
+#include <sstream>
 #include "log.hpp"
 
-std::tuple<std::vector<std::string>, std::unordered_map<int, std::string>>
-Log::committedAndUncommittedLog(const std::vector<std::vector<PValue>>& acceptorLogs) {
-    std::vector<PValue> bestValueForSlot = {};
-    std::vector<int> countForSlot = {};
-    bestValueForSlot.reserve(acceptorLogs[0].size());
-    countForSlot.reserve(acceptorLogs[0].size());
+std::tuple<Log::stringLog, Log::pValueLog, std::unordered_map<int, int>>
+Log::committedAndUncommittedLog(const allAcceptorGroupLogs& acceptorGroupLogs) {
+    std::unordered_map<int, int> acceptorGroupForSlot = {};
+    pValueLog bestUncommittedValueForSlotInAllGroups = {};
+    stringLog bestCommittedValueForSlotInAllGroups = {};
 
-    for (const auto& log : acceptorLogs) {
-        for (int slot = 0; slot < log.size(); slot++) {
-            const PValue &pValue = log[slot];
-            if (pValue.payload().empty())
-                continue;
+    for (const auto& [acceptorGroupId, logs] : acceptorGroupLogs) {
+        pValueLog bestValueForSlot = {};
+        std::unordered_map<int, int> countForSlot = {}; //key = slot
+        bestValueForSlot.reserve(logs[0].size());
+        countForSlot.reserve(logs[0].size());
 
-            if (slot >= bestValueForSlot.size()) {
-                //we're the first value for this slot, automatically we're the best
-                bestValueForSlot.resize(slot + 1);
-                countForSlot.resize(slot + 1);
-                bestValueForSlot[slot] = pValue;
-                countForSlot[slot] = 1;
-            }
-            else {
+        for (const auto& log : logs) {
+            for (const auto& [slot, pValue] : log) {
+                if (pValue.payload().empty())
+                    continue;
+
                 const PValue& bestValue = bestValueForSlot[slot];
                 if (bestValue.payload() == pValue.payload()) {
                     countForSlot[slot] += 1;
-                }
-                else if (isBallotGreaterThan(pValue.ballot(), bestValue.ballot())) {
+                } else if (isBallotGreaterThan(pValue.ballot(), bestValue.ballot())) {
                     bestValueForSlot[slot] = pValue;
                     countForSlot[slot] = 1;
                 }
             }
         }
-    }
 
-    std::vector<std::string> committedLog = {};
-    std::unordered_map<int, std::string> uncommittedLog = {};
-    committedLog.reserve(bestValueForSlot.size());
-    uncommittedLog.reserve(bestValueForSlot.size());
+        //coalesce committed/best values across acceptor groups
+        for (const auto& [slot, pValue] : bestValueForSlot) {
+            const int count = countForSlot[slot];
 
-    for (int slot = 0; slot < bestValueForSlot.size(); slot++) {
-        const std::string& payload = bestValueForSlot[slot].payload();
-        const int count = countForSlot[slot];
-
-        if (count == acceptorLogs.size()) {
-            if (committedLog.size() <= slot)
-                committedLog.resize(slot + 1);
-            committedLog[slot] = payload;
+            if (count == logs.size()) { // this PValue is present in all acceptors of the group (it is committed)
+                bestCommittedValueForSlotInAllGroups[slot] = pValue.payload();
+                bestUncommittedValueForSlotInAllGroups.erase(slot);
+                acceptorGroupForSlot[slot] = acceptorGroupId;
+            }
+            else {
+                if (pValue.payload().empty())
+                    continue;
+                if (!bestCommittedValueForSlotInAllGroups[slot].empty()) //there's already a committed value at this slot
+                    continue;
+                const PValue& prevBestPValue = bestUncommittedValueForSlotInAllGroups[slot];
+                if (isBallotGreaterThan(pValue.ballot(), prevBestPValue.ballot())) { // we have the best uncommitted PValue
+                    bestUncommittedValueForSlotInAllGroups[slot] = pValue;
+                    acceptorGroupForSlot[slot] = acceptorGroupId;
+                }
+            }
         }
-        else
-            uncommittedLog[slot] = payload;
     }
-    return {committedLog, uncommittedLog};
+    return {bestCommittedValueForSlotInAllGroups, bestUncommittedValueForSlotInAllGroups, acceptorGroupForSlot};
 }
 
-void Log::printLog(const std::vector<PValue>& log) {
-    for (int slot = 0; slot < log.size(); ++slot)
-        printf("%d) %s\n", slot, log[slot].payload().c_str());
+std::string Log::printLog(const pValueLog& log) {
+    std::stringstream out;
+    for (const auto&[slot, pValue] : log)
+        out << slot << ") " << pValue.payload().c_str() << ", ";
+    return out.str();
 }
 
 bool Log::isBallotGreaterThan(const Ballot& ballotLeft, const Ballot& ballotRight) {

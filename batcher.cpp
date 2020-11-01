@@ -21,19 +21,10 @@ void batcher::listenToMain() {
         unproposedPayloads.emplace_back(payload);
 
         if (unproposedPayloads.size() >= config::THRESHOLD_BATCH_SIZE) {
-            const ProposerReceiver& proposerReceiver = message::createBatchMessage(unproposedPayloads);
-            broadcastToProposers(proposerReceiver);
+            {std::lock_guard<std::mutex> lock(proposerMutex);
+                network::broadcastProtobuf(message::createBatchMessage(unproposedPayloads), proposerSockets);}
             unproposedPayloads.clear();
         }
-    }
-}
-
-void batcher::broadcastToProposers(const google::protobuf::Message& message) {
-    const std::string& serializedMessage = message.SerializeAsString();
-
-    std::lock_guard<std::mutex> lock(proposerMutex);
-    for (const int socket : proposerSockets) {
-        network::sendPayload(socket, serializedMessage);
     }
 }
 

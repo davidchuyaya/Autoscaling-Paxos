@@ -70,3 +70,9 @@ std::string network::receivePayload(const int socketId) {
     buffer[size] = '\0';
     return std::string(buffer);
 }
+
+void network::broadcastProtobuf(const google::protobuf::Message& message, const std::vector<int>& destSockets) {
+    const std::string& serializedMessage = message.SerializeAsString();
+    for (const int socket : destSockets)
+        network::sendPayload(socket, serializedMessage);
+}

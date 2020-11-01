@@ -6,14 +6,15 @@
 #include "utils/network.hpp"
 #include "models/message.hpp"
 
-acceptor::acceptor(const int id) : id(id) {
+acceptor::acceptor(const int id, const int acceptorGroupId) : id(id), acceptorGroupId(acceptorGroupId) {
     startServer();
 }
 
 [[noreturn]]
 void acceptor::startServer() {
-    network::startServerAtPort(config::ACCEPTOR_PORT_START + id, [&](const int proposerSocketId) {
-        printf("Acceptor %d connected to proposer\n", id);
+    const int acceptorGroupPortOffset = config::ACCEPTOR_GROUP_PORT_OFFSET * acceptorGroupId;
+    network::startServerAtPort(config::ACCEPTOR_PORT_START + acceptorGroupPortOffset + id, [&](const int proposerSocketId) {
+        printf("Acceptor [%d, %d] connected to proposer\n", acceptorGroupId, id);
         listenToProposer(proposerSocketId);
     });
 }
@@ -27,25 +28,22 @@ void acceptor::listenToProposer(int socket) {
         std::scoped_lock lock(ballotMutex, logMutex);
         switch (payload.type()) {
             case ProposerToAcceptor_Type_p1a:
-                printf("Acceptor %d received p1a: [%d, %d], highestBallot: [%d, %d]\n", id, payload.ballot().id(),
+                printf("Acceptor [%d, %d] received p1a: [%d, %d], highestBallot: [%d, %d]\n", acceptorGroupId, id, payload.ballot().id(),
                        payload.ballot().ballotnum(), highestBallot.id(), highestBallot.ballotnum());
                 if (Log::isBallotGreaterThan(payload.ballot(), highestBallot))
                     highestBallot = payload.ballot();
-                network::sendPayload(socket, message::createP1B(highestBallot, log).SerializeAsString());
+                network::sendPayload(socket, message::createP1B(acceptorGroupId, highestBallot, log).SerializeAsString());
                 break;
             case ProposerToAcceptor_Type_p2a:
-                printf("Acceptor %d received p2a: [%s]\n", id, payload.DebugString().c_str());
+                printf("Acceptor [%d, %d] received p2a: [%s]\n", acceptorGroupId, id, payload.DebugString().c_str());
                 if (!Log::isBallotGreaterThan(highestBallot, payload.ballot())) {
                     PValue pValue;
                     pValue.set_payload(payload.payload());
                     *pValue.mutable_ballot() = payload.ballot();
-                    if (log.size() <= payload.slot())
-                        log.resize(payload.slot() + 1);
                     log[payload.slot()] = pValue;
-                    printf("New log: ");
-                    Log::printLog(log);
+                    printf("[%d, %d] New log: %s\n", acceptorGroupId, id, Log::printLog(log).c_str());
                 }
-                network::sendPayload(socket, message::createP2B(highestBallot, payload.slot()).SerializeAsString());
+                network::sendPayload(socket, message::createP2B(highestBallot, acceptorGroupId, payload.slot()).SerializeAsString());
                 break;
             default: {}
         }
