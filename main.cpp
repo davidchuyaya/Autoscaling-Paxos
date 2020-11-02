@@ -64,7 +64,6 @@ void paxos::readInput() {
     }
 }
 
-// TODO: Make sure that the client broadcasts to the same batcher every single time.
 // TODO retry on timeout with different batcher
 void paxos::sendToBatcher(const std::string& payload) {
     std::lock_guard<std::mutex> lock(clientsMutex);
