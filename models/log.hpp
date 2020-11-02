@@ -14,11 +14,31 @@ namespace Log {
     using pValueLog = std::unordered_map<int, PValue>;
     using acceptorGroupLog = std::vector<pValueLog>;
 
+    /**
+     * Merge the committed logs of acceptor groups. A committed log only contains slots in which all acceptors within
+     * a group agree on the value.
+     *
+     * @note Invariant: No 2 committed logs have values for the same slots; no conflicting keys
+     * @param committedLogs List of acceptor groups' committed logs
+     * @return Merged committed log
+     */
     stringLog mergeCommittedLogs(const std::vector<stringLog>& committedLogs);
-
+    /**
+     * Merge the uncommitted logs of acceptor groups. If 2 acceptor groups have values for the same slot, the value with
+     * the higher ballot is chosen. An uncommitted log only contains slots in which < F+1 acceptors agree upon the value.
+     *
+     * @param uncommittedLogs List of acceptor groups' uncommitted logs
+     * @return Merged uncommitted logs
+     */
     std::tuple<pValueLog, std::unordered_map<int, int>>
     mergeUncommittedLogs(const std::unordered_map<int, pValueLog>& uncommittedLogs);
-
+    /**
+     * Merge the logs of individual acceptors within the same acceptor group. The value at each slot is committed if all
+     * acceptors hold that value; otherwise it is uncommitted and the value with the largest ballot is preserved.
+     *
+     * @param logs List of acceptors' logs
+     * @return {committed log, uncommitted log}
+     */
     std::tuple<stringLog, pValueLog>
     mergeLogsOfAcceptorGroup(const acceptorGroupLog& logs);
     /**

@@ -15,6 +15,10 @@ namespace uuid {
     static std::default_random_engine rng(rd());
     static std::uniform_int_distribution<int32_t> randomInt32(INT32_MIN, INT32_MAX);
 
+    /**
+     * Generate a random 32-bit int. Is thread-safe.
+     * @return The random int.
+     */
     int generate();
 };
 

@@ -15,11 +15,11 @@ void acceptor::startServer() {
     const int acceptorGroupPortOffset = config::ACCEPTOR_GROUP_PORT_OFFSET * acceptorGroupId;
     network::startServerAtPort(config::ACCEPTOR_PORT_START + acceptorGroupPortOffset + id, [&](const int proposerSocketId) {
         printf("Acceptor [%d, %d] connected to proxy leader\n", acceptorGroupId, id);
-        listenToProposer(proposerSocketId);
+        listenToProxyLeaders(proposerSocketId);
     });
 }
 
-void acceptor::listenToProposer(int socket) {
+void acceptor::listenToProxyLeaders(int socket) {
     ProposerToAcceptor payload;
 
     while (true) {

@@ -59,9 +59,19 @@ private:
 
     std::vector<std::thread> threads = {}; // A place to put threads so they don't get freed
 
+    /**
+     * Set acceptorGroupIds. TODO not hardcode the IDs
+     */
     void findAcceptorGroupIds();
 
+    /**
+     * If isLeader = true, periodically tell other proposers.
+     */
     [[noreturn]] void broadcastIAmLeader();
+    /**
+     * 1. Check if a leader has sent us a heartbeat. If it timed out, prepare to send scouts.
+     * 2. Check if proxy leaders have sent us a heartbeat. If they timed out, remove it and send its messages to different proxy leaders.
+     */
     [[noreturn]] void checkHeartbeats();
 
     [[noreturn]] void startServer();
@@ -72,18 +82,18 @@ private:
 
     /**
      * Execute all scout/commander logic.
-     * @note Variables that are only used in the main loop do not need to be locked, as they are used in a single thread.
      */
     [[noreturn]] void mainLoop();
     /**
      * Broadcast p1a to acceptors to become the leader.
-     * @invariant isLeader = false, shouldSendScouts = true
+     * @invariant isLeader = false
      */
     void sendScouts();
     /**
-     * Check if more than F p1b's have been received. If so, determine if we are the new leader.
-     * Compile logs received, removing committed items from our proposals and, if we are the new leader,
-     * adding uncommitted items to our own proposal at the right slot.
+     * Check if proxy leaders have replied with a win in phase 1.
+     * If every acceptor group has replied, then we are the new leader, and we should merge the committed/uncommitted logs
+     * of each acceptor group.
+     * Otherwise, reset values.
      *
      * @invariant isLeader = false, shouldSendScouts = false, uncommittedProposals.empty()
      */
@@ -91,7 +101,7 @@ private:
     /**
      * Update log with newly committed slots from acceptors. Remove committed proposals from unproposedPayloads.
      * Propose uncommitted slots, add to uncommittedProposals
-     * @invariant acceptorLogs contains F+1 acceptors' logs, uncommittedProposals.empty()
+     * @invariant uncommittedProposals.empty()
      */
     void mergeLogs();
     /**
@@ -101,15 +111,17 @@ private:
     void sendCommandersForPayloads();
     /**
      * Send p2a messages for a given payload.
-     * @warning Does NOT lock acceptorMutex or ballotMutex. The caller MUST lock both.
+     * Stores this event by calling sendToProxyLeader().
+     *
+     * @warning Does NOT lock proxyLeaderMutex or ballotMutex. The caller MUST lock both.
+     * @param acceptorGroupId
      * @param slot
      * @param payload
      */
     void sendCommanders(int acceptorGroupId, int slot, const std::string& payload);
     /**
-     * Check if more than F p2b's have been received, once for each uncommitted slot. If yes, then confirm that slot
-     * as committed. If we've been preempted, then that means another has become the leader. Move all uncommittedProposals
-     * back into unproposedPayloads.
+     * Check if a proxy leader has committed values for a slot. If yes, then confirm that slot as committed.
+     * If we've been preempted, then that means another has become the leader. Reset values.
      * @invariant isLeader = true
      */
     void handleP2B(const ProxyLeaderToProposer& message);
@@ -118,15 +130,25 @@ private:
      */
     void noLongerLeader();
     /**
- * Increments (round robin) the next acceptor group a payload will be proposed to.
- * @warning Does NOT lock acceptorMutex. The caller MUST lock it.
- * @return The acceptor group to propose to.
- */
+     * Increments (round robin) the next acceptor group a payload will be proposed to.
+     * @warning Does NOT lock acceptorMutex. The caller MUST lock it.
+     * @return The acceptor group to propose to.
+     */
     int fetchNextAcceptorGroup();
-    //TODO documentation
+    /**
+     * Increments (round robin) the next proxy leader a payload will be sent to.
+     * @warning Does NOT lock proxyLeaderMutex. The caller MUST lock it.
+     * @return The proxy leader to send to.
+     */
     int fetchNextProxyLeader();
-
-    void sendToProxyLeader(const int proxyLeaderSocket, const ProposerToAcceptor& message);
+    /**
+     * Stores the fact that we've sent this message to this proxy leader so we can resend if the proxy leader fails.
+     *
+     * @warning Does NOT lock proxyLeaderMutex. The caller MUST lock it.
+     * @param proxyLeaderSocket
+     * @param message
+     */
+    void sendToProxyLeader(int proxyLeaderSocket, const ProposerToAcceptor& message);
 };
 
 

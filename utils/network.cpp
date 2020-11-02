@@ -71,6 +71,7 @@ void network::sendPayload(const int socketId, const std::string& payload) {
 }
 
 std::string network::receivePayload(const int socketId) {
+    //TODO a fixed read buffer size might come back to bite us when we send large messages
     char buffer[config::TCP_READ_BUFFER_SIZE] = {0};
     const auto size = read(socketId, buffer, config::TCP_READ_BUFFER_SIZE);
     buffer[size] = '\0';

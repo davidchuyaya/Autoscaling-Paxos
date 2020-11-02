@@ -58,6 +58,7 @@ void proposer::checkHeartbeats() {
             const int socket = *iterator;
             if (difftime(now, proxyLeaderHeartbeats[socket]) > config::HEARTBEAT_TIMEOUT_SEC) {
                 printf("Proxy leader failed to heartbeat to proposer %d, it is pronounced dead.\n", id);
+                //TODO if the timeout is too stringent, we could end up in an invalid program state... we can't remove proxy leaders
                 proxyLeaderHeartbeats.erase(socket);
 
                 //resend what was sent to this proxy leader to another. Won't loop forever, assuming at least 1 proxy leader is alive

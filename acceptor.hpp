@@ -21,10 +21,10 @@ private:
 
     [[noreturn]] void startServer();
     /**
-     * Process p1a and p2a messages from proposers.
-     * @param socket Socket ID of proposer
+     * Process p1a and p2a messages from proxy leaders.
+     * @param socket Socket ID of proxy leader
      */
-    [[noreturn]] void listenToProposer(int socket);
+    [[noreturn]] void listenToProxyLeaders(int socket);
 };
 
 

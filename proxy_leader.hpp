@@ -38,9 +38,26 @@ private:
     void connectToAcceptors();
     [[noreturn]] void listenToAcceptor(int socket);
 
+    /**
+     * Handle a p1b from an acceptor group.
+     * If the acceptor preempted us, immediately tell the leader. Clear the value.
+     * If the acceptor accepted the ballot, check if we have f+1 acceptors. If so, tell the leader & clear the value.
+     *
+     * @param payload
+     */
     void handleP1B(const AcceptorToProxyLeader& payload);
+    /**
+     * Handle a p2b from an acceptor group.
+     * If the acceptor preempted us, immediately tell the leader. Clear the value.
+     * If the acceptor saved the message, check if we have f+1 acceptors. If so, tell the leader & clear the value.
+     *
+     * @param payload
+     */
     void handleP2B(const AcceptorToProxyLeader& payload);
 
+    /**
+     * Periodically send heartbeats to all proposers.
+     */
     [[noreturn]] void sendHeartbeat();
 };
 
