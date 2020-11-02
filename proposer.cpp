@@ -197,18 +197,18 @@ void proposer::sendScouts() {
         currentBallotNum = ballotNum;}
     printf("P1A blasting out: id = %d, ballotNum = %d\n", id, currentBallotNum);
 
-    std::scoped_lock lock(acceptorMutex, proxyLeaderMutex, remainingAcceptorGroupsForScoutsMutex);
+    std::scoped_lock lock(acceptorMutex, proxyLeaderMutex, remainingAcceptorGroupsForScoutsMutex, logMutex);
     for (const int acceptorGroupId : acceptorGroupIds) {
         remainingAcceptorGroupsForScouts.emplace(acceptorGroupId);
-        const ProposerToAcceptor& p1a = message::createP1A(id, currentBallotNum, acceptorGroupId);
+        const ProposerToAcceptor& p1a = message::createP1A(id, currentBallotNum, acceptorGroupId, lastCommittedSlot);
         sendToProxyLeader(proxyLeaders[fetchNextProxyLeader()], p1a);
     }
     shouldSendScouts = false;
 }
 
 void proposer::handleP1B(const ProxyLeaderToProposer& message) {
-    printf("Proposer %d received p1b from acceptor group: %d, committed log length: %d\n", id,
-           message.acceptorgroupid(), message.committedlog_size());
+    printf("Proposer %d received p1b from acceptor group: %d, committed log length: %d, uncommitted log length: %d\n", id,
+           message.acceptorgroupid(), message.committedlog_size(), message.uncommittedlog_size());
 
     if (message.ballot().id() != id) { //we lost the election
         //store the largest ballot we last saw so we can immediately catch up
@@ -239,26 +239,21 @@ void proposer::handleP1B(const ProxyLeaderToProposer& message) {
 }
 
 void proposer::mergeLogs() {
-    //TODO all this locking & unlocking breaks up the critical section & makes it unsafe. Consider giant scoped_locks
-    std::unique_lock logsLock(acceptorGroupLogsMutex);
-    //use tempLog because "log" must be locked. Then we must use a scoped_lock instead, & they don't support unlock()
-    const auto& tempLog = Log::mergeCommittedLogs(acceptorGroupCommittedLogs);
+    std::scoped_lock lock(acceptorGroupLogsMutex, logMutex, unproposedPayloadsMutex, ballotMutex, acceptorMutex,
+                           uncommittedProposalsMutex, proxyLeaderMutex);
+    Log::mergeCommittedLogs(&log, acceptorGroupCommittedLogs);
+    calcLastCommittedSlot();
     const auto& [uncommittedLog, acceptorGroupForSlot] = Log::mergeUncommittedLogs(acceptorGroupUncommittedLogs);
     acceptorGroupCommittedLogs.clear();
     acceptorGroupUncommittedLogs.clear();
-    logsLock.unlock();
 
-    {std::scoped_lock lock(logMutex, unproposedPayloadsMutex);
-    log = tempLog; //TODO prevent already committed item from being uncommitted
     for (const auto&[slot, committedPayload] : log)
         //TODO this is O(log.length * unproposedPayloads.length), not great
         unproposedPayloads.erase(std::remove(unproposedPayloads.begin(), unproposedPayloads.end(), committedPayload),unproposedPayloads.end());
     for (const auto&[slot, pValue] : uncommittedLog)
-        unproposedPayloads.erase(std::remove(unproposedPayloads.begin(), unproposedPayloads.end(), pValue.payload()),unproposedPayloads.end());}
+        unproposedPayloads.erase(std::remove(unproposedPayloads.begin(), unproposedPayloads.end(), pValue.payload()),unproposedPayloads.end());
 
     if (isLeader) {
-        std::scoped_lock locks(ballotMutex, acceptorMutex, uncommittedProposalsMutex, proxyLeaderMutex);
-
         for (const auto& [slot, pValue] : uncommittedLog) {
             uncommittedProposals[slot] = pValue.payload();
             int acceptorGroup;
@@ -277,6 +272,7 @@ void proposer::sendCommandersForPayloads() {
         return;}
 
     //calculate the next unused slot (log is 1-indexed, because 0 = null in protobuf & will be ignored)
+    std::scoped_lock lock(uncommittedProposalsMutex, unproposedPayloadsMutex, logMutex, ballotMutex, acceptorMutex, proxyLeaderMutex);
     auto nextSlot = 1;
     for (const auto& [slot, payload] : log)
         if (slot >= nextSlot)
@@ -285,7 +281,6 @@ void proposer::sendCommandersForPayloads() {
         if (slot >= nextSlot)
             nextSlot = slot + 1;
 
-    std::scoped_lock lock(unproposedPayloadsMutex, ballotMutex, acceptorMutex, proxyLeaderMutex);
     for (const std::string& payload : unproposedPayloads) {
         uncommittedProposals[nextSlot] = payload;
         sendCommanders(fetchNextAcceptorGroup(), nextSlot, payload);
@@ -318,10 +313,10 @@ void proposer::noLongerLeader() {
     isLeader = false;
     shouldSendScouts = true;
 
-    {std::lock_guard<std::mutex> lock(proxyLeaderMutex);
-    proxyLeaderSentMessages.clear();}
+    std::scoped_lock lock(proxyLeaderMutex, acceptorGroupLogsMutex, remainingAcceptorGroupsForScoutsMutex, unproposedPayloadsMutex,
+                          uncommittedProposalsMutex);
+    proxyLeaderSentMessages.clear();
 
-    std::scoped_lock lock(acceptorGroupLogsMutex, remainingAcceptorGroupsForScoutsMutex, unproposedPayloadsMutex);
     acceptorGroupCommittedLogs.clear();
     acceptorGroupUncommittedLogs.clear();
     remainingAcceptorGroupsForScouts.clear();
@@ -347,4 +342,9 @@ int proposer::fetchNextProxyLeader() {
 void proposer::sendToProxyLeader(const int proxyLeaderSocket, const ProposerToAcceptor& message) {
     proxyLeaderSentMessages[proxyLeaderSocket][message.messageid()] = message;
     network::sendPayload(proxyLeaderSocket, message);
+}
+
+void proposer::calcLastCommittedSlot() {
+    while (log.find(lastCommittedSlot + 1) != log.end())
+        lastCommittedSlot += 1;
 }

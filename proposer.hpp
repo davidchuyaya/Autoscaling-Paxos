@@ -35,6 +35,7 @@ private:
 
     std::mutex logMutex;
     Log::stringLog log;
+    int lastCommittedSlot = 0;
 
     std::mutex uncommittedProposalsMutex;
     Log::stringLog uncommittedProposals = {}; //invariant: empty until we are leader. Key = slot
@@ -149,6 +150,12 @@ private:
      * @param message
      */
     void sendToProxyLeader(int proxyLeaderSocket, const ProposerToAcceptor& message);
+
+    /**
+     * Find the newest slot in which all previous slots have been committed.
+     * @warning Does NOT lock logMutex. The caller MUST lock it
+     */
+    void calcLastCommittedSlot();
 };
 
 

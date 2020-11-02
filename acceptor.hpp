@@ -14,8 +14,10 @@ public:
 private:
     const int id;
     const int acceptorGroupId;
+
     std::mutex ballotMutex;
     Ballot highestBallot = {};
+
     std::mutex logMutex;
     Log::pValueLog log = {};
 
@@ -25,6 +27,13 @@ private:
      * @param socket Socket ID of proxy leader
      */
     [[noreturn]] void listenToProxyLeaders(int socket);
+    /**
+     * Returns the log with only slots larger than the one provided.
+     * @warning Does NOT lock logMutex. The caller MUST lock it
+     * @param slotToFilter
+     * @return
+     */
+    Log::pValueLog logAfterSlot(int slotToFilter);
 };
 
 

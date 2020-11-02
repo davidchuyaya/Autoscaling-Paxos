@@ -6,11 +6,9 @@
 #include <sstream>
 #include "log.hpp"
 
-Log::stringLog Log::mergeCommittedLogs(const std::vector<stringLog>& committedLogs) {
-    Log::stringLog mergedLog = {};
+void Log::mergeCommittedLogs(stringLog* committedLog, const std::vector<stringLog>& committedLogs) {
     for (const stringLog& log : committedLogs)
-        mergedLog.insert(log.begin(), log.end());
-    return mergedLog;
+        committedLog->insert(log.begin(), log.end());
 }
 
 std::tuple<Log::pValueLog, std::unordered_map<int, int>>

@@ -12,7 +12,7 @@
 
 namespace message {
     WhoIsThis createWhoIsThis(const WhoIsThis_Sender& sender);
-    ProposerToAcceptor createP1A(int id, int ballotNum, int acceptorGroupId);
+    ProposerToAcceptor createP1A(int id, int ballotNum, int acceptorGroupId, int lastCommittedSLot);
     AcceptorToProxyLeader createP1B(int messageId, int acceptorGroupId, const Ballot& highestBallot, const Log::pValueLog& log);
     ProposerToAcceptor createP2A(int id, int ballotNum, int slot, const std::string& payload, int acceptorGroupId);
     AcceptorToProxyLeader createP2B(int messageId, int acceptorGroupId, const Ballot& highestBallot, int slot);

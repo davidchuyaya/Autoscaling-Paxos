@@ -15,14 +15,13 @@ namespace Log {
     using acceptorGroupLog = std::vector<pValueLog>;
 
     /**
-     * Merge the committed logs of acceptor groups. A committed log only contains slots in which all acceptors within
-     * a group agree on the value.
+     * Merge the committed logs of acceptor groups into the existing committed log.
+     * A committed log only contains slots in which all acceptors within a group agree on the value.
      *
      * @note Invariant: No 2 committed logs have values for the same slots; no conflicting keys
      * @param committedLogs List of acceptor groups' committed logs
-     * @return Merged committed log
      */
-    stringLog mergeCommittedLogs(const std::vector<stringLog>& committedLogs);
+    void mergeCommittedLogs(stringLog* committedLog, const std::vector<stringLog>& committedLogs);
     /**
      * Merge the uncommitted logs of acceptor groups. If 2 acceptor groups have values for the same slot, the value with
      * the higher ballot is chosen. An uncommitted log only contains slots in which < F+1 acceptors agree upon the value.
