@@ -17,10 +17,13 @@ void batcher::startServer() {
     });
 }
 
-[[noreturn]]
 void batcher::listenToClient(const int clientSocketId) {
     while (true) {
-        std::string payload = network::receivePayload(clientSocketId);
+        const std::optional<std::string>& incoming = network::receivePayload(clientSocketId);
+        if (incoming->empty())
+            return;
+
+        const std::string& payload = incoming.value();
         printf("Batcher %d received payload: [%s]\n", id, payload.c_str());
         unproposedPayloads.emplace_back(payload);
 

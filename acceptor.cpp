@@ -24,7 +24,10 @@ void acceptor::listenToProxyLeaders(int socket) {
     ProposerToAcceptor payload;
 
     while (true) {
-        payload.ParseFromString(network::receivePayload(socket));
+        const std::optional<std::string>& incoming = network::receivePayload(socket);
+        if (incoming->empty())
+            return;
+        payload.ParseFromString(incoming.value());
 
         std::scoped_lock lock(ballotMutex, logMutex);
         switch (payload.type()) {

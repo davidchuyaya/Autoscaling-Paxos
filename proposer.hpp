@@ -77,10 +77,10 @@ private:
     [[noreturn]] void checkHeartbeats();
 
     [[noreturn]] void startServer();
-    [[noreturn]] void listenToBatcher(int socket);
-    [[noreturn]] void listenToProxyLeader(int socket);
+    void listenToBatcher(int socket);
+    void listenToProxyLeader(int socket);
     void connectToProposers(std::map<int, std::string> proposers);
-    [[noreturn]] void listenToProposer(int socket);
+    void listenToProposer(int socket);
 
     /**
      * Execute all scout/commander logic.

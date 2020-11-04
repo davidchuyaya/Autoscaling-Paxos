@@ -32,7 +32,10 @@ void proxy_leader::connectToProposers(std::map<int, std::string> proposers) {
 void proxy_leader::listenToProposer(int socket) {
     ProposerToAcceptor payload;
     while (true) {
-        payload.ParseFromString(network::receivePayload(socket));
+        const std::optional<std::string>& incoming = network::receivePayload(socket);
+        if (incoming->empty())
+            return;
+        payload.ParseFromString(incoming.value());
         //keep track
         {std::lock_guard<std::mutex> lock(sentMessagesMutex);
             sentMessages[payload.messageid()] = payload;}
@@ -71,7 +74,10 @@ void proxy_leader::connectToAcceptors(std::map<int, std::map<int, std::string>> 
 void proxy_leader::listenToAcceptor(int socket) {
     AcceptorToProxyLeader payload;
     while (true) {
-        payload.ParseFromString(network::receivePayload(socket));
+        const std::optional<std::string>& incoming = network::receivePayload(socket);
+        if (incoming->empty())
+            return;
+        payload.ParseFromString(incoming.value());
         printf("Proxy leader %d received from acceptors: %s\n", id, payload.ShortDebugString().c_str());
 
         switch (payload.type()) {

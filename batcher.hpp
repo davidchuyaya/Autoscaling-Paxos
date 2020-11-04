@@ -37,7 +37,7 @@ private:
      *
      * @param client_address Address of the client
      */
-    [[noreturn]] void listenToClient(const int clientSocketId);
+    void listenToClient(const int clientSocketId);
     /**
      * Connects to the Proposers.
      *

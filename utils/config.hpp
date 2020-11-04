@@ -22,6 +22,7 @@ namespace config {
     const static int ACCEPTOR_GROUP_PORT_OFFSET = 100;
 
     const static inline std::string LOCALHOST = "127.0.0.1";
+    const static int TCP_RETRY_TIMEOUT_SEC = 10;
     const static int TCP_READ_BUFFER_SIZE = 1024;
     const static int HEARTBEAT_TIMEOUT_SEC = 20; // this - HEARTBEAT_SLEEP_SEC = time allowed between message send & receive
     const static int HEARTBEAT_SLEEP_SEC = 5;

@@ -58,7 +58,7 @@ namespace network {
      * @param socketId Socket ID of sender
      * @return Payload
      */
-    std::string receivePayload(int socketId);
+    std::optional<std::string> receivePayload(int socketId);
 }
 
 #endif //C__PAXOS_NETWORKNODE_HPP

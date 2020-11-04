@@ -83,8 +83,11 @@ void proposer::startServer() {
     printf("Proposer Port Id: %d\n", config::PROPOSER_PORT_START + id);
     network::startServerAtPort(config::PROPOSER_PORT_START + id, [&](const int clientSocket) {
         //read first incoming message to tell who the connecting node is
+        const std::optional<std::string>& incoming = network::receivePayload(clientSocket);
+        if (incoming->empty())
+            return;
         WhoIsThis whoIsThis;
-        whoIsThis.ParseFromString(network::receivePayload(clientSocket));
+        whoIsThis.ParseFromString(incoming.value());
         switch (whoIsThis.sender()) {
             case WhoIsThis_Sender_batcher:
                 listenToBatcher(clientSocket);
@@ -100,11 +103,13 @@ void proposer::startServer() {
     });
 }
 
-[[noreturn]]
 void proposer::listenToBatcher(int socket) {
     BatcherToProposer payload;
     while (true) {
-        payload.ParseFromString(network::receivePayload(socket));
+        const std::optional<std::string>& incoming = network::receivePayload(socket);
+        if (incoming->empty())
+            return;
+        payload.ParseFromString(incoming.value());
         printf("Proposer %d received a batch request\n", id);
         std::lock_guard<std::mutex> lock(unproposedPayloadsMutex);
         unproposedPayloads.insert(unproposedPayloads.end(), payload.requests().begin(), payload.requests().end());
@@ -113,14 +118,17 @@ void proposer::listenToBatcher(int socket) {
     }
 }
 
-[[noreturn]]
 void proposer::listenToProxyLeader(int socket) {
     {std::lock_guard<std::mutex> lock(proxyLeaderMutex);
     proxyLeaders.emplace_back(socket);}
     ProxyLeaderToProposer payload;
 
     while (true) {
-        payload.ParseFromString(network::receivePayload(socket));
+        const std::optional<std::string>& incoming = network::receivePayload(socket);
+        if (incoming->empty())
+            return;
+
+        payload.ParseFromString(incoming.value());
         if (payload.type() != ProxyLeaderToProposer_Type_heartbeat) {
             std::lock_guard<std::mutex> lock(proxyLeaderMutex);
             proxyLeaderSentMessages[socket].erase(payload.messageid());
@@ -163,11 +171,13 @@ void proposer::connectToProposers(std::map<int, std::string> proposers) {
     }
 }
 
-[[noreturn]]
 void proposer::listenToProposer(const int socket) {
     ProposerToProposer payload;
     while (true) {
-        payload.ParseFromString(network::receivePayload(socket));
+        const std::optional<std::string>& incoming = network::receivePayload(socket);
+        if (incoming->empty())
+            return;
+        payload.ParseFromString(incoming.value());
 
         {std::lock_guard<std::mutex> lock(heartbeatMutex);
             printf("%d received leader heartbeat for time: %s\n", id,
