@@ -5,9 +5,14 @@
 #ifndef C__PAXOS_MAIN_HPP
 #define C__PAXOS_MAIN_HPP
 
-#include "proposer.hpp"
+#include <iostream>
+#include <thread>
+#include <numeric>
+
+#include "utils/config.hpp"
 #include "acceptor.hpp"
 #include "batcher.hpp"
+#include "proposer.hpp"
 
 class paxos {
 public:
@@ -18,11 +23,7 @@ private:
     std::mutex clientsMutex;
     std::vector<int> clientSockets {};
 
-    void startServer();
-    void startProposers();
-    void startAcceptors();
-    void startBatchers();
-    void startProxyLeaders();
+    void connectToBatcher();
     [[noreturn]] void readInput();
     void sendToBatcher(const std::string& payload);
 };

@@ -8,11 +8,12 @@
 
 #include <vector>
 #include <message.pb.h>
+#include "utils/parser.hpp"
 #include "models/log.hpp"
 
 class proxy_leader {
 public:
-    explicit proxy_leader(int id);
+    explicit proxy_leader(int id, std::map<int, std::string> proposers, std::map<int, std::map<int, std::string>> acceptors);
 private:
     const int id;
     std::mutex sentMessagesMutex;
@@ -33,9 +34,9 @@ private:
 
     std::vector<std::thread> threads = {}; // A place to put threads so they don't get freed
 
-    void connectToProposers();
+    void connectToProposers(std::map<int, std::string> proposers);
     [[noreturn]] void listenToProposer(int socket);
-    void connectToAcceptors();
+    void connectToAcceptors(std::map<int, std::map<int, std::string>> acceptors);
     [[noreturn]] void listenToAcceptor(int socket);
 
     /**

@@ -1,10 +1,6 @@
-#include <iostream>
-#include <thread>
-#include <numeric>
+
 #include "main.hpp"
-#include "proposer.hpp"
-#include "utils/config.hpp"
-#include "proxy_leader.hpp"
+
 
 int main() {
     paxos p{};
@@ -14,45 +10,18 @@ int main() {
 paxos::paxos() {
     std::cout << "F: " << config::F << std::endl;
     setbuf(stdout, nullptr); //TODO force flush to stdout. Disable when doing metrics or in prod
-    std::thread server([&]{startServer();});
-    startProposers();
-    startAcceptors();
-    startBatchers();
-    startProxyLeaders();
+    connectToBatcher();
     readInput();
 }
 
-void paxos::startServer() {
-    network::startServerAtPort(config::MAIN_PORT, [&](int clientSocketId) {
-        std::lock_guard<std::mutex> lock(clientsMutex);
-        clientSockets.emplace_back(clientSocketId);
-    });
-}
-
-void paxos::startProposers() {
-    for (int i = 0; i < config::F + 1; i++) {
-        participants.emplace_back(std::thread([i]{proposer {i};}));
-    }
-}
-
-void paxos::startAcceptors() {
-    for (int acceptorGroupId = 0; acceptorGroupId < config::NUM_ACCEPTOR_GROUPS; acceptorGroupId++) {
-        for (int i = 0; i < 2 * config::F + 1; i++) {
-            participants.emplace_back(std::thread([i, acceptorGroupId]{acceptor(i, acceptorGroupId);}));
-        }
-    }
-}
-
-void paxos::startBatchers() {
-    for (int i = 0; i < config::F + 1; i++) {
-        participants.emplace_back(std::thread([i]{batcher {i};}));
-    }
-}
-
-void paxos::startProxyLeaders() {
-    for (int i = 0; i < config::F + 1; i++) {
-        participants.emplace_back(std::thread([i]{proxy_leader {i};}));
-    }
+// TODO Connect to Multiple Batchers
+void paxos::connectToBatcher() {
+    printf("Input the IP Address of the Batcher to connect to: \n");
+    std::string batcher_ip;
+    std::cin >> batcher_ip;
+    const int batcherSocketId = network::connectToServerAtAddress(batcher_ip, config::BATCHER_PORT);
+    {std::lock_guard<std::mutex> lock(clientsMutex);
+    clientSockets.push_back(batcherSocketId);}
 }
 
 [[noreturn]]

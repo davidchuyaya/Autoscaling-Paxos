@@ -8,20 +8,20 @@
 #include "utils/config.hpp"
 #include "models/message.hpp"
 
-proposer::proposer(const int id) : id(id) {
-    findAcceptorGroupIds();
+proposer::proposer(const int id, std::map<int, std::string> proposers, std::map<int, std::map<int, std::string>> acceptors) : id(id) {
+    findAcceptorGroupIds(acceptors);
     const std::thread server([&] {startServer(); });
-    connectToProposers();
+    connectToProposers(proposers);
     const std::thread broadcastLeader([&] { broadcastIAmLeader(); });
     const std::thread heartbeatChecker([&] { checkHeartbeats(); });
     std::this_thread::sleep_for(std::chrono::seconds(1)); //TODO loop to see we're connected to F+1 proxy leaders
     mainLoop();
 }
 
-void proposer::findAcceptorGroupIds() {
+void proposer::findAcceptorGroupIds(std::map<int, std::map<int, std::string>> acceptors) {
     std::lock_guard<std::mutex> lock(acceptorMutex);
-    for (int acceptorGroupId = 0; acceptorGroupId < config::NUM_ACCEPTOR_GROUPS; acceptorGroupId++)
-        acceptorGroupIds.emplace_back(acceptorGroupId);
+    for (const auto pair : acceptors)
+        acceptorGroupIds.emplace_back(pair.first);
 }
 
 [[noreturn]]
@@ -80,6 +80,7 @@ void proposer::checkHeartbeats() {
 
 [[noreturn]]
 void proposer::startServer() {
+    printf("Proposer Port Id: %d\n", config::PROPOSER_PORT_START + id);
     network::startServerAtPort(config::PROPOSER_PORT_START + id, [&](const int clientSocket) {
         //read first incoming message to tell who the connecting node is
         WhoIsThis whoIsThis;
@@ -143,18 +144,22 @@ void proposer::listenToProxyLeader(int socket) {
     }
 }
 
-void proposer::connectToProposers() {
+void proposer::connectToProposers(std::map<int, std::string> proposers) {
     //Protocol is "connect to servers with a higher id than yourself, so we don't end up as both server & client for anyone
-    for (int i = id + 1; i < config::F + 1; i++) {
-        const int proposerPort = config::PROPOSER_PORT_START + i;
-        threads.emplace_back(std::thread([&, proposerPort]{
-            const int proposerSocket = network::connectToServerAtAddress(config::LOCALHOST, proposerPort);
-            network::sendPayload(proposerSocket, message::createWhoIsThis(WhoIsThis_Sender_proposer));
-            printf("Proposer %d connected to other proposer\n", id);
-            {std::lock_guard<std::mutex> lock(proposerMutex);
-                proposerSockets.emplace_back(proposerSocket);}
-            listenToProposer(proposerSocket);
-        }));
+    for (const auto pair : proposers) {
+        int p_id = pair.first;
+        std::string ip_addr = pair.second;
+        if (p_id > id) {
+            const int proposerPort = config::PROPOSER_PORT_START + p_id;
+            threads.emplace_back(std::thread([&, proposerPort, ip_addr]{
+                const int proposerSocket = network::connectToServerAtAddress(ip_addr, proposerPort);
+                network::sendPayload(proposerSocket, message::createWhoIsThis(WhoIsThis_Sender_proposer));
+                printf("Proposer %d connected to other proposer\n", id);
+                {std::lock_guard<std::mutex> lock(proposerMutex);
+                    proposerSockets.emplace_back(proposerSocket);}
+                listenToProposer(proposerSocket);
+            }));
+        }
     }
 }
 
@@ -348,3 +353,17 @@ void proposer::calcLastCommittedSlot() {
     while (log.find(lastCommittedSlot + 1) != log.end())
         lastCommittedSlot += 1;
 }
+
+int main(int argc, char** argv) {
+    if(argc != 4) {
+        printf("Please follow the format for running this function: ./proposer <PROPOSER ID> <PROPOSER FILE NAME> <ACCEPTORS FILE NAME>.\n");
+        exit(0);
+    }
+    int proposer_id = atoi( argv[1] );
+    std::string proposer_file = argv[2];
+    std::map<int, std::string> proposers = parser::parse_proposer(proposer_file);
+    std::string acceptor_file = argv[3];
+    std::map<int, std::map<int, std::string>> acceptors = parser::parse_acceptors(acceptor_file);
+    proposer(proposer_id, proposers, acceptors);
+}
+

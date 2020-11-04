@@ -9,12 +9,13 @@
 #include <vector>
 #include <deque>
 #include "utils/network.hpp"
+#include "utils/parser.hpp"
 #include "message.pb.h"
 #include "models/log.hpp"
 
 class proposer {
 public:
-    explicit proposer(int id);
+    explicit proposer(const int id, std::map<int, std::string> proposers, std::map<int, std::map<int, std::string>> acceptors);
 private:
     const int id; // 0 indexed, no gaps
 
@@ -63,7 +64,7 @@ private:
     /**
      * Set acceptorGroupIds. TODO not hardcode the IDs
      */
-    void findAcceptorGroupIds();
+    void findAcceptorGroupIds(std::map<int, std::map<int, std::string>> acceptors);
 
     /**
      * If isLeader = true, periodically tell other proposers.
@@ -78,7 +79,7 @@ private:
     [[noreturn]] void startServer();
     [[noreturn]] void listenToBatcher(int socket);
     [[noreturn]] void listenToProxyLeader(int socket);
-    void connectToProposers();
+    void connectToProposers(std::map<int, std::string> proposers);
     [[noreturn]] void listenToProposer(int socket);
 
     /**

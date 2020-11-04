@@ -13,6 +13,7 @@ acceptor::acceptor(const int id, const int acceptorGroupId) : id(id), acceptorGr
 [[noreturn]]
 void acceptor::startServer() {
     const int acceptorGroupPortOffset = config::ACCEPTOR_GROUP_PORT_OFFSET * acceptorGroupId;
+    printf("Acceptor Port: %d\n", config::ACCEPTOR_PORT_START + acceptorGroupPortOffset + id);
     network::startServerAtPort(config::ACCEPTOR_PORT_START + acceptorGroupPortOffset + id, [&](const int proposerSocketId) {
         printf("Acceptor [%d, %d] connected to proxy leader\n", acceptorGroupId, id);
         listenToProxyLeaders(proposerSocketId);
@@ -57,8 +58,18 @@ void acceptor::listenToProxyLeaders(int socket) {
 
 Log::pValueLog acceptor::logAfterSlot(int slotToFilter) {
     Log::pValueLog filteredLog = {};
-    for (const auto& [slot, pValue] : log)
+    for (const auto&[slot, pValue] : log)
         if (slot > slotToFilter)
             filteredLog[slot] = pValue;
     return filteredLog;
+}
+
+int main(int argc, char** argv) {
+    if(argc != 3) {
+        printf("Please follow the format for running this function: ./acceptor <ACCEPTOR GROUP ID> <ACCEPTOR ID>.\n");
+        exit(0);
+    }
+    int acceptor_group_id = atoi( argv[1] );
+    int acceptor_id = atoi( argv[2] );
+    acceptor(acceptor_id, acceptor_group_id);
 }

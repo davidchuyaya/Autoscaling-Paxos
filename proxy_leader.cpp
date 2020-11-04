@@ -8,17 +8,18 @@
 #include "models/message.hpp"
 #include <thread>
 
-proxy_leader::proxy_leader(int id) : id(id) {
-    connectToProposers();
-    connectToAcceptors();
+proxy_leader::proxy_leader(int id, std::map<int, std::string> proposers, std::map<int, std::map<int, std::string>> acceptors) : id(id) {
+    connectToProposers(proposers);
+    connectToAcceptors(acceptors);
     sendHeartbeat();
 }
 
-void proxy_leader::connectToProposers() {
-    for (int i = 0; i < config::F + 1; i++) {
-        const int proposerPort = config::PROPOSER_PORT_START + i;
-        threads.emplace_back(std::thread([&, i, proposerPort]{
-            const int proposerSocket = network::connectToServerAtAddress(config::LOCALHOST, proposerPort);
+void proxy_leader::connectToProposers(std::map<int, std::string> proposers) {
+    for (const auto pair : proposers) {
+        int i = pair.first;
+        std::string proposer_address = pair.second;
+        threads.emplace_back(std::thread([&, i, proposer_address]{
+            const int proposerSocket = network::connectToServerAtAddress(proposer_address, config::PROPOSER_PORT_START + i);
             network::sendPayload(proposerSocket, message::createWhoIsThis(WhoIsThis_Sender_proxyLeader));
             printf("Proxy leader %d connected to proposer\n", id);
             {std::lock_guard<std::mutex> lock(proposerMutex);
@@ -45,16 +46,20 @@ void proxy_leader::listenToProposer(int socket) {
     }
 }
 
-void proxy_leader::connectToAcceptors() {
-    for (int acceptorGroupId = 0; acceptorGroupId < config::NUM_ACCEPTOR_GROUPS; acceptorGroupId++) {
+void proxy_leader::connectToAcceptors(std::map<int, std::map<int, std::string>> acceptors) {
+    for (const auto pair : acceptors) {
+        int acceptorGroupId = pair.first;
+        std::map<int, std::string> acceptorIPs = pair.second;
         const int acceptorGroupPortOffset = config::ACCEPTOR_GROUP_PORT_OFFSET * acceptorGroupId;
         {std::lock_guard<std::mutex> lock(acceptorMutex);
             acceptorGroupIds.emplace_back(acceptorGroupId);}
 
-        for (int i = 0; i < 2 * config::F + 1; i++) {
+        for (const auto acceptor: acceptorIPs) {
+            int i = acceptor.first;
+            std::string acceptor_ip = acceptor.second;
             const int acceptorPort = config::ACCEPTOR_PORT_START + acceptorGroupPortOffset + i;
-            threads.emplace_back(std::thread([&, acceptorPort, acceptorGroupId]{
-                const int acceptorSocket = network::connectToServerAtAddress(config::LOCALHOST, acceptorPort);
+            threads.emplace_back(std::thread([&, acceptor_ip, acceptorPort, acceptorGroupId]{
+                const int acceptorSocket = network::connectToServerAtAddress(acceptor_ip, acceptorPort);
                 {std::lock_guard<std::mutex> lock(acceptorMutex);
                     acceptorSockets[acceptorGroupId].emplace_back(acceptorSocket);}
                 listenToAcceptor(acceptorSocket);
@@ -153,4 +158,17 @@ void proxy_leader::sendHeartbeat() {
         for (const auto&[id, socket] : proposerSockets)
             network::sendPayload(socket, heartbeat);
     }
+}
+
+int main(int argc, char** argv) {
+    if(argc != 4) {
+        printf("Please follow the format for running this function: ./proxy_leader <PROXY LEADER ID> <PROPOSER FILE NAME> <ACCEPTOR FILE NAME>.\n");
+        exit(0);
+    }
+    int proxy_leader_id = atoi( argv[1] );
+    std::string proposer_file = argv[2];
+    std::map<int, std::string> proposers = parser::parse_proposer(proposer_file);
+    std::string acceptor_file = argv[3];
+    std::map<int, std::map<int, std::string>> acceptors = parser::parse_acceptors(acceptor_file);
+    proxy_leader main = proxy_leader(proxy_leader_id, proposers, acceptors);
 }

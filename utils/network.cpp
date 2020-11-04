@@ -8,7 +8,8 @@
 #include <vector>
 #include "network.hpp"
 
-[[noreturn]] void network::startServerAtPort(const int port, const std::function<void(int)>& onClientConnected) {
+[[noreturn]]
+void network::startServerAtPort(const int port, const std::function<void(int)>& onClientConnected) {
     const auto& [socketId, serverAddress] = listenToPort(port);
     std::vector<std::thread> clientThreads {};
     while (true) {
@@ -36,17 +37,22 @@ std::tuple<int, sockaddr_in> network::listenToPort(const int port) {
 }
 
 int network::connectToServerAtAddress(const std::string& address, const int port) {
-    const int socketId = createSocket();
-
-    sockaddr_in serverAddress {};
-    serverAddress.sin_family = AF_INET;
-    serverAddress.sin_port = htons(port);
-    inet_pton(AF_INET, address.c_str(), &serverAddress.sin_addr);
-
-    //TODO sometimes this connection never goes through. Investigate?
     int connectResult = -1;
-    while (connectResult < 0)
+    int socketId;
+    while (connectResult < 0) {
+        socketId = createSocket();
+
+        sockaddr_in serverAddress {};
+        serverAddress.sin_family = AF_INET;
+        serverAddress.sin_port = htons(port);
+        inet_pton(AF_INET, address.c_str(), &serverAddress.sin_addr);
+
+        //TODO sometimes this connection never goes through. Investigate?
         connectResult = connect(socketId, (sockaddr *) &serverAddress, sizeof(serverAddress));
+        if (connectResult < 0) {
+            std::this_thread::sleep_for(std::chrono::seconds(10));
+        }
+    }
     return socketId;
 }
 
