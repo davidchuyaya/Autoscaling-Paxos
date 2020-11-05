@@ -41,8 +41,9 @@ void proxy_leader::listenToProposer(int socket) {
             sentMessages[payload.messageid()] = payload;}
         printf("Proxy leader %d received from proposer: %s\n", id, payload.ShortDebugString().c_str());
 
-        // Broadcast to Acceptors
-        std::lock_guard<std::mutex> lock(acceptorMutex);
+        // Broadcast to Acceptors; wait if necessary
+        std::unique_lock lock(acceptorMutex);
+        acceptorCV.wait(lock, [&]{return acceptorSockets.find(payload.acceptorgroupid()) != acceptorSockets.end();});
         // TODO check if connection to acceptors is valid for the ID; if not, fetch from Anna
         for (const int acceptorSocket : acceptorSockets[payload.acceptorgroupid()])
             network::sendPayload(acceptorSocket, payload);
@@ -68,6 +69,7 @@ void proxy_leader::connectToAcceptors(std::map<int, std::map<int, std::string>> 
                 printf("Proxy leader %d connected to acceptor\n", id);
                 {std::lock_guard<std::mutex> lock(acceptorMutex);
                     acceptorSockets[acceptorGroupId].emplace_back(acceptorSocket);}
+                acceptorCV.notify_one();
                 listenToAcceptor(acceptorSocket);
                 printf("Proxy leader %d disconnected from acceptor!!!\n", id);
             }));

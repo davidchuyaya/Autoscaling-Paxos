@@ -29,6 +29,7 @@ private:
     std::unordered_map<int, int> proposerSockets = {}; //key = proposer ID
 
     std::mutex acceptorMutex;
+    std::condition_variable acceptorCV;
     std::unordered_map<int, std::vector<int>> acceptorSockets = {}; //key = acceptor group ID
     std::vector<int> acceptorGroupIds = {};
 
