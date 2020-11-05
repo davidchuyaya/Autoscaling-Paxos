@@ -36,14 +36,14 @@ void proxy_leader::listenToProposer(int socket) {
         if (incoming->empty())
             return;
         payload.ParseFromString(incoming.value());
-        //keep track
+        // keep track
         {std::lock_guard<std::mutex> lock(sentMessagesMutex);
             sentMessages[payload.messageid()] = payload;}
         printf("Proxy leader %d received from proposer: %s\n", id, payload.ShortDebugString().c_str());
 
-        //broadcast to acceptors
+        // Broadcast to Acceptors
         std::lock_guard<std::mutex> lock(acceptorMutex);
-        //TODO check if connection to acceptors is valid for the ID; if not, fetch from Anna
+        // TODO check if connection to acceptors is valid for the ID; if not, fetch from Anna
         for (const int acceptorSocket : acceptorSockets[payload.acceptorgroupid()])
             network::sendPayload(acceptorSocket, payload);
     }
