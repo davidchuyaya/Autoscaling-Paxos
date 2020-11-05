@@ -47,6 +47,7 @@ int network::connectToServerAtAddress(const std::string& address, const int port
         serverAddress.sin_port = htons(port);
         inet_pton(AF_INET, address.c_str(), &serverAddress.sin_addr);
 
+        // TODO sometimes this connection never goes through. Investigate?
         connectResult = connect(socketId, (sockaddr *) &serverAddress, sizeof(serverAddress));
         if (connectResult < 0) {
             std::this_thread::sleep_for(std::chrono::seconds(config::TCP_RETRY_TIMEOUT_SEC));

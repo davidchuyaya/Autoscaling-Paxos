@@ -100,7 +100,7 @@ void proposer::checkHeartbeats() {
 void proposer::startServer() {
     printf("Proposer Port Id: %d\n", config::PROPOSER_PORT_START + id);
     network::startServerAtPort(config::PROPOSER_PORT_START + id, [&](const int clientSocket) {
-        //read first incoming message to tell who the connecting node is
+        // read first incoming message to tell who the connecting node is
         const std::optional<std::string>& incoming = network::receivePayload(clientSocket);
         if (incoming->empty())
             return;
@@ -175,7 +175,7 @@ void proposer::listenToProxyLeader(int socket) {
 }
 
 void proposer::connectToProposers(std::map<int, std::string> proposers) {
-    //Protocol is "connect to servers with a higher id than yourself, so we don't end up as both server & client for anyone
+    // Protocol is "connect to servers with a higher id than yourself, so we don't end up as both server & client for anyone
     for (const auto pair : proposers) {
         int p_id = pair.first;
         std::string ip_addr = pair.second;
@@ -247,8 +247,8 @@ void proposer::handleP1B(const ProxyLeaderToProposer& message) {
     printf("Proposer %d received p1b from acceptor group: %d, committed log length: %d, uncommitted log length: %d\n", id,
            message.acceptorgroupid(), message.committedlog_size(), message.uncommittedlog_size());
 
-    if (message.ballot().id() != id) { //we lost the election
-        //store the largest ballot we last saw so we can immediately catch up
+    if (message.ballot().id() != id) { // we lost the election
+        // store the largest ballot we last saw so we can immediately catch up
         {std::lock_guard lock(ballotMutex);
         ballotNum = message.ballot().ballotnum();}
         noLongerLeader();
