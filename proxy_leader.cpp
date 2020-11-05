@@ -46,6 +46,8 @@ void proxy_leader::listenToProposer(int socket) {
         //TODO check if connection to acceptors is valid for the ID; if not, fetch from Anna
         for (const int acceptorSocket : acceptorSockets[payload.acceptorgroupid()])
             network::sendPayload(acceptorSocket, payload);
+
+        payload.Clear();
     }
 }
 
@@ -63,9 +65,11 @@ void proxy_leader::connectToAcceptors(std::map<int, std::map<int, std::string>> 
             const int acceptorPort = config::ACCEPTOR_PORT_START + acceptorGroupPortOffset + i;
             threads.emplace_back(std::thread([&, acceptor_ip, acceptorPort, acceptorGroupId]{
                 const int acceptorSocket = network::connectToServerAtAddress(acceptor_ip, acceptorPort);
+                printf("Proxy leader %d connected to acceptor\n", id);
                 {std::lock_guard<std::mutex> lock(acceptorMutex);
                     acceptorSockets[acceptorGroupId].emplace_back(acceptorSocket);}
                 listenToAcceptor(acceptorSocket);
+                printf("Proxy leader %d disconnected from acceptor!!!\n", id);
             }));
         }
     }
@@ -89,6 +93,7 @@ void proxy_leader::listenToAcceptor(int socket) {
                 break;
             default: {}
         }
+        payload.Clear();
     }
 }
 

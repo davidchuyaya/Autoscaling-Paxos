@@ -54,7 +54,9 @@ private:
     int nextAcceptorGroup = 0;
 
     std::mutex proxyLeaderMutex;
-    std::vector<int> proxyLeaders = {};
+    std::condition_variable proxyLeaderCV;
+    std::vector<int> fastProxyLeaders = {};
+    std::vector<int> slowProxyLeaders = {};
     std::unordered_map<int, std::unordered_map<int, ProposerToAcceptor>> proxyLeaderSentMessages = {}; //{socket: {messageID: message}}
 
     int nextProxyLeader = 0;
@@ -134,15 +136,15 @@ private:
     /**
      * Increments (round robin) the next acceptor group a payload will be proposed to.
      * @warning Does NOT lock acceptorMutex. The caller MUST lock it.
-     * @return The acceptor group to propose to.
+     * @return The ID of the acceptor group to propose to.
      */
-    int fetchNextAcceptorGroup();
+    int fetchNextAcceptorGroupId();
     /**
      * Increments (round robin) the next proxy leader a payload will be sent to.
      * @warning Does NOT lock proxyLeaderMutex. The caller MUST lock it.
-     * @return The proxy leader to send to.
+     * @return The socket of the proxy leader to send to.
      */
-    int fetchNextProxyLeader();
+    int fetchNextProxyLeaderSocket();
     /**
      * Stores the fact that we've sent this message to this proxy leader so we can resend if the proxy leader fails.
      *
