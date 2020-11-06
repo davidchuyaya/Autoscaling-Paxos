@@ -4,14 +4,14 @@
 
 #include "batcher.hpp"
 
-batcher::batcher(const int id, const std::map<int, std::string> proposers_addr) : id(id) {
-    connectToProposers(proposers_addr);
+batcher::batcher(const int id, const parser::idToIP& proposerIDtoIPs) : id(id) {
+    connectToProposers(proposerIDtoIPs);
     startServer();
 }
 
 [[noreturn]]
 void batcher::startServer() {
-    network::startServerAtPort(config::BATCHER_PORT, [&](const int clientSocketId) {
+    network::startServerAtPort(config::BATCHER_PORT_START + id, [&](const int clientSocketId) {
         printf("Batcher %d connected to client\n", id);
         listenToClient(clientSocketId);
     });
@@ -36,30 +36,29 @@ void batcher::listenToClient(const int clientSocketId) {
     }
 }
 
-// need to connect to the proposers
-// have this information passed along to the proposers
-void batcher::connectToProposers(const std::map<int, std::string> proposers_addr) {
-    for (const auto pair : proposers_addr) {
-        int i = pair.first;
-        std::string proposer_ip_addr = pair.second;
-        const int proposerPort = config::PROPOSER_PORT_START + i;
-        threads.emplace_back(std::thread([&, proposerPort, i]{
-            const int proposerSocketId = network::connectToServerAtAddress(proposer_ip_addr, proposerPort);
+void batcher::connectToProposers(const parser::idToIP& proposerIDToIPs) {
+    for (const auto& idToIP : proposerIDToIPs) {
+        int proposerID = idToIP.first;
+        std::string proposerIP = idToIP.second;
+        const int proposerPort = config::PROPOSER_PORT_START + proposerID;
+
+        threads.emplace_back(std::thread([&, proposerIP, proposerPort] {
+            const int proposerSocketId = network::connectToServerAtAddress(proposerIP, proposerPort);
             network::sendPayload(proposerSocketId, message::createWhoIsThis(WhoIsThis_Sender_batcher));
             {std::lock_guard<std::mutex> lock(proposerMutex);
             proposerSockets.emplace_back(proposerSocketId);}
-            printf("Batcher %d connected to proposer %d\n", id, i);
+            printf("Batcher %d connected to proposer\n", id);
         }));
     }
 }
 
-int main(int argc, char** argv) {
-    if(argc != 3) {
-        printf("Please follow the format for running this function: ./batcher <BATCHER ID> <PROPOSER FILE NAME>.\n");
+int main(const int argc, const char** argv) {
+    if (argc != 3) {
+        printf("Usage: ./batcher <BATCHER ID> <PROPOSER FILE NAME>.\n");
         exit(0);
     }
-    int batcher_id = atoi( argv[1] );
-    std::string proposer_file = argv[2];
-    std::map<int, std::string> proposers = parser::parse_proposer(proposer_file);
-    batcher(batcher_id, proposers);
+    const int batcherId = atoi(argv[1] );
+    const std::string& proposerFile = argv[2];
+    const parser::idToIP& proposers = parser::parseProposer(proposerFile);
+    batcher(batcherId, proposers);
 }

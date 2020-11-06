@@ -15,7 +15,7 @@
 
 class proposer {
 public:
-    explicit proposer(const int id, std::map<int, std::string> proposers, std::map<int, std::map<int, std::string>> acceptors);
+    explicit proposer(const int id, const parser::idToIP& proposers, const std::unordered_map<int, parser::idToIP>& acceptors);
 private:
     const int id; // 0 indexed, no gaps
 
@@ -24,7 +24,7 @@ private:
 
     std::atomic<bool> isLeader = false;
     std::mutex heartbeatMutex;
-    time_t lastLeaderHeartbeat;
+    time_t lastLeaderHeartbeat = 0;
     std::unordered_map<int, time_t> proxyLeaderHeartbeats = {}; //key = socket
 
     std::atomic<bool> shouldSendScouts = true;
@@ -66,7 +66,7 @@ private:
     /**
      * Set acceptorGroupIds. TODO not hardcode the IDs
      */
-    void findAcceptorGroupIds(std::map<int, std::map<int, std::string>> acceptors);
+    void findAcceptorGroupIds(const std::unordered_map<int, parser::idToIP>& acceptors);
 
     /**
      * If isLeader = true, periodically tell other proposers.
@@ -81,7 +81,7 @@ private:
     [[noreturn]] void startServer();
     void listenToBatcher(int socket);
     void listenToProxyLeader(int socket);
-    void connectToProposers(std::map<int, std::string> proposers);
+    void connectToProposers(const parser::idToIP& proposers);
     void listenToProposer(int socket);
 
     /**

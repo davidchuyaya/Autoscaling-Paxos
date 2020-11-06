@@ -13,7 +13,7 @@
 
 class proxy_leader {
 public:
-    explicit proxy_leader(int id, std::map<int, std::string> proposers, std::map<int, std::map<int, std::string>> acceptors);
+    explicit proxy_leader(int id, const parser::idToIP& proposers, const std::unordered_map<int, parser::idToIP>& acceptors);
 private:
     const int id;
     std::mutex sentMessagesMutex;
@@ -35,9 +35,9 @@ private:
 
     std::vector<std::thread> threads = {}; // A place to put threads so they don't get freed
 
-    void connectToProposers(std::map<int, std::string> proposers);
+    void connectToProposers(const parser::idToIP&  proposers);
     void listenToProposer(int socket);
-    void connectToAcceptors(std::map<int, std::map<int, std::string>> acceptors);
+    void connectToAcceptors(const std::unordered_map<int, parser::idToIP>& acceptors);
     void listenToAcceptor(int socket);
 
     /**

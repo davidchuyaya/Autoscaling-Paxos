@@ -20,7 +20,7 @@ void acceptor::startServer() {
     });
 }
 
-void acceptor::listenToProxyLeaders(int socket) {
+void acceptor::listenToProxyLeaders(const int socket) {
     ProposerToAcceptor payload;
 
     while (true) {
@@ -59,7 +59,7 @@ void acceptor::listenToProxyLeaders(int socket) {
     }
 }
 
-Log::pValueLog acceptor::logAfterSlot(int slotToFilter) {
+Log::pValueLog acceptor::logAfterSlot(const int slotToFilter) {
     Log::pValueLog filteredLog = {};
     for (const auto&[slot, pValue] : log)
         if (slot > slotToFilter)
@@ -67,12 +67,12 @@ Log::pValueLog acceptor::logAfterSlot(int slotToFilter) {
     return filteredLog;
 }
 
-int main(int argc, char** argv) {
-    if(argc != 3) {
-        printf("Please follow the format for running this function: ./acceptor <ACCEPTOR GROUP ID> <ACCEPTOR ID>.\n");
+int main(const int argc, const char** argv) {
+    if (argc != 3) {
+        printf("Usage: ./acceptor <ACCEPTOR GROUP ID> <ACCEPTOR ID>.\n");
         exit(0);
     }
-    int acceptor_group_id = atoi( argv[1] );
-    int acceptor_id = atoi( argv[2] );
-    acceptor(acceptor_id, acceptor_group_id);
+    const int acceptorGroupId = atoi(argv[1] );
+    const int id = atoi(argv[2] );
+    acceptor(id, acceptorGroupId);
 }

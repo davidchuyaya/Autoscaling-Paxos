@@ -16,7 +16,7 @@
 
 class batcher {
 public:
-    explicit batcher(const int id, const std::map<int, std::string> proposers_addr);
+    explicit batcher(int id, const parser::idToIP& proposerIDtoIPs);
 private:
     int id = 0;
     std::vector<std::string> unproposedPayloads = {};
@@ -37,13 +37,13 @@ private:
      *
      * @param client_address Address of the client
      */
-    void listenToClient(const int clientSocketId);
+    void listenToClient(int clientSocketId);
     /**
      * Connects to the Proposers.
      *
      * @param proposers_addr Address of the Proposers
      */
-    void connectToProposers(const std::map<int, std::string> proposers_addr);
+    void connectToProposers(const parser::idToIP& proposerIDtoIPs);
 };
 
 #endif //AUTOSCALING_PAXOS_BATCHER_HPP

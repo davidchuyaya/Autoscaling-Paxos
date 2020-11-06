@@ -2,9 +2,10 @@
 #include "main.hpp"
 
 
-int main() {
-    paxos p{};
+int main(const int argc, const char** argv) {
+    paxos p {};
 }
+
 
 [[noreturn]]
 paxos::paxos() {
@@ -16,12 +17,15 @@ paxos::paxos() {
 
 // TODO Connect to Multiple Batchers
 void paxos::connectToBatcher() {
-    printf("Input the IP Address of the Batcher to connect to: \n");
-    std::string batcher_ip;
-    std::cin >> batcher_ip;
-    const int batcherSocketId = network::connectToServerAtAddress(batcher_ip, config::BATCHER_PORT);
-    {std::lock_guard<std::mutex> lock(clientsMutex);
-    clientSockets.push_back(batcherSocketId);}
+    printf("Input the IP Address of the Batcher to connect to: ");
+    std::string batcherIp;
+    std::cin >> batcherIp;
+    printf("Input the ID of the batcher: ");
+    int batcherId;
+    std::cin >> batcherId;
+    const int batcherSocketId = network::connectToServerAtAddress(batcherIp, config::BATCHER_PORT_START + batcherId);
+    {std::lock_guard<std::mutex> lock(batcherMutex);
+    batcherSockets.push_back(batcherSocketId);}
 }
 
 [[noreturn]]
@@ -35,7 +39,7 @@ void paxos::readInput() {
 
 // TODO retry on timeout with different batcher
 void paxos::sendToBatcher(const std::string& payload) {
-    std::lock_guard<std::mutex> lock(clientsMutex);
-    network::sendPayload(clientSockets[batcherIndex], payload);
-    batcherIndex = (batcherIndex + 1) % (clientSockets.size());
+    std::lock_guard<std::mutex> lock(batcherMutex);
+    network::sendPayload(batcherSockets[batcherIndex], payload);
+    batcherIndex = (batcherIndex + 1) % (batcherSockets.size());
 }
