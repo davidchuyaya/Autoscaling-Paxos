@@ -1,6 +1,7 @@
 //
 // Created by David Chu on 10/4/20.
 //
+#include <unistd.h>
 #include <thread>
 #include <algorithm>
 #include <google/protobuf/message.h>
@@ -99,9 +100,9 @@ void proposer::checkHeartbeats() {
 [[noreturn]]
 void proposer::startServer() {
     printf("Proposer Port Id: %d\n", config::PROPOSER_PORT_START + id);
-    network::startServerAtPort(config::PROPOSER_PORT_START + id, [&](const int clientSocket) {
+    network::startServerAtPort(config::PROPOSER_PORT_START + id, [&](const int socket) {
         // read first incoming message to tell who the connecting node is
-        const std::optional<std::string>& incoming = network::receivePayload(clientSocket);
+        const std::optional<std::string>& incoming = network::receivePayload(socket);
         if (incoming->empty())
             return;
         WhoIsThis whoIsThis;
@@ -109,17 +110,18 @@ void proposer::startServer() {
         switch (whoIsThis.sender()) {
             case WhoIsThis_Sender_batcher:
                 printf("Server %d connected to batcher\n", id);
-                listenToBatcher(clientSocket);
+                listenToBatcher(socket);
             case WhoIsThis_Sender_proxyLeader:
                 printf("Server %d connected to proxy leader\n", id);
-                listenToProxyLeader(clientSocket);
+                listenToProxyLeader(socket);
             case WhoIsThis_Sender_proposer:
                 printf("Server %d connected to proposer\n", id);
                 {std::lock_guard<std::mutex> lock(proposerMutex);
-                    proposerSockets.emplace_back(clientSocket);}
-                listenToProposer(clientSocket);
+                    proposerSockets.emplace_back(socket);}
+                listenToProposer(socket);
             default: {}
         }
+        close(socket);
     });
 }
 
@@ -185,12 +187,13 @@ void proposer::connectToProposers(const parser::idToIP& proposers) {
 
         const int proposerPort = config::PROPOSER_PORT_START + proposerID;
         threads.emplace_back(std::thread([&, proposerPort, proposerIP]{
-            const int proposerSocket = network::connectToServerAtAddress(proposerIP, proposerPort);
-            network::sendPayload(proposerSocket, message::createWhoIsThis(WhoIsThis_Sender_proposer));
+            const int socket = network::connectToServerAtAddress(proposerIP, proposerPort);
+            network::sendPayload(socket, message::createWhoIsThis(WhoIsThis_Sender_proposer));
             printf("Proposer %d connected to other proposer\n", id);
             {std::lock_guard<std::mutex> lock(proposerMutex);
-                proposerSockets.emplace_back(proposerSocket);}
-            listenToProposer(proposerSocket);
+                proposerSockets.emplace_back(socket);}
+            listenToProposer(socket);
+            close(socket);
         }));
     }
 }

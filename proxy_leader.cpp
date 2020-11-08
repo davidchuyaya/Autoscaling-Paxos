@@ -2,6 +2,7 @@
 // Created by David Chu on 10/29/20.
 //
 
+#include <unistd.h>
 #include "proxy_leader.hpp"
 #include "utils/config.hpp"
 #include "utils/network.hpp"
@@ -20,12 +21,13 @@ void proxy_leader::connectToProposers(const parser::idToIP& proposers) {
         const std::string& proposerIp = proposerIdToIps.second;
 
         threads.emplace_back(std::thread([&, proposerId, proposerIp] {
-            const int proposerSocket = network::connectToServerAtAddress(proposerIp, config::PROPOSER_PORT_START + proposerId);
-            network::sendPayload(proposerSocket, message::createWhoIsThis(WhoIsThis_Sender_proxyLeader));
+            const int socket = network::connectToServerAtAddress(proposerIp, config::PROPOSER_PORT_START + proposerId);
+            network::sendPayload(socket, message::createWhoIsThis(WhoIsThis_Sender_proxyLeader));
             printf("Proxy leader %d connected to proposer\n", id);
             {std::lock_guard<std::mutex> lock(proposerMutex);
-                proposerSockets[proposerId] = proposerSocket;}
-            listenToProposer(proposerSocket);
+                proposerSockets[proposerId] = socket;}
+            listenToProposer(socket);
+            close(socket);
         }));
     }
 }
@@ -67,13 +69,13 @@ void proxy_leader::connectToAcceptors(const std::unordered_map<int, parser::idTo
             const int acceptorPort = config::ACCEPTOR_PORT_START + acceptorGroupPortOffset + acceptorId;
 
             threads.emplace_back(std::thread([&, acceptorIp, acceptorPort, acceptorGroupId]{
-                const int acceptorSocket = network::connectToServerAtAddress(acceptorIp, acceptorPort);
+                const int socket = network::connectToServerAtAddress(acceptorIp, acceptorPort);
                 printf("Proxy leader %d connected to acceptor\n", id);
                 {std::lock_guard<std::mutex> lock(acceptorMutex);
-                    acceptorSockets[acceptorGroupId].emplace_back(acceptorSocket);}
+                    acceptorSockets[acceptorGroupId].emplace_back(socket);}
                 acceptorCV.notify_one();
-                listenToAcceptor(acceptorSocket);
-                printf("Proxy leader %d disconnected from acceptor\n", id);
+                listenToAcceptor(socket);
+                close(socket);
             }));
         }
     }

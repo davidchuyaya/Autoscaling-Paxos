@@ -1,7 +1,7 @@
 //
 // Created by Taj Shaik on 10/15/20.
 //
-
+#include <unistd.h>
 #include "batcher.hpp"
 
 batcher::batcher(const int id, const parser::idToIP& proposerIDtoIPs) : id(id) {
@@ -14,6 +14,7 @@ void batcher::startServer() {
     network::startServerAtPort(config::BATCHER_PORT_START + id, [&](const int clientSocketId) {
         printf("Batcher %d connected to client\n", id);
         listenToClient(clientSocketId);
+        close(clientSocketId);
     });
 }
 

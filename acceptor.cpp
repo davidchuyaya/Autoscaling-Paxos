@@ -2,6 +2,7 @@
 // Created by David Chu on 10/4/20.
 //
 
+#include <unistd.h>
 #include "acceptor.hpp"
 #include "utils/network.hpp"
 #include "models/message.hpp"
@@ -14,9 +15,10 @@ acceptor::acceptor(const int id, const int acceptorGroupId) : id(id), acceptorGr
 void acceptor::startServer() {
     const int acceptorGroupPortOffset = config::ACCEPTOR_GROUP_PORT_OFFSET * acceptorGroupId;
     printf("Acceptor Port: %d\n", config::ACCEPTOR_PORT_START + acceptorGroupPortOffset + id);
-    network::startServerAtPort(config::ACCEPTOR_PORT_START + acceptorGroupPortOffset + id, [&](const int proposerSocketId) {
+    network::startServerAtPort(config::ACCEPTOR_PORT_START + acceptorGroupPortOffset + id, [&](const int socket) {
         printf("Acceptor [%d, %d] connected to proxy leader\n", acceptorGroupId, id);
-        listenToProxyLeaders(proposerSocketId);
+        listenToProxyLeaders(socket);
+        close(socket);
     });
 }
 
