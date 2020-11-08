@@ -19,6 +19,9 @@ void batcher::startServer() {
 }
 
 void batcher::listenToClient(const int clientSocketId) {
+    //first payload is IP address of client
+    const std::string ipAddress = network::receivePayload(clientSocketId).value();
+
     while (true) {
         const std::optional<std::string>& incoming = network::receivePayload(clientSocketId);
         if (incoming->empty())
@@ -26,14 +29,23 @@ void batcher::listenToClient(const int clientSocketId) {
 
         const std::string& payload = incoming.value();
         printf("Batcher %d received payload: [%s]\n", id, payload.c_str());
-        unproposedPayloads.emplace_back(payload);
+        {std::lock_guard<std::mutex> lock(payloadsMutex);
+        clientToPayloads[ipAddress].emplace_back(payload);}
 
-        if (unproposedPayloads.size() >= config::THRESHOLD_BATCH_SIZE) {
-            {std::lock_guard<std::mutex> lock(proposerMutex);
-            for (const int socket : proposerSockets)
-                network::sendPayload(socket, message::createBatchMessage(unproposedPayloads));}
-            unproposedPayloads.clear();
-        }
+        //check if it's time to send another batch
+        {std::lock_guard<std::mutex> lock(lastBatchTimeMutex);
+        time_t now;
+        time(&now);
+        if (difftime(now, lastBatchTime) < config::BATCH_TIME_SEC)
+            continue;
+        lastBatchTime = now;}
+
+        std::scoped_lock lock(payloadsMutex, proposerMutex);
+        printf("Sending batch\n");
+        const Batch& batchMessage = message::createBatchMessage(clientToPayloads);
+        for (const int socket : proposerSockets)
+            network::sendPayload(socket, batchMessage);
+        clientToPayloads.clear();
     }
 }
 

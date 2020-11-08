@@ -19,7 +19,11 @@ public:
     explicit batcher(int id, const parser::idToIP& proposerIDtoIPs);
 private:
     int id = 0;
-    std::vector<std::string> unproposedPayloads = {};
+    std::mutex lastBatchTimeMutex;
+    time_t lastBatchTime = 0;
+
+    std::mutex payloadsMutex;
+    std::unordered_map<std::string, std::vector<std::string>> clientToPayloads = {};
     std::vector<std::thread> threads = {}; // A place to put threads so they don't get freed
 
     std::mutex proposerMutex;
@@ -38,11 +42,6 @@ private:
      * @param client_address Address of the client
      */
     void listenToClient(int clientSocketId);
-    /**
-     * Connects to the Proposers.
-     *
-     * @param proposers_addr Address of the Proposers
-     */
     void connectToProposers(const parser::idToIP& proposerIDtoIPs);
 };
 

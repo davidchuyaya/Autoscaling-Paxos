@@ -22,6 +22,7 @@ private:
     std::mutex batcherMutex;
     std::vector<int> batcherSockets {};
 
+    [[noreturn]] void startServer();
     void connectToBatcher();
     [[noreturn]] void readInput();
     void sendToBatcher(const std::string& payload);

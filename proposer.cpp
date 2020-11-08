@@ -126,17 +126,13 @@ void proposer::startServer() {
 }
 
 void proposer::listenToBatcher(const int socket) {
-    BatcherToProposer payload;
     while (true) {
         const std::optional<std::string>& incoming = network::receivePayload(socket);
         if (incoming->empty())
             return;
-        payload.ParseFromString(incoming.value());
         printf("Proposer %d received a batch request\n", id);
         std::lock_guard<std::mutex> lock(unproposedPayloadsMutex);
-        unproposedPayloads.insert(unproposedPayloads.end(), payload.requests().begin(), payload.requests().end());
-
-        payload.Clear();
+        unproposedPayloads.emplace_back(incoming.value());
     }
 }
 
