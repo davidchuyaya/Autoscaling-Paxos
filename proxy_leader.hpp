@@ -10,6 +10,7 @@
 #include <message.pb.h>
 #include "utils/parser.hpp"
 #include "models/log.hpp"
+#include "models/heartbeat_component.hpp"
 
 class proxy_leader {
 public:
@@ -34,8 +35,7 @@ private:
     std::unordered_map<int, std::vector<int>> acceptorSockets = {}; //key = acceptor group ID
     std::vector<int> acceptorGroupIds = {};
 
-    std::mutex unbatcherMutex;
-    std::unordered_map<int, int> unbatcherSockets = {}; //key = unbatcher ID
+    heartbeat_component unbatchers;
 
     std::vector<std::thread> threads = {}; // A place to put threads so they don't get freed
 

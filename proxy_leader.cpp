@@ -2,7 +2,6 @@
 // Created by David Chu on 10/29/20.
 //
 
-#include <unistd.h>
 #include "proxy_leader.hpp"
 #include "utils/config.hpp"
 #include "utils/network.hpp"
@@ -10,24 +9,19 @@
 #include <thread>
 
 proxy_leader::proxy_leader(const int id, const parser::idToIP& unbatchers, const parser::idToIP& proposers,
-                           const std::unordered_map<int, parser::idToIP>& acceptors) : id(id) {
+                           const std::unordered_map<int, parser::idToIP>& acceptors) : id(id), unbatchers(config::F+1) {
     connectToUnbatchers(unbatchers);
     connectToProposers(proposers);
     connectToAcceptors(acceptors);
     sendHeartbeat();
 }
 
-void proxy_leader::connectToUnbatchers(const parser::idToIP& unbatchers) { //TODO heartbeat component
-    for (const auto& unbatcherIdToIps : unbatchers) {
-        const int unbatcherId = unbatcherIdToIps.first;
-        const std::string unbatcherIp = unbatcherIdToIps.second;
-
-        threads.emplace_back(std::thread([&, unbatcherId, unbatcherIp] {
-            const int socket = network::connectToServerAtAddress(unbatcherIp,config::UNBATCHER_PORT_START + unbatcherId, WhoIsThis_Sender_proxyLeader);
-            std::lock_guard<std::mutex> lock(unbatcherMutex);
-            unbatcherSockets[unbatcherId] = socket;
-        }));
-    }
+void proxy_leader::connectToUnbatchers(const parser::idToIP& unbatchersIdToIps) {
+    unbatchers.connectToServers(unbatchersIdToIps, config::UNBATCHER_PORT_START, WhoIsThis_Sender_proxyLeader,
+        [&](const int socket, const std::string& payload) {
+        unbatchers.addHeartbeat(socket);
+    });
+    //TODO should we wait for F+1 unbatchers?
 }
 
 void proxy_leader::connectToProposers(const parser::idToIP& proposers) {
@@ -140,7 +134,7 @@ void proxy_leader::handleP1B(const AcceptorToProxyLeader& payload) {
 }
 
 void proxy_leader::handleP2B(const AcceptorToProxyLeader& payload) {
-    std::scoped_lock lock(sentMessagesMutex, approvedCommandersMutex, proposerMutex, unbatcherMutex);
+    std::scoped_lock lock(sentMessagesMutex, approvedCommandersMutex, proposerMutex);
     const ProposerToAcceptor& sentValue = sentMessages[payload.messageid()];
     if (sentValue.slot() == 0) {
         //p2b is arriving for a nonexistent sentValue
@@ -164,7 +158,7 @@ void proxy_leader::handleP2B(const AcceptorToProxyLeader& payload) {
             const ProxyLeaderToProposer& messageToProposer = message::createProxyP2B(payload.messageid(), payload.acceptorgroupid(),
                                                                                      payload.ballot(), payload.slot());
             network::sendPayload(proposerSockets[sentValue.ballot().id()], messageToProposer);
-            network::sendPayload(unbatcherSockets[1], sentMessages[payload.messageid()].payload()); //TODO choose fast unbatcher, heartbeats
+            unbatchers.send(sentMessages[payload.messageid()].payload());
             sentMessages.erase(payload.messageid());
             approvedCommanders.erase(payload.messageid());
         }

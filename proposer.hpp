@@ -13,7 +13,6 @@
 #include "message.pb.h"
 #include "models/log.hpp"
 #include "models/heartbeat_component.hpp"
-#include "models/heartbeat_component.cpp"
 
 class proposer {
 public:
@@ -54,7 +53,7 @@ private:
 
     int nextAcceptorGroup = 0;
 
-    heartbeat_component<ProposerToAcceptor> proxyLeaders;
+    heartbeat_component proxyLeaders;
 
     std::vector<std::thread> threads = {}; // A place to put threads so they don't get freed
 

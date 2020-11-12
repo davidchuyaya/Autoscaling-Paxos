@@ -12,16 +12,20 @@
 #include <functional>
 #include "message.pb.h"
 #include "../utils/parser.hpp"
+#include "../utils/network.hpp"
 
-template<typename Message>
 class heartbeat_component {
 public:
     explicit heartbeat_component(int waitThreshold);
     void connectToServers(const parser::idToIP& idToIPs, int socketOffset, const WhoIsThis_Sender& whoIsThis,
-                          const std::function<void(const Message&)>* listener);
+                          const std::function<void(int, const std::string&)>& listener);
     void addConnection(int socket);
     void waitForThreshold();
-    void send(const Message& payload);
+    template<typename Message> void send(const Message& payload) {
+        std::lock_guard<std::mutex> lock(componentMutex);
+        int socket = nextComponentSocket();
+        network::sendPayload(socket, payload);
+    }
     void addHeartbeat(int socket);
 private:
     const int waitThreshold;

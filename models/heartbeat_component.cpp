@@ -3,35 +3,30 @@
 //
 
 #include "heartbeat_component.hpp"
-#include "../utils/network.hpp"
 #include "message.hpp"
 
-template<typename Message>
-heartbeat_component<Message>::heartbeat_component(const int waitThreshold) : waitThreshold(waitThreshold) {
+heartbeat_component::heartbeat_component(const int waitThreshold) : waitThreshold(waitThreshold) {
     std::thread thread([&]{checkHeartbeats();});
     thread.detach();
 }
 
-template<typename Message>
-void heartbeat_component<Message>::connectToServers(const parser::idToIP& idToIPs, const int socketOffset,
+void heartbeat_component::connectToServers(const parser::idToIP& idToIPs, const int socketOffset,
                                                     const WhoIsThis_Sender& whoIsThis,
-                                                    const std::function<void(const Message&)>* listener) {
+                                                    const std::function<void(int, const std::string&)>& listener) {
     for (const auto& idToIP : idToIPs) {
         const int id = idToIP.first;
         const std::string& ip = idToIP.second;
 
-        std::thread thread([&, id, ip, socketOffset]{
+        std::thread thread([&, id, ip, whoIsThis, socketOffset, listener]{
             int socket = network::connectToServerAtAddress(ip, socketOffset + id, whoIsThis);
             addConnection(socket);
-            if (listener != nullptr)
-                network::listenToSocket(socket, listener);
+            network::listenToSocket(socket, listener);
         });
         thread.detach();
     }
 }
 
-template<typename Message>
-void heartbeat_component<Message>::addConnection(const int socket) {
+void heartbeat_component::addConnection(const int socket) {
     {std::lock_guard<std::mutex> lock(componentMutex);
     fastComponents.emplace_back(socket);
     //check threshold
@@ -40,26 +35,16 @@ void heartbeat_component<Message>::addConnection(const int socket) {
     componentCV.notify_one();
 }
 
-template<typename Message>
-void heartbeat_component<Message>::waitForThreshold() {
+void heartbeat_component::waitForThreshold() {
     std::unique_lock lock(componentMutex);
     componentCV.wait(lock, [&]{return thresholdMet();});
 }
 
-template<typename Message>
-bool heartbeat_component<Message>::thresholdMet() {
+bool heartbeat_component::thresholdMet() {
     return fastComponents.size() + slowComponents.size() >= waitThreshold;
 }
 
-template<typename Message>
-void heartbeat_component<Message>::send(const Message& payload) {
-    std::lock_guard<std::mutex> lock(componentMutex);
-    int socket = nextComponentSocket();
-    network::sendPayload(socket, payload);
-}
-
-template<typename Message>
-int heartbeat_component<Message>::nextComponentSocket() {
+int heartbeat_component::nextComponentSocket() {
     //prioritize sending to fast proxy leaders
     if (!fastComponents.empty()) {
         next = (next + 1) % fastComponents.size();
@@ -71,8 +56,7 @@ int heartbeat_component<Message>::nextComponentSocket() {
     }
 }
 
-template<typename Message>
-void heartbeat_component<Message>::checkHeartbeats() {
+void heartbeat_component::checkHeartbeats() {
     time_t now;
     while (true) {
         std::this_thread::sleep_for(std::chrono::seconds(config::HEARTBEAT_TIMEOUT_SEC));
@@ -109,8 +93,7 @@ void heartbeat_component<Message>::checkHeartbeats() {
     }
 }
 
-template<typename Message>
-void heartbeat_component<Message>::addHeartbeat(int socket) {
+void heartbeat_component::addHeartbeat(int socket) {
     std::lock_guard<std::mutex> lock(heartbeatMutex);
     time(&heartbeats[socket]);
 }
