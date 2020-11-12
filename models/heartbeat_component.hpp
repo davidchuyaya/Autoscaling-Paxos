@@ -21,15 +21,13 @@ public:
                           const std::function<void(const Message&)>* listener);
     void addConnection(int socket);
     void waitForThreshold();
-    void send(const Message& payload, int messageID);
+    void send(const Message& payload);
     void addHeartbeat(int socket);
 private:
     const int waitThreshold;
 
     std::mutex heartbeatMutex;
     std::unordered_map<int, time_t> heartbeats = {}; //key = socket
-
-    std::unordered_map<int, std::unordered_map<int, Message>> sentMessages = {};  //{socket: {messageID: message}}
 
     std::mutex componentMutex;
     std::condition_variable componentCV;

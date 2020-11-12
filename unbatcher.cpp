@@ -22,7 +22,7 @@ void unbatcher::startServer() {
        for (const auto&[clientIp, requests] : batch.clienttorequests()) {
            const int clientSocket = connectToClient(clientIp);
            for (const std::string& request : requests.requests())
-               network::sendPayload(clientSocket, requests);
+               network::sendPayload(clientSocket, request);
        }
     });
 }

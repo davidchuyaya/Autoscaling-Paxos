@@ -52,10 +52,9 @@ bool heartbeat_component<Message>::thresholdMet() {
 }
 
 template<typename Message>
-void heartbeat_component<Message>::send(const Message& payload, const int messageID) {
+void heartbeat_component<Message>::send(const Message& payload) {
     std::lock_guard<std::mutex> lock(componentMutex);
     int socket = nextComponentSocket();
-    sentMessages[socket][messageID] = payload;
     network::sendPayload(socket, payload);
 }
 
@@ -107,16 +106,6 @@ void heartbeat_component<Message>::checkHeartbeats() {
             else
                 ++iterator;
         }
-
-        //send what was sent to a slowed component to another
-        for (const int socket : slowedComponents) {
-            int otherSocket = nextComponentSocket();
-            for (const auto& [messageId, message] : sentMessages[socket])
-                send(otherSocket, message);
-        }
-
-        //TODO can fail after 1 heartbeat
-        sentMessages.clear();
     }
 }
 

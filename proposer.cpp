@@ -9,19 +9,14 @@
 #include "utils/config.hpp"
 #include "models/message.hpp"
 
-proposer::proposer(const int id, const parser::idToIP& proposers, const std::unordered_map<int, parser::idToIP>& acceptors) : id(id) {
+proposer::proposer(const int id, const parser::idToIP& proposers, const std::unordered_map<int, parser::idToIP>& acceptors) : id(id), proxyLeaders(config::F+1) {
     findAcceptorGroupIds(acceptors);
     const std::thread server([&] {startServer(); });
     connectToProposers(proposers);
     const std::thread broadcastLeader([&] { broadcastIAmLeader(); });
     const std::thread heartbeatChecker([&] { checkHeartbeats(); });
     printf("Waiting for proxy leaders\n");
-
-    //wait
-    std::unique_lock<std::mutex> lock(proxyLeaderMutex);
-    proxyLeaderCV.wait(lock, [&]{return fastProxyLeaders.size() + slowProxyLeaders.size() >= config::F+1;});
-    lock.unlock();
-
+    proxyLeaders.waitForThreshold();
     printf("Starting main loop\n");
     mainLoop();
 }
@@ -53,47 +48,10 @@ void proposer::checkHeartbeats() {
     time_t now;
     while (true) {
         std::this_thread::sleep_for(std::chrono::seconds(config::HEARTBEAT_TIMEOUT_SEC));
-
+        std::scoped_lock lock(heartbeatMutex);
         time(&now);
-
-        std::scoped_lock lock(heartbeatMutex, proxyLeaderMutex); //TODO time may be out-of-sync due to lock contention?
         if (difftime(now, lastLeaderHeartbeat) > config::HEARTBEAT_TIMEOUT_SEC && !isLeader)
             shouldSendScouts = true;
-
-        //if a proxy leader has no recent heartbeat, move it into the slow list
-        auto iterator = fastProxyLeaders.begin();
-        while (iterator != fastProxyLeaders.end()) {
-            const int socket = *iterator;
-            if (difftime(now, proxyLeaderHeartbeats[socket]) > config::HEARTBEAT_TIMEOUT_SEC) {
-                printf("Proxy leader failed to heartbeat to proposer %d\n", id);
-                proxyLeaderHeartbeats.erase(socket);
-                slowProxyLeaders.emplace_back(socket);
-                iterator = fastProxyLeaders.erase(iterator);
-
-                //send what was sent to this proxy leader to another. Won't loop forever, if at least 1 proxy leader is alive
-                //will be inefficient if multiple proxy leaders fail simultaneously, and we just handed off to another failed one.
-                int otherProxyLeaderSocket;
-                do otherProxyLeaderSocket = fetchNextProxyLeaderSocket();
-                while (otherProxyLeaderSocket == socket);
-                for (const auto& [messageId, message] : proxyLeaderSentMessages[socket])
-                    sendToProxyLeader(otherProxyLeaderSocket, message);
-                proxyLeaderSentMessages.erase(socket);
-            }
-            else
-                ++iterator;
-        }
-
-        //if a proxy leader has a heartbeat, move it into the fast list
-        iterator = slowProxyLeaders.begin();
-        while (iterator != slowProxyLeaders.end()) {
-            const int socket = *iterator;
-            if (difftime(now, proxyLeaderHeartbeats[socket]) > config::HEARTBEAT_TIMEOUT_SEC) {
-                fastProxyLeaders.emplace_back(socket);
-                iterator = slowProxyLeaders.erase(iterator);
-            }
-            else
-                ++iterator;
-        }
     }
 }
 
@@ -108,7 +66,7 @@ void proposer::startServer() {
                     break;
                 case WhoIsThis_Sender_proxyLeader:
                     printf("Server %d connected to proxy leader\n", id);
-                    listenToProxyLeader(socket); //TODO heartbeat component
+                    proxyLeaders.addConnection(socket);
                     break;
                 case WhoIsThis_Sender_proposer:
                     printf("Server %d connected to proposer\n", id);
@@ -117,14 +75,17 @@ void proposer::startServer() {
                     break;
                 default: {}
             }
-        }, [&](const int socket, const WhoIsThis_Sender& whoIsThis, const std::string& payload) {
+        }, [&](const int socket, const WhoIsThis_Sender& whoIsThis, const std::string& payloadString) {
             switch (whoIsThis) {
                 case WhoIsThis_Sender_batcher:
-                    listenToBatcher(payload);
+                    listenToBatcher(payloadString);
                     break;
-                case WhoIsThis_Sender_proxyLeader:
-                    listenToProxyLeader(socket);
+                case WhoIsThis_Sender_proxyLeader: {
+                    ProxyLeaderToProposer payload;
+                    payload.ParseFromString(payloadString);
+                    listenToProxyLeader(socket, payload);
                     break;
+                }
                 case WhoIsThis_Sender_proposer:
                     listenToProposer();
                     break;
@@ -139,39 +100,19 @@ void proposer::listenToBatcher(const std::string& payload) {
     unproposedPayloads.emplace_back(payload);
 }
 
-void proposer::listenToProxyLeader(const int socket) { //TODO heartbeat component
-    {std::lock_guard<std::mutex> lock(proxyLeaderMutex);
-    fastProxyLeaders.emplace_back(socket);}
-    proxyLeaderCV.notify_one();
-    printf("Listening to proxy leader\n");
-    ProxyLeaderToProposer payload;
-
-    while (true) {
-        const std::optional<std::string>& incoming = network::receivePayload(socket);
-        if (incoming->empty())
-            return;
-
-        payload.ParseFromString(incoming.value());
-        if (payload.type() != ProxyLeaderToProposer_Type_heartbeat) {
-            std::lock_guard<std::mutex> lock(proxyLeaderMutex);
-            proxyLeaderSentMessages[socket].erase(payload.messageid());
+void proposer::listenToProxyLeader(const int socket, const ProxyLeaderToProposer& payload) {
+    switch (payload.type()) {
+        case ProxyLeaderToProposer_Type_p1b:
+            handleP1B(payload);
+            break;
+        case ProxyLeaderToProposer_Type_p2b:
+            handleP2B(payload);
+            break;
+        case ProxyLeaderToProposer_Type_heartbeat: {
+            proxyLeaders.addHeartbeat(socket);
+            break;
         }
-
-        switch (payload.type()) {
-            case ProxyLeaderToProposer_Type_p1b:
-                handleP1B(payload);
-                break;
-            case ProxyLeaderToProposer_Type_p2b:
-                handleP2B(payload);
-                break;
-            case ProxyLeaderToProposer_Type_heartbeat: { //store the time we received this heartbeat
-                std::lock_guard<std::mutex> lock(heartbeatMutex); //TODO lock proxy leaders?
-                time(&proxyLeaderHeartbeats[socket]);
-                break;
-            }
-            default: {}
-        }
-        payload.Clear();
+        default: {}
     }
 }
 
@@ -229,11 +170,10 @@ void proposer::sendScouts() {
         currentBallotNum = ballotNum;}
     printf("P1A blasting out: id = %d, ballotNum = %d\n", id, currentBallotNum);
 
-    std::scoped_lock lock(acceptorMutex, proxyLeaderMutex, remainingAcceptorGroupsForScoutsMutex, logMutex);
+    std::scoped_lock lock(acceptorMutex, remainingAcceptorGroupsForScoutsMutex, logMutex);
     for (const int acceptorGroupId : acceptorGroupIds) {
         remainingAcceptorGroupsForScouts.emplace(acceptorGroupId);
-        const ProposerToAcceptor& p1a = message::createP1A(id, currentBallotNum, acceptorGroupId, lastCommittedSlot);
-        sendToProxyLeader(fetchNextProxyLeaderSocket(), p1a);
+        proxyLeaders.send(message::createP1A(id, currentBallotNum, acceptorGroupId, lastCommittedSlot));
     }
     shouldSendScouts = false;
 }
@@ -272,7 +212,7 @@ void proposer::handleP1B(const ProxyLeaderToProposer& message) {
 
 void proposer::mergeLogs() {
     std::scoped_lock lock(acceptorGroupLogsMutex, logMutex, unproposedPayloadsMutex, ballotMutex, acceptorMutex,
-                           uncommittedProposalsMutex, proxyLeaderMutex);
+                           uncommittedProposalsMutex);
     Log::mergeCommittedLogs(&log, acceptorGroupCommittedLogs);
     calcLastCommittedSlot();
     const auto& [uncommittedLog, acceptorGroupForSlot] = Log::mergeUncommittedLogs(acceptorGroupUncommittedLogs);
@@ -293,7 +233,7 @@ void proposer::mergeLogs() {
                 acceptorGroup = acceptorGroupForSlot.at(slot);
             else
                 acceptorGroup = fetchNextAcceptorGroupId();
-            sendCommanders(acceptorGroup, slot, pValue.payload());
+            proxyLeaders.send(message::createP2A(id, ballotNum, slot, pValue.payload(), acceptorGroup));
         }
     }
 }
@@ -304,7 +244,8 @@ void proposer::sendCommandersForPayloads() {
         return;}
 
     //calculate the next unused slot (log is 1-indexed, because 0 = null in protobuf & will be ignored)
-    std::scoped_lock lock(uncommittedProposalsMutex, unproposedPayloadsMutex, logMutex, ballotMutex, acceptorMutex, proxyLeaderMutex);
+    std::scoped_lock lock(uncommittedProposalsMutex, unproposedPayloadsMutex, logMutex, ballotMutex, acceptorMutex);
+    //TODO more efficient next slot calculations
     auto nextSlot = 1;
     for (const auto& [slot, payload] : log)
         if (slot >= nextSlot)
@@ -315,15 +256,11 @@ void proposer::sendCommandersForPayloads() {
 
     for (const std::string& payload : unproposedPayloads) {
         uncommittedProposals[nextSlot] = payload;
-        sendCommanders(fetchNextAcceptorGroupId(), nextSlot, payload);
+        proxyLeaders.send(message::createP2A(id, ballotNum, nextSlot, payload,
+                                             fetchNextAcceptorGroupId()));
         nextSlot += 1;
     }
     unproposedPayloads.clear();
-}
-
-void proposer::sendCommanders(int acceptorGroupId, int slot, const std::string& payload) {
-    const ProposerToAcceptor& p2a = message::createP2A(id, ballotNum, slot, payload, acceptorGroupId);
-    sendToProxyLeader(fetchNextProxyLeaderSocket(), p2a);
 }
 
 void proposer::handleP2B(const ProxyLeaderToProposer& message) {
@@ -345,9 +282,8 @@ void proposer::noLongerLeader() {
     isLeader = false;
     shouldSendScouts = true;
 
-    std::scoped_lock lock(proxyLeaderMutex, acceptorGroupLogsMutex, remainingAcceptorGroupsForScoutsMutex, unproposedPayloadsMutex,
+    std::scoped_lock lock(acceptorGroupLogsMutex, remainingAcceptorGroupsForScoutsMutex, unproposedPayloadsMutex,
                           uncommittedProposalsMutex);
-    proxyLeaderSentMessages.clear();
 
     acceptorGroupCommittedLogs.clear();
     acceptorGroupUncommittedLogs.clear();
@@ -364,23 +300,6 @@ void proposer::noLongerLeader() {
 int proposer::fetchNextAcceptorGroupId() {
     nextAcceptorGroup = (nextAcceptorGroup + 1) % acceptorGroupIds.size();
     return acceptorGroupIds[nextAcceptorGroup];
-}
-
-int proposer::fetchNextProxyLeaderSocket() {
-    //prioritize sending to fast proxy leaders
-    if (!fastProxyLeaders.empty()) {
-        nextProxyLeader = (nextProxyLeader + 1) % fastProxyLeaders.size();
-        return fastProxyLeaders[nextProxyLeader];
-    }
-    else {
-        nextProxyLeader = (nextProxyLeader + 1) % slowProxyLeaders.size();
-        return slowProxyLeaders[nextProxyLeader];
-    }
-}
-
-void proposer::sendToProxyLeader(const int proxyLeaderSocket, const ProposerToAcceptor& message) {
-    proxyLeaderSentMessages[proxyLeaderSocket][message.messageid()] = message;
-    network::sendPayload(proxyLeaderSocket, message);
 }
 
 void proposer::calcLastCommittedSlot() {

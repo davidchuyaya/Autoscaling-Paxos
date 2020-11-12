@@ -12,10 +12,12 @@
 #include "utils/parser.hpp"
 #include "message.pb.h"
 #include "models/log.hpp"
+#include "models/heartbeat_component.hpp"
+#include "models/heartbeat_component.cpp"
 
 class proposer {
 public:
-    explicit proposer(const int id, const parser::idToIP& proposers, const std::unordered_map<int, parser::idToIP>& acceptors);
+    explicit proposer(int id, const parser::idToIP& proposers, const std::unordered_map<int, parser::idToIP>& acceptors);
 private:
     const int id; // 0 indexed, no gaps
 
@@ -25,7 +27,6 @@ private:
     std::atomic<bool> isLeader = false;
     std::mutex heartbeatMutex;
     time_t lastLeaderHeartbeat = 0;
-    std::unordered_map<int, time_t> proxyLeaderHeartbeats = {}; //key = socket
 
     std::atomic<bool> shouldSendScouts = true;
     std::mutex remainingAcceptorGroupsForScoutsMutex;
@@ -53,13 +54,7 @@ private:
 
     int nextAcceptorGroup = 0;
 
-    std::mutex proxyLeaderMutex;
-    std::condition_variable proxyLeaderCV;
-    std::vector<int> fastProxyLeaders = {};
-    std::vector<int> slowProxyLeaders = {};
-    std::unordered_map<int, std::unordered_map<int, ProposerToAcceptor>> proxyLeaderSentMessages = {}; //{socket: {messageID: message}}
-
-    int nextProxyLeader = 0;
+    heartbeat_component<ProposerToAcceptor> proxyLeaders;
 
     std::vector<std::thread> threads = {}; // A place to put threads so they don't get freed
 
@@ -80,7 +75,7 @@ private:
 
     [[noreturn]] void startServer();
     void listenToBatcher(const std::string& payload);
-    void listenToProxyLeader(int socket);
+    void listenToProxyLeader(int socket, const ProxyLeaderToProposer& payload);
     void connectToProposers(const parser::idToIP& proposers);
     void listenToProposer();
 
@@ -114,16 +109,6 @@ private:
      */
     void sendCommandersForPayloads();
     /**
-     * Send p2a messages for a given payload.
-     * Stores this event by calling sendToProxyLeader().
-     *
-     * @warning Does NOT lock proxyLeaderMutex or ballotMutex. The caller MUST lock both.
-     * @param acceptorGroupId
-     * @param slot
-     * @param payload
-     */
-    void sendCommanders(int acceptorGroupId, int slot, const std::string& payload);
-    /**
      * Check if a proxy leader has committed values for a slot. If yes, then confirm that slot as committed.
      * If we've been preempted, then that means another has become the leader. Reset values.
      * @invariant isLeader = true
@@ -139,20 +124,6 @@ private:
      * @return The ID of the acceptor group to propose to.
      */
     int fetchNextAcceptorGroupId();
-    /**
-     * Increments (round robin) the next proxy leader a payload will be sent to.
-     * @warning Does NOT lock proxyLeaderMutex. The caller MUST lock it.
-     * @return The socket of the proxy leader to send to.
-     */
-    int fetchNextProxyLeaderSocket();
-    /**
-     * Stores the fact that we've sent this message to this proxy leader so we can resend if the proxy leader fails.
-     *
-     * @warning Does NOT lock proxyLeaderMutex. The caller MUST lock it.
-     * @param proxyLeaderSocket
-     * @param message
-     */
-    void sendToProxyLeader(int proxyLeaderSocket, const ProposerToAcceptor& message);
 
     /**
      * Find the newest slot in which all previous slots have been committed.
