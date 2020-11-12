@@ -13,7 +13,8 @@
 
 class proxy_leader {
 public:
-    explicit proxy_leader(int id, const parser::idToIP& proposers, const std::unordered_map<int, parser::idToIP>& acceptors);
+    explicit proxy_leader(int id, const parser::idToIP& unbatchers, const parser::idToIP& proposers,
+                          const std::unordered_map<int, parser::idToIP>& acceptors);
 private:
     const int id;
     std::mutex sentMessagesMutex;
@@ -33,12 +34,16 @@ private:
     std::unordered_map<int, std::vector<int>> acceptorSockets = {}; //key = acceptor group ID
     std::vector<int> acceptorGroupIds = {};
 
+    std::mutex unbatcherMutex;
+    std::unordered_map<int, int> unbatcherSockets = {}; //key = unbatcher ID
+
     std::vector<std::thread> threads = {}; // A place to put threads so they don't get freed
 
-    void connectToProposers(const parser::idToIP&  proposers);
-    void listenToProposer(int socket);
+    void connectToUnbatchers(const parser::idToIP& unbatchers);
+    void connectToProposers(const parser::idToIP& proposers);
+    void listenToProposer(const ProposerToAcceptor& payload);
     void connectToAcceptors(const std::unordered_map<int, parser::idToIP>& acceptors);
-    void listenToAcceptor(int socket);
+    void listenToAcceptor(const AcceptorToProxyLeader& payload);
 
     /**
      * Handle a p1b from an acceptor group.

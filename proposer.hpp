@@ -79,10 +79,10 @@ private:
     [[noreturn]] void checkHeartbeats();
 
     [[noreturn]] void startServer();
-    void listenToBatcher(int socket);
+    void listenToBatcher(const std::string& payload);
     void listenToProxyLeader(int socket);
     void connectToProposers(const parser::idToIP& proposers);
-    void listenToProposer(int socket);
+    void listenToProposer();
 
     /**
      * Execute all scout/commander logic.

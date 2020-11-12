@@ -18,14 +18,11 @@ paxos::paxos() {
 
 [[noreturn]]
 void paxos::startServer() {
-    network::startServerAtPort(config::CLIENT_PORT, [](int socket) {
-        while (true) {
-            std::optional<std::string> payload = network::receivePayload(socket);
-            if (payload->empty())
-                break;
-            printf("Acked: %s\n", payload.value().c_str());
-        }
-        close(socket);
+    network::startServerAtPort(config::CLIENT_PORT,
+       [](const int socket, const WhoIsThis_Sender& whoIsThis) {
+            printf("Main connected to unbatcher");
+    }, [](const int socket, const WhoIsThis_Sender& whoIsThis, const std::string& payload) {
+            printf("--Acked: {%s}--\n", payload.c_str());
     });
 }
 
@@ -37,11 +34,9 @@ void paxos::connectToBatcher() {
     printf("Input the ID of the batcher: ");
     int batcherId;
     std::cin >> batcherId;
-    const int batcherSocketId = network::connectToServerAtAddress(batcherIp, config::BATCHER_PORT_START + batcherId);
+    const int batcherSocketId = network::connectToServerAtAddress(batcherIp, config::BATCHER_PORT_START + batcherId, WhoIsThis_Sender_client);
     {std::lock_guard<std::mutex> lock(batcherMutex);
     batcherSockets.push_back(batcherSocketId);}
-    //TODO replace localhost with IP address
-    network::sendPayload(batcherSocketId, "127.0.0.1");
 }
 
 [[noreturn]]
@@ -56,6 +51,8 @@ void paxos::readInput() {
 // TODO retry on timeout with different batcher
 void paxos::sendToBatcher(const std::string& payload) {
     std::lock_guard<std::mutex> lock(batcherMutex);
-    network::sendPayload(batcherSockets[batcherIndex], payload);
+    //TODO replace localhost with IP address
+    const ClientToBatcher& request = message::createClientRequest("127.0.0.1", payload);
+    network::sendPayload(batcherSockets[batcherIndex], request);
     batcherIndex = (batcherIndex + 1) % (batcherSockets.size());
 }

@@ -100,43 +100,46 @@ void proposer::checkHeartbeats() {
 [[noreturn]]
 void proposer::startServer() {
     printf("Proposer Port Id: %d\n", config::PROPOSER_PORT_START + id);
-    network::startServerAtPort(config::PROPOSER_PORT_START + id, [&](const int socket) {
-        // read first incoming message to tell who the connecting node is
-        const std::optional<std::string>& incoming = network::receivePayload(socket);
-        if (incoming->empty())
-            return;
-        WhoIsThis whoIsThis;
-        whoIsThis.ParseFromString(incoming.value());
-        switch (whoIsThis.sender()) {
-            case WhoIsThis_Sender_batcher:
-                printf("Server %d connected to batcher\n", id);
-                listenToBatcher(socket);
-            case WhoIsThis_Sender_proxyLeader:
-                printf("Server %d connected to proxy leader\n", id);
-                listenToProxyLeader(socket);
-            case WhoIsThis_Sender_proposer:
-                printf("Server %d connected to proposer\n", id);
-                {std::lock_guard<std::mutex> lock(proposerMutex);
+    network::startServerAtPort(config::PROPOSER_PORT_START + id,
+           [&](const int socket, const WhoIsThis_Sender& whoIsThis) {
+            switch (whoIsThis) {
+                case WhoIsThis_Sender_batcher:
+                    printf("Server %d connected to batcher\n", id);
+                    break;
+                case WhoIsThis_Sender_proxyLeader:
+                    printf("Server %d connected to proxy leader\n", id);
+                    listenToProxyLeader(socket); //TODO heartbeat component
+                    break;
+                case WhoIsThis_Sender_proposer:
+                    printf("Server %d connected to proposer\n", id);
+                    {std::lock_guard<std::mutex> lock(proposerMutex);
                     proposerSockets.emplace_back(socket);}
-                listenToProposer(socket);
-            default: {}
-        }
-        close(socket);
+                    break;
+                default: {}
+            }
+        }, [&](const int socket, const WhoIsThis_Sender& whoIsThis, const std::string& payload) {
+            switch (whoIsThis) {
+                case WhoIsThis_Sender_batcher:
+                    listenToBatcher(payload);
+                    break;
+                case WhoIsThis_Sender_proxyLeader:
+                    listenToProxyLeader(socket);
+                    break;
+                case WhoIsThis_Sender_proposer:
+                    listenToProposer();
+                    break;
+                default: {}
+            }
     });
 }
 
-void proposer::listenToBatcher(const int socket) {
-    while (true) {
-        const std::optional<std::string>& incoming = network::receivePayload(socket);
-        if (incoming->empty())
-            return;
-        printf("Proposer %d received a batch request\n", id);
-        std::lock_guard<std::mutex> lock(unproposedPayloadsMutex);
-        unproposedPayloads.emplace_back(incoming.value());
-    }
+void proposer::listenToBatcher(const std::string& payload) {
+    printf("Proposer %d received a batch request\n", id);
+    std::lock_guard<std::mutex> lock(unproposedPayloadsMutex);
+    unproposedPayloads.emplace_back(payload);
 }
 
-void proposer::listenToProxyLeader(const int socket) {
+void proposer::listenToProxyLeader(const int socket) { //TODO heartbeat component
     {std::lock_guard<std::mutex> lock(proxyLeaderMutex);
     fastProxyLeaders.emplace_back(socket);}
     proxyLeaderCV.notify_one();
@@ -177,40 +180,31 @@ void proposer::connectToProposers(const parser::idToIP& proposers) {
         int proposerID = idToIP.first;
         std::string proposerIP = idToIP.second;
 
-        // Protocol is "connect to servers with a higher id than yourself, so we don't end up as both server & client for anyone
+        //Connect to servers with a higher id than yourself, so we don't end up as both server & client for anyone
         if (proposerID <= id)
             continue;
 
         const int proposerPort = config::PROPOSER_PORT_START + proposerID;
         threads.emplace_back(std::thread([&, proposerPort, proposerIP]{
-            const int socket = network::connectToServerAtAddress(proposerIP, proposerPort);
-            network::sendPayload(socket, message::createWhoIsThis(WhoIsThis_Sender_proposer));
+            const int socket = network::connectToServerAtAddress(proposerIP, proposerPort, WhoIsThis_Sender_proposer);
             printf("Proposer %d connected to other proposer\n", id);
             {std::lock_guard<std::mutex> lock(proposerMutex);
-                proposerSockets.emplace_back(socket);}
-            listenToProposer(socket);
-            close(socket);
+            proposerSockets.emplace_back(socket);}
+            network::listenToSocketUntilClose(socket, [&](const int socket, const std::string& payload) {
+                listenToProposer();
+            });
         }));
     }
 }
 
-void proposer::listenToProposer(const int socket) {
-    ProposerToProposer payload;
-    while (true) {
-        const std::optional<std::string>& incoming = network::receivePayload(socket);
-        if (incoming->empty())
-            return;
-        payload.ParseFromString(incoming.value());
+void proposer::listenToProposer() {
+    {std::lock_guard<std::mutex> lock(heartbeatMutex);
+    printf("%d received leader heartbeat for time: %s\n", id,
+           std::asctime(std::localtime(&lastLeaderHeartbeat)));
+    time(&lastLeaderHeartbeat);} // store the time we received the heartbeat
 
-        {std::lock_guard<std::mutex> lock(heartbeatMutex);
-            printf("%d received leader heartbeat for time: %s\n", id,
-                   std::asctime(std::localtime(&lastLeaderHeartbeat)));
-            time(&lastLeaderHeartbeat);} // store the time we received the heartbeat
-        noLongerLeader();
-        shouldSendScouts = false; // disable scouts until the leader's heartbeat times out
-
-        payload.Clear();
-    }
+    noLongerLeader();
+    shouldSendScouts = false; // disable scouts until the leader's heartbeat times out
 }
 
 [[noreturn]]
@@ -380,7 +374,7 @@ int proposer::fetchNextProxyLeaderSocket() {
     }
     else {
         nextProxyLeader = (nextProxyLeader + 1) % slowProxyLeaders.size();
-        return nextProxyLeader;
+        return slowProxyLeaders[nextProxyLeader];
     }
 }
 
@@ -401,7 +395,7 @@ int main(const int argc, const char** argv) {
     }
     const int id = atoi( argv[1] );
     const std::string& proposerFileName = argv[2];
-    const parser::idToIP& proposers = parser::parseProposer(proposerFileName);
+    const parser::idToIP& proposers = parser::parseIDtoIPs(proposerFileName);
     const std::string& acceptorFileName = argv[3];
     const std::unordered_map<int, parser::idToIP>& acceptors = parser::parseAcceptors(acceptorFileName);
     proposer(id, proposers, acceptors);

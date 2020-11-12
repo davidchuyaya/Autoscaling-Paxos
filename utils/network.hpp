@@ -9,6 +9,7 @@
 
 #include <netinet/in.h>
 #include <google/protobuf/message.h>
+#include <message.pb.h>
 #include "config.hpp"
 
 namespace network {
@@ -21,7 +22,10 @@ namespace network {
      * @param onClientConnected Callback that accepts the socket ID of a client connection. Started in new thread, so
      * this is allowed to block
      */
-    [[noreturn]] void startServerAtPort(int port, const std::function<void(int)>& onClientConnected);
+    [[noreturn]] void startServerAtPort(int port,
+                                        const std::function<void(int, const WhoIsThis_Sender&)>& onConnect,
+                                        const std::function<void(int, const WhoIsThis_Sender&, const std::string&)>&
+                                                onPayloadReceived);
     /**
      * Creates a local server at the given port and listens.
      *
@@ -29,6 +33,9 @@ namespace network {
      * @return {Socket ID, socket address struct}
      */
     std::tuple<int, sockaddr_in> listenToPort(int port);
+
+    bool listenToSocket(int socket, const std::function<void(int, const std::string&)>& onPayloadReceived);
+    void listenToSocketUntilClose(int socket, const std::function<void(int, const std::string&)>& onPayloadReceived);
     /**
      * Creates a connection to the server at the given IP address and port.
      * @note Blocks until connection is made.
@@ -37,7 +44,7 @@ namespace network {
      * @param port Port of server
      * @return Socket ID
      */
-    int connectToServerAtAddress(const std::string& address, int port);
+    int connectToServerAtAddress(const std::string& address, int port, const WhoIsThis_Sender& identity);
     /**
      * Creates a TCP socket. Terminates on failure.
      *

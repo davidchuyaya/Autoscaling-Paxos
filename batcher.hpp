@@ -41,7 +41,7 @@ private:
      *
      * @param client_address Address of the client
      */
-    void listenToClient(int clientSocketId);
+    void listenToClient(const ClientToBatcher& payload);
     void connectToProposers(const parser::idToIP& proposerIDtoIPs);
 };
 

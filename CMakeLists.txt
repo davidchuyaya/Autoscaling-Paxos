@@ -9,11 +9,13 @@ PROTOBUF_GENERATE_CPP(PROTO_SRCS PROTO_HDRS models/message.proto)
 add_library(proto ${PROTO_SRCS} ${PROTO_HDRS})
 
 set(UTILS_SRC utils/network.cpp utils/network.hpp utils/config.hpp utils/uuid.cpp utils/uuid.hpp utils/parser.cpp utils/parser.hpp)
-set(MODELS_SRC models/log.cpp models/log.hpp models/message.hpp models/message.cpp)
+set(MODELS_SRC models/log.cpp models/log.hpp models/message.hpp models/message.cpp models/heartbeat_component.hpp
+        models/heartbeat_component.cpp)
 set(PROXY_LEADERS_SRC proxy_leader.cpp proxy_leader.hpp)
 set(BATCHERS_SRC batcher.cpp batcher.hpp)
 set(PROPOSER_SRC proposer.cpp proposer.hpp)
 set(ACCEPTOR_SRC acceptor.cpp acceptor.hpp)
+set(UNBATCHER_SRC unbatcher.cpp unbatcher.hpp)
 set(MAIN_SRC main.cpp main.hpp)
 
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
@@ -22,9 +24,11 @@ add_executable(acceptor ${ACCEPTOR_SRC} ${UTILS_SRC} ${MODELS_SRC} ${PROTO_SRC} 
 add_executable(batcher ${BATCHERS_SRC} ${UTILS_SRC} ${MODELS_SRC} ${PROTO_SRC} ${PROTO_HDRS})
 add_executable(proposer ${PROPOSER_SRC} ${UTILS_SRC} ${MODELS_SRC} ${PROTO_SRC} ${PROTO_HDRS})
 add_executable(proxy_leader ${PROXY_LEADERS_SRC} ${UTILS_SRC} ${MODELS_SRC} ${PROTO_SRC} ${PROTO_HDRS})
+add_executable(unbatcher ${UNBATCHER_SRC} ${UTILS_SRC} ${MODELS_SRC} ${PROTO_SRC} ${PROTO_HDRS})
 
 target_link_libraries(Autoscaling_Paxos proto ${PROTOBUF_LIBRARY})
 target_link_libraries(acceptor proto ${PROTOBUF_LIBRARY})
 target_link_libraries(batcher proto ${PROTOBUF_LIBRARY})
 target_link_libraries(proposer proto ${PROTOBUF_LIBRARY})
 target_link_libraries(proxy_leader proto ${PROTOBUF_LIBRARY})
+target_link_libraries(unbatcher proto ${PROTOBUF_LIBRARY})

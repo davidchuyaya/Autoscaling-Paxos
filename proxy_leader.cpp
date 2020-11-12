@@ -9,10 +9,25 @@
 #include "models/message.hpp"
 #include <thread>
 
-proxy_leader::proxy_leader(const int id, const parser::idToIP& proposers, const std::unordered_map<int, parser::idToIP>& acceptors) : id(id) {
+proxy_leader::proxy_leader(const int id, const parser::idToIP& unbatchers, const parser::idToIP& proposers,
+                           const std::unordered_map<int, parser::idToIP>& acceptors) : id(id) {
+    connectToUnbatchers(unbatchers);
     connectToProposers(proposers);
     connectToAcceptors(acceptors);
     sendHeartbeat();
+}
+
+void proxy_leader::connectToUnbatchers(const parser::idToIP& unbatchers) { //TODO heartbeat component
+    for (const auto& unbatcherIdToIps : unbatchers) {
+        const int unbatcherId = unbatcherIdToIps.first;
+        const std::string unbatcherIp = unbatcherIdToIps.second;
+
+        threads.emplace_back(std::thread([&, unbatcherId, unbatcherIp] {
+            const int socket = network::connectToServerAtAddress(unbatcherIp,config::UNBATCHER_PORT_START + unbatcherId, WhoIsThis_Sender_proxyLeader);
+            std::lock_guard<std::mutex> lock(unbatcherMutex);
+            unbatcherSockets[unbatcherId] = socket;
+        }));
+    }
 }
 
 void proxy_leader::connectToProposers(const parser::idToIP& proposers) {
@@ -21,38 +36,31 @@ void proxy_leader::connectToProposers(const parser::idToIP& proposers) {
         const std::string& proposerIp = proposerIdToIps.second;
 
         threads.emplace_back(std::thread([&, proposerId, proposerIp] {
-            const int socket = network::connectToServerAtAddress(proposerIp, config::PROPOSER_PORT_START + proposerId);
-            network::sendPayload(socket, message::createWhoIsThis(WhoIsThis_Sender_proxyLeader));
+            const int socket = network::connectToServerAtAddress(proposerIp, config::PROPOSER_PORT_START + proposerId, WhoIsThis_Sender_proxyLeader);
             printf("Proxy leader %d connected to proposer\n", id);
             {std::lock_guard<std::mutex> lock(proposerMutex);
                 proposerSockets[proposerId] = socket;}
-            listenToProposer(socket);
-            close(socket);
+            network::listenToSocketUntilClose(socket, [&](const int socket, const std::string& payloadString) {
+                ProposerToAcceptor payload;
+                payload.ParseFromString(payloadString);
+                listenToProposer(payload);
+            });
         }));
     }
 }
 
-void proxy_leader::listenToProposer(const int socket) {
-    ProposerToAcceptor payload;
-    while (true) {
-        const std::optional<std::string>& incoming = network::receivePayload(socket);
-        if (incoming->empty())
-            return;
-        payload.ParseFromString(incoming.value());
-        // keep track
-        {std::lock_guard<std::mutex> lock(sentMessagesMutex);
-            sentMessages[payload.messageid()] = payload;}
-        printf("Proxy leader %d received from proposer: %s\n", id, payload.ShortDebugString().c_str());
+void proxy_leader::listenToProposer(const ProposerToAcceptor& payload) {
+    // keep track
+    {std::lock_guard<std::mutex> lock(sentMessagesMutex);
+        sentMessages[payload.messageid()] = payload;}
+    printf("Proxy leader %d received from proposer: %s\n", id, payload.ShortDebugString().c_str());
 
-        // Broadcast to Acceptors; wait if necessary
-        std::unique_lock lock(acceptorMutex);
-        acceptorCV.wait(lock, [&]{return acceptorSockets.find(payload.acceptorgroupid()) != acceptorSockets.end();});
-        // TODO check if connection to acceptors is valid for the ID; if not, fetch from Anna
-        for (const int acceptorSocket : acceptorSockets[payload.acceptorgroupid()])
-            network::sendPayload(acceptorSocket, payload);
-
-        payload.Clear();
-    }
+    // Broadcast to Acceptors; wait if necessary
+    std::unique_lock lock(acceptorMutex);
+    acceptorCV.wait(lock, [&]{return acceptorSockets.find(payload.acceptorgroupid()) != acceptorSockets.end();});
+    // TODO check if connection to acceptors is valid for the ID; if not, fetch from Anna
+    for (const int acceptorSocket : acceptorSockets[payload.acceptorgroupid()])
+        network::sendPayload(acceptorSocket, payload);
 }
 
 void proxy_leader::connectToAcceptors(const std::unordered_map<int, parser::idToIP>& acceptors) {
@@ -69,37 +77,33 @@ void proxy_leader::connectToAcceptors(const std::unordered_map<int, parser::idTo
             const int acceptorPort = config::ACCEPTOR_PORT_START + acceptorGroupPortOffset + acceptorId;
 
             threads.emplace_back(std::thread([&, acceptorIp, acceptorPort, acceptorGroupId]{
-                const int socket = network::connectToServerAtAddress(acceptorIp, acceptorPort);
+                const int socket = network::connectToServerAtAddress(acceptorIp, acceptorPort, WhoIsThis_Sender_proxyLeader);
                 printf("Proxy leader %d connected to acceptor\n", id);
                 {std::lock_guard<std::mutex> lock(acceptorMutex);
                     acceptorSockets[acceptorGroupId].emplace_back(socket);}
                 acceptorCV.notify_one();
-                listenToAcceptor(socket);
-                close(socket);
+
+                network::listenToSocketUntilClose(socket, [&](const int socket, const std::string& payloadString) {
+                    AcceptorToProxyLeader payload;
+                    payload.ParseFromString(payloadString);
+                    listenToAcceptor(payload);
+                });
             }));
         }
     }
 }
 
-void proxy_leader::listenToAcceptor(const int socket) {
-    AcceptorToProxyLeader payload;
-    while (true) {
-        const std::optional<std::string>& incoming = network::receivePayload(socket);
-        if (incoming->empty())
-            return;
-        payload.ParseFromString(incoming.value());
-        printf("Proxy leader %d received from acceptors: %s\n", id, payload.ShortDebugString().c_str());
+void proxy_leader::listenToAcceptor(const AcceptorToProxyLeader& payload) {
+    printf("Proxy leader %d received from acceptors: %s\n", id, payload.ShortDebugString().c_str());
 
-        switch (payload.type()) {
-            case AcceptorToProxyLeader_Type_p1b:
-                handleP1B(payload);
-                break;
-            case AcceptorToProxyLeader_Type_p2b:
-                handleP2B(payload);
-                break;
-            default: {}
-        }
-        payload.Clear();
+    switch (payload.type()) {
+        case AcceptorToProxyLeader_Type_p1b:
+            handleP1B(payload);
+            break;
+        case AcceptorToProxyLeader_Type_p2b:
+            handleP2B(payload);
+            break;
+        default: {}
     }
 }
 
@@ -136,7 +140,7 @@ void proxy_leader::handleP1B(const AcceptorToProxyLeader& payload) {
 }
 
 void proxy_leader::handleP2B(const AcceptorToProxyLeader& payload) {
-    std::scoped_lock lock(sentMessagesMutex, approvedCommandersMutex, proposerMutex);
+    std::scoped_lock lock(sentMessagesMutex, approvedCommandersMutex, proposerMutex, unbatcherMutex);
     const ProposerToAcceptor& sentValue = sentMessages[payload.messageid()];
     if (sentValue.slot() == 0) {
         //p2b is arriving for a nonexistent sentValue
@@ -160,6 +164,7 @@ void proxy_leader::handleP2B(const AcceptorToProxyLeader& payload) {
             const ProxyLeaderToProposer& messageToProposer = message::createProxyP2B(payload.messageid(), payload.acceptorgroupid(),
                                                                                      payload.ballot(), payload.slot());
             network::sendPayload(proposerSockets[sentValue.ballot().id()], messageToProposer);
+            network::sendPayload(unbatcherSockets[1], sentMessages[payload.messageid()].payload()); //TODO choose fast unbatcher, heartbeats
             sentMessages.erase(payload.messageid());
             approvedCommanders.erase(payload.messageid());
         }
@@ -178,14 +183,16 @@ void proxy_leader::sendHeartbeat() {
 }
 
 int main(int argc, char** argv) {
-    if (argc != 4) {
-        printf("Usage: ./proxy_leader <PROXY LEADER ID> <PROPOSER FILE NAME> <ACCEPTOR FILE NAME>.\n");
+    if (argc != 5) {
+        printf("Usage: ./proxy_leader <PROXY LEADER ID> <UNBATCHER FILE NAME> <PROPOSER FILE NAME> <ACCEPTOR FILE NAME>.\n");
         exit(0);
     }
     const int id = atoi( argv[1] );
-    const std::string& proposerFileName = argv[2];
-    const parser::idToIP& proposers = parser::parseProposer(proposerFileName);
-    const std::string& acceptorFileName = argv[3];
+    const std::string& unbatcherFileName = argv[2];
+    const parser::idToIP& unbatchers = parser::parseIDtoIPs(unbatcherFileName);
+    const std::string& proposerFileName = argv[3];
+    const parser::idToIP& proposers = parser::parseIDtoIPs(proposerFileName);
+    const std::string& acceptorFileName = argv[4];
     const std::unordered_map<int, parser::idToIP>& acceptors = parser::parseAcceptors(acceptorFileName);
-    proxy_leader(id, proposers, acceptors);
+    proxy_leader(id, unbatchers, proposers, acceptors);
 }

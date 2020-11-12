@@ -94,6 +94,13 @@ ProposerToProposer message::createIamLeader() {
     return iAmLeader;
 }
 
+ClientToBatcher message::createClientRequest(const std::string& ipAddress, const std::string& payload) {
+    ClientToBatcher clientToBatcher;
+    clientToBatcher.set_ipaddress(ipAddress);
+    clientToBatcher.set_request(payload);
+    return clientToBatcher;
+}
+
 Batch message::createBatchMessage(const std::unordered_map<std::string, std::vector<std::string>>& requests) {
     std::unordered_map<std::string, Batch_Requests> protobufRequests = {};
     for (const auto& [ip, requestsForIp] : requests)

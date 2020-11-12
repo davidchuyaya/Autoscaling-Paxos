@@ -26,7 +26,7 @@ private:
      * Process p1a and p2a messages from proxy leaders.
      * @param socket Socket ID of proxy leader
      */
-    void listenToProxyLeaders(int socket);
+    void listenToProxyLeaders(int socket, const ProposerToAcceptor& payload);
     /**
      * Returns the log with only slots larger than the one provided.
      * @warning Does NOT lock logMutex. The caller MUST lock it
