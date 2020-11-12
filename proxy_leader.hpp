@@ -37,8 +37,6 @@ private:
 
     heartbeat_component unbatchers;
 
-    std::vector<std::thread> threads = {}; // A place to put threads so they don't get freed
-
     void connectToUnbatchers(const parser::idToIP& unbatchers);
     void connectToProposers(const parser::idToIP& proposers);
     void listenToProposer(const ProposerToAcceptor& payload);
@@ -61,11 +59,6 @@ private:
      * @param payload
      */
     void handleP2B(const AcceptorToProxyLeader& payload);
-
-    /**
-     * Periodically send heartbeats to all proposers.
-     */
-    [[noreturn]] void sendHeartbeat();
 };
 
 

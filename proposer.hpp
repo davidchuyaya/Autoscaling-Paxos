@@ -50,12 +50,9 @@ private:
 
     std::mutex acceptorMutex;
     std::vector<int> acceptorGroupIds = {};
-
     int nextAcceptorGroup = 0;
 
     heartbeat_component proxyLeaders;
-
-    std::vector<std::thread> threads = {}; // A place to put threads so they don't get freed
 
     /**
      * Set acceptorGroupIds. TODO not hardcode the IDs

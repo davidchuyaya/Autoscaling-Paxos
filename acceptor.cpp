@@ -2,7 +2,6 @@
 // Created by David Chu on 10/4/20.
 //
 
-#include <unistd.h>
 #include "acceptor.hpp"
 #include "utils/network.hpp"
 #include "models/message.hpp"
@@ -67,7 +66,7 @@ int main(const int argc, const char** argv) {
         printf("Usage: ./acceptor <ACCEPTOR GROUP ID> <ACCEPTOR ID>.\n");
         exit(0);
     }
-    const int acceptorGroupId = atoi(argv[1] );
-    const int id = atoi(argv[2] );
+    const int acceptorGroupId = atoi(argv[1]);
+    const int id = atoi(argv[2]);
     acceptor(id, acceptorGroupId);
 }

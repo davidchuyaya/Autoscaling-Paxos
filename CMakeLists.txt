@@ -10,7 +10,7 @@ add_library(proto ${PROTO_SRCS} ${PROTO_HDRS})
 
 set(UTILS_SRC utils/network.cpp utils/network.hpp utils/config.hpp utils/uuid.cpp utils/uuid.hpp utils/parser.cpp utils/parser.hpp)
 set(MODELS_SRC models/log.cpp models/log.hpp models/message.hpp models/message.cpp models/heartbeat_component.hpp
-        models/heartbeat_component.cpp)
+        models/heartbeat_component.cpp utils/heartbeater.hpp)
 set(PROXY_LEADERS_SRC proxy_leader.cpp proxy_leader.hpp)
 set(BATCHERS_SRC batcher.cpp batcher.hpp)
 set(PROPOSER_SRC proposer.cpp proposer.hpp)

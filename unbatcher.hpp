@@ -20,8 +20,12 @@ private:
     std::mutex ipToSocketMutex;
     std::unordered_map<std::string, int> ipToSocket = {};
 
+    std::mutex proxyLeaderMutex;
+    std::vector<int> proxyLeaders;
+
     [[noreturn]] void startServer();
     int connectToClient(const std::string& ipAddress);
+
 };
 
 

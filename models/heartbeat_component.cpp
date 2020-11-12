@@ -20,7 +20,7 @@ void heartbeat_component::connectToServers(const parser::idToIP& idToIPs, const 
         std::thread thread([&, id, ip, whoIsThis, socketOffset, listener]{
             int socket = network::connectToServerAtAddress(ip, socketOffset + id, whoIsThis);
             addConnection(socket);
-            network::listenToSocket(socket, listener);
+            network::listenToSocketUntilClose(socket, listener);
         });
         thread.detach();
     }

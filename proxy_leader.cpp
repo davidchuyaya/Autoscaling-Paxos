@@ -5,15 +5,17 @@
 #include "proxy_leader.hpp"
 #include "utils/config.hpp"
 #include "utils/network.hpp"
+#include "utils/heartbeater.hpp"
 #include "models/message.hpp"
 #include <thread>
 
-proxy_leader::proxy_leader(const int id, const parser::idToIP& unbatchers, const parser::idToIP& proposers,
+proxy_leader::proxy_leader(const int id, const parser::idToIP& unbatchersIdToIps, const parser::idToIP& proposers,
                            const std::unordered_map<int, parser::idToIP>& acceptors) : id(id), unbatchers(config::F+1) {
-    connectToUnbatchers(unbatchers);
+    connectToUnbatchers(unbatchersIdToIps);
     connectToProposers(proposers);
     connectToAcceptors(acceptors);
-    sendHeartbeat();
+    heartbeater::heartbeat(message::createProxyLeaderHeartbeat(), proposerMutex, proposerSockets);
+    pthread_exit(nullptr);
 }
 
 void proxy_leader::connectToUnbatchers(const parser::idToIP& unbatchersIdToIps) {
@@ -21,7 +23,7 @@ void proxy_leader::connectToUnbatchers(const parser::idToIP& unbatchersIdToIps) 
         [&](const int socket, const std::string& payload) {
         unbatchers.addHeartbeat(socket);
     });
-    //TODO should we wait for F+1 unbatchers?
+    unbatchers.waitForThreshold();
 }
 
 void proxy_leader::connectToProposers(const parser::idToIP& proposers) {
@@ -29,7 +31,7 @@ void proxy_leader::connectToProposers(const parser::idToIP& proposers) {
         const int proposerId = proposerIdToIps.first;
         const std::string& proposerIp = proposerIdToIps.second;
 
-        threads.emplace_back(std::thread([&, proposerId, proposerIp] {
+        std::thread thread([&, proposerId, proposerIp] {
             const int socket = network::connectToServerAtAddress(proposerIp, config::PROPOSER_PORT_START + proposerId, WhoIsThis_Sender_proxyLeader);
             printf("Proxy leader %d connected to proposer\n", id);
             {std::lock_guard<std::mutex> lock(proposerMutex);
@@ -39,7 +41,8 @@ void proxy_leader::connectToProposers(const parser::idToIP& proposers) {
                 payload.ParseFromString(payloadString);
                 listenToProposer(payload);
             });
-        }));
+        });
+        thread.detach();
     }
 }
 
@@ -70,7 +73,7 @@ void proxy_leader::connectToAcceptors(const std::unordered_map<int, parser::idTo
             const std::string& acceptorIp = acceptor.second;
             const int acceptorPort = config::ACCEPTOR_PORT_START + acceptorGroupPortOffset + acceptorId;
 
-            threads.emplace_back(std::thread([&, acceptorIp, acceptorPort, acceptorGroupId]{
+            std::thread thread([&, acceptorIp, acceptorPort, acceptorGroupId]{
                 const int socket = network::connectToServerAtAddress(acceptorIp, acceptorPort, WhoIsThis_Sender_proxyLeader);
                 printf("Proxy leader %d connected to acceptor\n", id);
                 {std::lock_guard<std::mutex> lock(acceptorMutex);
@@ -82,7 +85,8 @@ void proxy_leader::connectToAcceptors(const std::unordered_map<int, parser::idTo
                     payload.ParseFromString(payloadString);
                     listenToAcceptor(payload);
                 });
-            }));
+            });
+            thread.detach();
         }
     }
 }
@@ -165,23 +169,12 @@ void proxy_leader::handleP2B(const AcceptorToProxyLeader& payload) {
     }
 }
 
-[[noreturn]]
-void proxy_leader::sendHeartbeat() {
-    ProxyLeaderToProposer heartbeat = message::createProxyLeaderHeartbeat();
-    while (true) {
-        std::this_thread::sleep_for(std::chrono::seconds(config::HEARTBEAT_SLEEP_SEC));
-        std::lock_guard<std::mutex> lock(proposerMutex);
-        for (const auto&[id, socket] : proposerSockets)
-            network::sendPayload(socket, heartbeat);
-    }
-}
-
 int main(int argc, char** argv) {
     if (argc != 5) {
         printf("Usage: ./proxy_leader <PROXY LEADER ID> <UNBATCHER FILE NAME> <PROPOSER FILE NAME> <ACCEPTOR FILE NAME>.\n");
         exit(0);
     }
-    const int id = atoi( argv[1] );
+    const int id = atoi(argv[1]);
     const std::string& unbatcherFileName = argv[2];
     const parser::idToIP& unbatchers = parser::parseIDtoIPs(unbatcherFileName);
     const std::string& proposerFileName = argv[3];

@@ -10,14 +10,18 @@
 
 proposer::proposer(const int id, const parser::idToIP& proposers, const std::unordered_map<int, parser::idToIP>& acceptors) : id(id), proxyLeaders(config::F+1) {
     findAcceptorGroupIds(acceptors);
-    const std::thread server([&] {startServer(); });
+    std::thread server([&] {startServer(); });
+    server.detach();
     connectToProposers(proposers);
-    const std::thread broadcastLeader([&] { broadcastIAmLeader(); });
-    const std::thread heartbeatChecker([&] { checkHeartbeats(); });
+    std::thread broadcastLeader([&] { broadcastIAmLeader(); });
+    broadcastLeader.detach();
+    std::thread heartbeatChecker([&] { checkHeartbeats(); });
+    heartbeatChecker.detach();
     printf("Waiting for proxy leaders\n");
     proxyLeaders.waitForThreshold();
     printf("Starting main loop\n");
     mainLoop();
+    pthread_exit(nullptr);
 }
 
 void proposer::findAcceptorGroupIds(const std::unordered_map<int, parser::idToIP>& acceptors) {
@@ -125,7 +129,7 @@ void proposer::connectToProposers(const parser::idToIP& proposers) {
             continue;
 
         const int proposerPort = config::PROPOSER_PORT_START + proposerID;
-        threads.emplace_back(std::thread([&, proposerPort, proposerIP]{
+        std::thread thread([&, proposerPort, proposerIP]{
             const int socket = network::connectToServerAtAddress(proposerIP, proposerPort, WhoIsThis_Sender_proposer);
             printf("Proposer %d connected to other proposer\n", id);
             {std::lock_guard<std::mutex> lock(proposerMutex);
@@ -133,7 +137,8 @@ void proposer::connectToProposers(const parser::idToIP& proposers) {
             network::listenToSocketUntilClose(socket, [&](const int socket, const std::string& payload) {
                 listenToProposer();
             });
-        }));
+        });
+        thread.detach();
     }
 }
 

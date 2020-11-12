@@ -2,28 +2,32 @@
 // Created by David Chu on 11/11/20.
 //
 
-#include <unistd.h>
 #include "utils/network.hpp"
+#include "utils/heartbeater.hpp"
 #include "unbatcher.hpp"
 
 unbatcher::unbatcher(const int id) : id(id) {
-    startServer();
+    const std::thread server([&] {startServer(); });
+    heartbeater::heartbeat("i'm alive", proxyLeaderMutex, proxyLeaders);
+    pthread_exit(nullptr);
 }
 
 void unbatcher::startServer() {
     network::startServerAtPort(config::UNBATCHER_PORT_START + id,
        [&](const int socket, const WhoIsThis_Sender& whoIsThis) {
-            printf("Unbatcher %d connected to proxy leader\n", id);
+           printf("Unbatcher %d connected to proxy leader\n", id);
+           std::lock_guard<std::mutex> lock(proxyLeaderMutex);
+           proxyLeaders.emplace_back(socket);
         },
        [&](const int socket, const WhoIsThis_Sender& whoIsThis, const std::string& payload) {
-       printf("Unbatcher received payload: %s\n", payload.c_str());
-       Batch batch;
-       batch.ParseFromString(payload);
-       for (const auto&[clientIp, requests] : batch.clienttorequests()) {
-           const int clientSocket = connectToClient(clientIp);
-           for (const std::string& request : requests.requests())
-               network::sendPayload(clientSocket, request);
-       }
+           printf("Unbatcher received payload: %s\n", payload.c_str());
+           Batch batch;
+           batch.ParseFromString(payload);
+           for (const auto&[clientIp, requests] : batch.clienttorequests()) {
+               const int clientSocket = connectToClient(clientIp);
+               for (const std::string& request : requests.requests())
+                   network::sendPayload(clientSocket, request);
+           }
     });
 }
 

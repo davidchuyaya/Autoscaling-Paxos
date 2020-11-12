@@ -109,6 +109,7 @@ int network::createSocket() {
     return socketId;
 }
 
+//TODO sender crashes if socket is closed
 void network::sendPayload(const int socketId, const google::protobuf::Message& payload) {
     const std::string& serializedMessage = payload.SerializeAsString();
     write(socketId, serializedMessage.c_str(), serializedMessage.length());

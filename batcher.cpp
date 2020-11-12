@@ -3,17 +3,22 @@
 //
 #include <unistd.h>
 #include "batcher.hpp"
+#include "utils/heartbeater.hpp"
 
 batcher::batcher(const int id, const parser::idToIP& proposerIDtoIPs) : id(id) {
     connectToProposers(proposerIDtoIPs);
-    startServer();
+    const std::thread server([&] {startServer(); });
+    heartbeater::heartbeat("i'm alive", clientMutex, clientSockets);
+    pthread_exit(nullptr);
 }
 
 [[noreturn]]
 void batcher::startServer() {
     network::startServerAtPort(config::BATCHER_PORT_START + id,
        [&](const int socket, const WhoIsThis_Sender& whoIsThis) {
-            printf("Batcher %d connected to client\n", id);
+           printf("Batcher %d connected to client\n", id);
+           std::lock_guard<std::mutex> lock(clientMutex);
+           clientSockets.emplace_back(socket);
         },
        [&](const int socket, const WhoIsThis_Sender& whoIsThis, const std::string& payloadString) {
             ClientToBatcher payload;
@@ -50,12 +55,13 @@ void batcher::connectToProposers(const parser::idToIP& proposerIDToIPs) {
         std::string proposerIP = idToIP.second;
         const int proposerPort = config::PROPOSER_PORT_START + proposerID;
 
-        threads.emplace_back(std::thread([&, proposerIP, proposerPort] {
+        std::thread thread([&, proposerIP, proposerPort] {
             const int proposerSocketId = network::connectToServerAtAddress(proposerIP, proposerPort, WhoIsThis_Sender_batcher);
             {std::lock_guard<std::mutex> lock(proposerMutex);
             proposerSockets.emplace_back(proposerSocketId);}
             printf("Batcher %d connected to proposer\n", id);
-        }));
+        });
+        thread.detach();
     }
 }
 
@@ -64,7 +70,7 @@ int main(const int argc, const char** argv) {
         printf("Usage: ./batcher <BATCHER ID> <PROPOSER FILE NAME>.\n");
         exit(0);
     }
-    const int batcherId = atoi(argv[1] );
+    const int batcherId = atoi(argv[1]);
     const std::string& proposerFile = argv[2];
     const parser::idToIP& proposers = parser::parseIDtoIPs(proposerFile);
     batcher(batcherId, proposers);

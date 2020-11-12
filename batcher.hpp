@@ -24,10 +24,12 @@ private:
 
     std::mutex payloadsMutex;
     std::unordered_map<std::string, std::vector<std::string>> clientToPayloads = {};
-    std::vector<std::thread> threads = {}; // A place to put threads so they don't get freed
 
     std::mutex proposerMutex;
     std::vector<int> proposerSockets = {};
+
+    std::mutex clientMutex;
+    std::vector<int> clientSockets = {};
 
     /**
      * Starts the server the clients connect to.

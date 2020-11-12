@@ -16,16 +16,13 @@
 
 class paxos {
 public:
-    [[noreturn]] paxos();
+    [[noreturn]] explicit paxos(const parser::idToIP& batchers);
 private:
-    int batcherIndex = 0;
-    std::mutex batcherMutex;
-    std::vector<int> batcherSockets {};
+    heartbeat_component batchers;
 
     [[noreturn]] void startServer();
-    void connectToBatcher();
+    void connectToBatchers(const parser::idToIP& batcherIdToIPs);
     [[noreturn]] void readInput();
-    void sendToBatcher(const std::string& payload);
 };
 
 #endif //C__PAXOS_MAIN_HPP
