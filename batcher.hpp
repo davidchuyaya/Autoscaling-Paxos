@@ -7,6 +7,7 @@
 
 #include <vector>
 #include <thread>
+#include <mutex>
 #include <google/protobuf/message.h>
 #include "utils/config.hpp"
 #include "models/message.hpp"

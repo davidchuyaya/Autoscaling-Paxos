@@ -3,10 +3,6 @@
 //
 
 #include "proxy_leader.hpp"
-#include "utils/config.hpp"
-#include "utils/network.hpp"
-#include "models/message.hpp"
-#include <thread>
 
 proxy_leader::proxy_leader(int id, std::map<int, std::string> proposers, std::map<int, std::map<int, std::string>> acceptors) : id(id) {
     connectToProposers(proposers);

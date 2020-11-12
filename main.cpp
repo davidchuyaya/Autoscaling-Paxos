@@ -1,7 +1,6 @@
 
 #include "main.hpp"
 
-
 int main() {
     paxos p{};
 }

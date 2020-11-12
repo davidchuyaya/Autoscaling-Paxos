@@ -1,12 +1,8 @@
 //
 // Created by David Chu on 10/4/20.
 //
-#include <thread>
-#include <algorithm>
-#include <google/protobuf/message.h>
+
 #include "proposer.hpp"
-#include "utils/config.hpp"
-#include "models/message.hpp"
 
 proposer::proposer(const int id, std::map<int, std::string> proposers, std::map<int, std::map<int, std::string>> acceptors) : id(id) {
     findAcceptorGroupIds(acceptors);

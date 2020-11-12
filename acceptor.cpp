@@ -3,8 +3,6 @@
 //
 
 #include "acceptor.hpp"
-#include "utils/network.hpp"
-#include "models/message.hpp"
 
 acceptor::acceptor(const int id, const int acceptorGroupId) : id(id), acceptorGroupId(acceptorGroupId) {
     startServer();
