@@ -5,7 +5,7 @@
 #ifndef AUTOSCALING_PAXOS_UNBATCHER_HPP
 #define AUTOSCALING_PAXOS_UNBATCHER_HPP
 
-#include <mutex>
+#include <shared_mutex>
 #include <string>
 #include <vector>
 #include <thread>
@@ -17,10 +17,10 @@ public:
     explicit unbatcher(int id);
 private:
     const int id;
-    std::mutex ipToSocketMutex;
+    std::shared_mutex ipToSocketMutex;
     std::unordered_map<std::string, int> ipToSocket = {};
 
-    std::mutex proxyLeaderMutex;
+    std::shared_mutex proxyLeaderMutex;
     std::vector<int> proxyLeaders;
 
     [[noreturn]] void startServer();

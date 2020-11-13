@@ -5,7 +5,7 @@
 #ifndef C__PAXOS_PROPOSER_HPP
 #define C__PAXOS_PROPOSER_HPP
 
-
+#include <shared_mutex>
 #include <vector>
 #include <deque>
 #include "utils/network.hpp"
@@ -20,35 +20,35 @@ public:
 private:
     const int id; // 0 indexed, no gaps
 
-    std::mutex ballotMutex;
+    std::shared_mutex ballotMutex;
     int ballotNum = 0; // must be at least 1 the first time it is sent
 
     std::atomic<bool> isLeader = false;
-    std::mutex heartbeatMutex;
+    std::shared_mutex heartbeatMutex;
     time_t lastLeaderHeartbeat = 0;
 
     std::atomic<bool> shouldSendScouts = true;
-    std::mutex remainingAcceptorGroupsForScoutsMutex;
+    std::shared_mutex remainingAcceptorGroupsForScoutsMutex;
     std::unordered_set<int> remainingAcceptorGroupsForScouts = {};
 
-    std::mutex unproposedPayloadsMutex;
+    std::shared_mutex unproposedPayloadsMutex;
     std::vector<std::string> unproposedPayloads = {};
 
-    std::mutex logMutex;
+    std::shared_mutex logMutex;
     Log::stringLog log;
     int lastCommittedSlot = 0;
 
-    std::mutex uncommittedProposalsMutex;
+    std::shared_mutex uncommittedProposalsMutex;
     Log::stringLog uncommittedProposals = {}; //invariant: empty until we are leader. Key = slot
 
-    std::mutex acceptorGroupLogsMutex;
+    std::shared_mutex acceptorGroupLogsMutex;
     std::vector<Log::stringLog> acceptorGroupCommittedLogs = {};
     std::unordered_map<int, Log::pValueLog> acceptorGroupUncommittedLogs = {}; //key = acceptor group ID
 
-    std::mutex proposerMutex;
+    std::shared_mutex proposerMutex;
     std::vector<int> proposerSockets = {};
 
-    std::mutex acceptorMutex;
+    std::shared_mutex acceptorMutex;
     std::vector<int> acceptorGroupIds = {};
     int nextAcceptorGroup = 0;
 

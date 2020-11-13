@@ -5,6 +5,7 @@
 #ifndef AUTOSCALING_PAXOS_BATCHER_HPP
 #define AUTOSCALING_PAXOS_BATCHER_HPP
 
+#include <shared_mutex>
 #include <vector>
 #include <thread>
 #include <google/protobuf/message.h>
@@ -19,16 +20,16 @@ public:
     explicit batcher(int id, const parser::idToIP& proposerIDtoIPs);
 private:
     int id = 0;
-    std::mutex lastBatchTimeMutex;
+    std::shared_mutex lastBatchTimeMutex;
     time_t lastBatchTime = 0;
 
-    std::mutex payloadsMutex;
+    std::shared_mutex payloadsMutex;
     std::unordered_map<std::string, std::vector<std::string>> clientToPayloads = {};
 
-    std::mutex proposerMutex;
+    std::shared_mutex proposerMutex;
     std::vector<int> proposerSockets = {};
 
-    std::mutex clientMutex;
+    std::shared_mutex clientMutex;
     std::vector<int> clientSockets = {};
 
     /**

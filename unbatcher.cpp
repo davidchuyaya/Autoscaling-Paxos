@@ -16,7 +16,7 @@ void unbatcher::startServer() {
     network::startServerAtPort(config::UNBATCHER_PORT_START + id,
        [&](const int socket, const WhoIsThis_Sender& whoIsThis) {
            printf("Unbatcher %d connected to proxy leader\n", id);
-           std::lock_guard<std::mutex> lock(proxyLeaderMutex);
+           std::unique_lock lock(proxyLeaderMutex);
            proxyLeaders.emplace_back(socket);
         },
        [&](const int socket, const WhoIsThis_Sender& whoIsThis, const std::string& payload) {
@@ -32,14 +32,12 @@ void unbatcher::startServer() {
 }
 
 int unbatcher::connectToClient(const std::string& ipAddress) {
-    std::unique_lock lock(ipToSocketMutex);
+    std::unique_lock lock(ipToSocketMutex); //writeLock, since we don't want 2 ppl creating new sockets for the same client
     int socket = ipToSocket[ipAddress]; //return the socket if connection already established
     if (socket != 0)
         return socket;
 
-    lock.unlock(); //connect to server is blocking, unlock first
     socket = network::connectToServerAtAddress(ipAddress, config::CLIENT_PORT, WhoIsThis_Sender_unbatcher);
-    lock.lock();
     ipToSocket[ipAddress] = socket;
     return socket;
 }

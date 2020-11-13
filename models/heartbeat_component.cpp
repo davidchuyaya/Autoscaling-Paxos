@@ -27,16 +27,17 @@ void heartbeat_component::connectToServers(const parser::idToIP& idToIPs, const 
 }
 
 void heartbeat_component::addConnection(const int socket) {
-    {std::lock_guard<std::mutex> lock(componentMutex);
+    std::unique_lock lock(componentMutex);
     fastComponents.emplace_back(socket);
     //check threshold
     if (!thresholdMet())
-        return;}
+        return;
+    lock.unlock();
     componentCV.notify_one();
 }
 
 void heartbeat_component::waitForThreshold() {
-    std::unique_lock lock(componentMutex);
+    std::shared_lock lock(componentMutex);
     componentCV.wait(lock, [&]{return thresholdMet();});
 }
 
@@ -61,7 +62,8 @@ void heartbeat_component::checkHeartbeats() {
     while (true) {
         std::this_thread::sleep_for(std::chrono::seconds(config::HEARTBEAT_TIMEOUT_SEC));
 
-        std::scoped_lock lock(heartbeatMutex, componentMutex);
+        std::shared_lock heartbeatLock(heartbeatMutex, std::defer_lock);
+        std::scoped_lock lock(heartbeatLock, componentMutex);
         time(&now);
 
         //if a node has no recent heartbeat, move it into the slow list
@@ -94,6 +96,6 @@ void heartbeat_component::checkHeartbeats() {
 }
 
 void heartbeat_component::addHeartbeat(int socket) {
-    std::lock_guard<std::mutex> lock(heartbeatMutex);
+    std::unique_lock lock(heartbeatMutex);
     time(&heartbeats[socket]);
 }

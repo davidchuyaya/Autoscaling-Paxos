@@ -17,7 +17,7 @@ void batcher::startServer() {
     network::startServerAtPort(config::BATCHER_PORT_START + id,
        [&](const int socket, const WhoIsThis_Sender& whoIsThis) {
            printf("Batcher %d connected to client\n", id);
-           std::lock_guard<std::mutex> lock(clientMutex);
+           std::unique_lock lock(clientMutex);
            clientSockets.emplace_back(socket);
         },
        [&](const int socket, const WhoIsThis_Sender& whoIsThis, const std::string& payloadString) {
@@ -30,18 +30,21 @@ void batcher::startServer() {
 void batcher::listenToClient(const ClientToBatcher& payload) {
     //first payload is IP address of client
     printf("Batcher %d received payload: [%s]\n", id, payload.request().c_str());
-    {std::lock_guard<std::mutex> lock(payloadsMutex);
-    clientToPayloads[payload.ipaddress()].emplace_back(payload.request());}
+    std::unique_lock payloadsLock(payloadsMutex);
+    clientToPayloads[payload.ipaddress()].emplace_back(payload.request());
+    payloadsLock.unlock();
 
     //check if it's time to send another batch TODO separate timer in case client sends nothing else
-    {std::lock_guard<std::mutex> lock(lastBatchTimeMutex);
+    std::shared_lock batchTimeLock(lastBatchTimeMutex);
     time_t now;
     time(&now);
     if (difftime(now, lastBatchTime) < config::BATCH_TIME_SEC)
         return;
-    lastBatchTime = now;}
+    batchTimeLock.unlock();
 
-    std::scoped_lock lock(payloadsMutex, proposerMutex);
+    std::shared_lock proposersLock(proposerMutex, std::defer_lock);
+    std::scoped_lock lock(lastBatchTimeMutex, payloadsMutex, proposersLock);
+    lastBatchTime = now;
     printf("Sending batch\n");
     const Batch& batchMessage = message::createBatchMessage(clientToPayloads);
     for (const int socket : proposerSockets)
@@ -57,8 +60,8 @@ void batcher::connectToProposers(const parser::idToIP& proposerIDToIPs) {
 
         std::thread thread([&, proposerIP, proposerPort] {
             const int proposerSocketId = network::connectToServerAtAddress(proposerIP, proposerPort, WhoIsThis_Sender_batcher);
-            {std::lock_guard<std::mutex> lock(proposerMutex);
-            proposerSockets.emplace_back(proposerSocketId);}
+            std::unique_lock lock(proposerMutex);
+            proposerSockets.emplace_back(proposerSocketId);
             printf("Batcher %d connected to proposer\n", id);
         });
         thread.detach();

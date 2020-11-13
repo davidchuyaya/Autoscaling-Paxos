@@ -4,6 +4,8 @@
 
 #ifndef C__PAXOS_ACCEPTOR_HPP
 #define C__PAXOS_ACCEPTOR_HPP
+
+#include <shared_mutex>
 #include <vector>
 #include "models/log.hpp"
 #include "message.pb.h"
@@ -15,10 +17,10 @@ private:
     const int id;
     const int acceptorGroupId;
 
-    std::mutex ballotMutex;
+    std::shared_mutex ballotMutex;
     Ballot highestBallot = {};
 
-    std::mutex logMutex;
+    std::shared_mutex logMutex;
     Log::pValueLog log = {};
 
     [[noreturn]] void startServer();

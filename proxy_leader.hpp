@@ -5,7 +5,8 @@
 #ifndef AUTOSCALING_PAXOS_PROXY_LEADER_HPP
 #define AUTOSCALING_PAXOS_PROXY_LEADER_HPP
 
-
+#include <shared_mutex>
+#include <condition_variable>
 #include <vector>
 #include <message.pb.h>
 #include "utils/parser.hpp"
@@ -18,20 +19,20 @@ public:
                           const std::unordered_map<int, parser::idToIP>& acceptors);
 private:
     const int id;
-    std::mutex sentMessagesMutex;
+    std::shared_mutex sentMessagesMutex;
     std::unordered_map<int, ProposerToAcceptor> sentMessages = {}; //key = message ID
 
-    std::mutex unmergedLogsMutex;
+    std::shared_mutex unmergedLogsMutex;
     std::unordered_map<int, Log::acceptorGroupLog> unmergedLogs = {}; //key = message ID
 
-    std::mutex approvedCommandersMutex;
+    std::shared_mutex approvedCommandersMutex;
     std::unordered_map<int, int> approvedCommanders = {}; //key = message ID
 
-    std::mutex proposerMutex;
+    std::shared_mutex proposerMutex;
     std::unordered_map<int, int> proposerSockets = {}; //key = proposer ID
 
-    std::mutex acceptorMutex;
-    std::condition_variable acceptorCV;
+    std::shared_mutex acceptorMutex;
+    std::condition_variable_any acceptorCV;
     std::unordered_map<int, std::vector<int>> acceptorSockets = {}; //key = acceptor group ID
     std::vector<int> acceptorGroupIds = {};
 

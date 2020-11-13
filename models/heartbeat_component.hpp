@@ -5,7 +5,8 @@
 #ifndef AUTOSCALING_PAXOS_HEARTBEAT_COMPONENT_HPP
 #define AUTOSCALING_PAXOS_HEARTBEAT_COMPONENT_HPP
 
-#include <mutex>
+#include <shared_mutex>
+#include <condition_variable>
 #include <unordered_map>
 #include <vector>
 #include <thread>
@@ -22,7 +23,7 @@ public:
     void addConnection(int socket);
     void waitForThreshold();
     template<typename Message> void send(const Message& payload) {
-        std::lock_guard<std::mutex> lock(componentMutex);
+        std::shared_lock lock(componentMutex);
         int socket = nextComponentSocket();
         network::sendPayload(socket, payload);
     }
@@ -30,11 +31,11 @@ public:
 private:
     const int waitThreshold;
 
-    std::mutex heartbeatMutex;
+    std::shared_mutex heartbeatMutex;
     std::unordered_map<int, time_t> heartbeats = {}; //key = socket
 
-    std::mutex componentMutex;
-    std::condition_variable componentCV;
+    std::shared_mutex componentMutex;
+    std::condition_variable_any componentCV;
     std::vector<int> fastComponents = {};
     std::vector<int> slowComponents = {};
     int next = 0;
