@@ -109,22 +109,33 @@ int network::createSocket() {
     return socketId;
 }
 
-//TODO sender crashes if socket is closed
 void network::sendPayload(const int socketId, const google::protobuf::Message& payload) {
     const std::string& serializedMessage = payload.SerializeAsString();
-    write(socketId, serializedMessage.c_str(), serializedMessage.length());
+    sendPayload(socketId, serializedMessage);
 }
 
 void network::sendPayload(const int socketId, const std::string& payload) {
-    write(socketId, payload.c_str(), payload.length());
+    uint16_t size = payload.length();
+    int bytesWritten = write(socketId, &size, sizeof(size)); //send size first
+    if (bytesWritten <= 0) {
+        //TODO sender crashes if socket is closed
+    }
+    bytesWritten = write(socketId, payload.c_str(), payload.length());
+    if (bytesWritten <= 0) {
+        //bad return?
+    }
 }
 
 std::optional<std::string> network::receivePayload(const int socketId) {
-    //TODO a fixed read buffer size might come back to bite us when we send large messages
-    char buffer[config::TCP_READ_BUFFER_SIZE] = {0};
-    const auto size = read(socketId, buffer, config::TCP_READ_BUFFER_SIZE);
-    if (size <= 0)
+    uint16_t size = 0;
+    auto bytesRead = read(socketId, &size, sizeof(uint16_t)); //read size first
+    if (bytesRead <= 0)
         return {};
-    buffer[size] = '\0';
-    return std::string(buffer);
+
+    std::string buffer(size, '\0');
+    bytesRead = read(socketId, buffer.data(), size);
+    if (bytesRead <= 0)
+        return {};
+
+    return buffer;
 }

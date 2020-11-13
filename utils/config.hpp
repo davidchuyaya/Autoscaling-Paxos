@@ -32,7 +32,6 @@ namespace config {
     const static inline std::string LOCALHOST = "127.0.0.1";
     const static int BATCH_TIME_SEC = 5;
     const static int TCP_RETRY_TIMEOUT_SEC = 10;
-    const static int TCP_READ_BUFFER_SIZE = 1024;
     const static int HEARTBEAT_TIMEOUT_SEC = 20; // this - HEARTBEAT_SLEEP_SEC = time allowed between message send & receive
     const static int HEARTBEAT_SLEEP_SEC = 5;
     const static int ID_SCOUT_DELAY_MULTIPLIER = 5; // this * proposer ID = number of seconds to delay before sending scouts
