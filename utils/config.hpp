@@ -10,6 +10,13 @@
  */
 #include <array>
 #include <numeric>
+#define DEBUG
+
+#ifdef DEBUG
+#   define LOG(...) printf(__VA_ARGS__)
+#else //noop
+#   define LOG(...) do{}while(0)
+#endif
 
 namespace config {
     const static int F = 1;

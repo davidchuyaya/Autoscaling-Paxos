@@ -73,7 +73,7 @@ void heartbeat_component::checkHeartbeats() {
         while (iterator != fastComponents.end()) {
             const int socket = *iterator;
             if (difftime(now, heartbeats[socket]) > config::HEARTBEAT_TIMEOUT_SEC) {
-                printf("Node failed to heartbeat\n");
+                LOG("Node failed to heartbeat\n");
                 slowComponents.emplace_back(socket);
                 iterator = fastComponents.erase(iterator);
                 slowedComponents.emplace_back(socket);

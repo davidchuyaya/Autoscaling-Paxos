@@ -16,7 +16,7 @@ batcher::batcher(const int id, const parser::idToIP& proposerIDtoIPs) : id(id) {
 void batcher::startServer() {
     network::startServerAtPort(config::BATCHER_PORT_START + id,
        [&](const int socket, const WhoIsThis_Sender& whoIsThis) {
-           printf("Batcher %d connected to client\n", id);
+           LOG("Batcher %d connected to client\n", id);
            std::unique_lock lock(clientMutex);
            clientSockets.emplace_back(socket);
         },
@@ -29,7 +29,7 @@ void batcher::startServer() {
 
 void batcher::listenToClient(const ClientToBatcher& payload) {
     //first payload is IP address of client
-    printf("Batcher %d received payload: [%s]\n", id, payload.request().c_str());
+    LOG("Batcher %d received payload: [%s]\n", id, payload.request().c_str());
     std::unique_lock payloadsLock(payloadsMutex);
     clientToPayloads[payload.ipaddress()].emplace_back(payload.request());
     payloadsLock.unlock();
@@ -45,7 +45,7 @@ void batcher::listenToClient(const ClientToBatcher& payload) {
     std::shared_lock proposersLock(proposerMutex, std::defer_lock);
     std::scoped_lock lock(lastBatchTimeMutex, payloadsMutex, proposersLock);
     lastBatchTime = now;
-    printf("Sending batch\n");
+    LOG("Sending batch\n");
     const Batch& batchMessage = message::createBatchMessage(clientToPayloads);
     for (const int socket : proposerSockets)
         network::sendPayload(socket, batchMessage);
@@ -62,7 +62,7 @@ void batcher::connectToProposers(const parser::idToIP& proposerIDToIPs) {
             const int proposerSocketId = network::connectToServerAtAddress(proposerIP, proposerPort, WhoIsThis_Sender_batcher);
             std::unique_lock lock(proposerMutex);
             proposerSockets.emplace_back(proposerSocketId);
-            printf("Batcher %d connected to proposer\n", id);
+            LOG("Batcher %d connected to proposer\n", id);
         });
         thread.detach();
     }

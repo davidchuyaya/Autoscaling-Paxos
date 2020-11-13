@@ -15,12 +15,12 @@ unbatcher::unbatcher(const int id) : id(id) {
 void unbatcher::startServer() {
     network::startServerAtPort(config::UNBATCHER_PORT_START + id,
        [&](const int socket, const WhoIsThis_Sender& whoIsThis) {
-           printf("Unbatcher %d connected to proxy leader\n", id);
+           LOG("Unbatcher %d connected to proxy leader\n", id);
            std::unique_lock lock(proxyLeaderMutex);
            proxyLeaders.emplace_back(socket);
         },
        [&](const int socket, const WhoIsThis_Sender& whoIsThis, const std::string& payload) {
-           printf("Unbatcher received payload: %s\n", payload.c_str());
+           LOG("Unbatcher received payload: %s\n", payload.c_str());
            Batch batch;
            batch.ParseFromString(payload);
            for (const auto&[clientIp, requests] : batch.clienttorequests()) {

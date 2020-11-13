@@ -32,7 +32,7 @@ void proxy_leader::connectToProposers(const parser::idToIP& proposers) {
 
         std::thread thread([&, proposerId, proposerIp] {
             const int socket = network::connectToServerAtAddress(proposerIp, config::PROPOSER_PORT_START + proposerId, WhoIsThis_Sender_proxyLeader);
-            printf("Proxy leader %d connected to proposer\n", id);
+            LOG("Proxy leader %d connected to proposer\n", id);
 
             std::unique_lock lock(proposerMutex);
             proposerSockets[proposerId] = socket;
@@ -53,7 +53,7 @@ void proxy_leader::listenToProposer(const ProposerToAcceptor& payload) {
     std::unique_lock messagesLock(sentMessagesMutex);
     sentMessages[payload.messageid()] = payload;
     messagesLock.unlock();
-    printf("Proxy leader %d received from proposer: %s\n", id, payload.ShortDebugString().c_str());
+    LOG("Proxy leader %d received from proposer: %s\n", id, payload.ShortDebugString().c_str());
 
     // Broadcast to Acceptors; wait if necessary
     std::shared_lock acceptorsLock(acceptorMutex);
@@ -79,7 +79,7 @@ void proxy_leader::connectToAcceptors(const std::unordered_map<int, parser::idTo
 
             std::thread thread([&, acceptorIp, acceptorPort, acceptorGroupId]{
                 const int socket = network::connectToServerAtAddress(acceptorIp, acceptorPort, WhoIsThis_Sender_proxyLeader);
-                printf("Proxy leader %d connected to acceptor\n", id);
+                LOG("Proxy leader %d connected to acceptor\n", id);
                 std::unique_lock acceptorsLock2(acceptorMutex);
                 acceptorSockets[acceptorGroupId].emplace_back(socket);
                 if (acceptorSockets[acceptorGroupId].size() >= 2 * config::F + 1) {
@@ -101,7 +101,7 @@ void proxy_leader::connectToAcceptors(const std::unordered_map<int, parser::idTo
 }
 
 void proxy_leader::listenToAcceptor(const AcceptorToProxyLeader& payload) {
-    printf("Proxy leader %d received from acceptors: %s\n", id, payload.ShortDebugString().c_str());
+    LOG("Proxy leader %d received from acceptors: %s\n", id, payload.ShortDebugString().c_str());
 
     switch (payload.type()) {
         case AcceptorToProxyLeader_Type_p1b:

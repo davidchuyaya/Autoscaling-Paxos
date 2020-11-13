@@ -3,8 +3,10 @@
 
 [[noreturn]]
 paxos::paxos(const parser::idToIP& batcherIdToIPs): batchers(config::F+1) {
-    std::cout << "F: " << config::F << std::endl;
-    setbuf(stdout, nullptr); //TODO force flush to stdout. Disable when doing metrics or in prod
+    LOG("F: %d\n", config::F);
+#ifdef DEBUG
+    setbuf(stdout, nullptr);
+#endif
     const std::thread server([&] {startServer(); });
     connectToBatchers(batcherIdToIPs);
     readInput();
@@ -14,9 +16,9 @@ paxos::paxos(const parser::idToIP& batcherIdToIPs): batchers(config::F+1) {
 void paxos::startServer() {
     network::startServerAtPort(config::CLIENT_PORT,
        [](const int socket, const WhoIsThis_Sender& whoIsThis) {
-            printf("Main connected to unbatcher\n");
+            LOG("Main connected to unbatcher\n");
     }, [](const int socket, const WhoIsThis_Sender& whoIsThis, const std::string& payload) {
-            printf("--Acked: {%s}--\n", payload.c_str());
+            LOG("--Acked: {%s}--\n", payload.c_str());
     });
 }
 

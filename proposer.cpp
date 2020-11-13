@@ -33,7 +33,7 @@ void proposer::leaderLoop() {
 
         //send heartbeats
         if (isLeader) {
-            printf("%d = leader, sending at time: %s\n", id, std::asctime(std::localtime(&now)));
+            LOG("%d = leader, sending at time: %s\n", id, std::asctime(std::localtime(&now)));
             std::shared_lock proposersLock(proposerMutex);
             for (const int proposerSocket : proposerSockets)
                 network::sendPayload(proposerSocket, iAmLeader);
@@ -54,19 +54,19 @@ void proposer::leaderLoop() {
 
 [[noreturn]]
 void proposer::startServer() {
-    printf("Proposer Port Id: %d\n", config::PROPOSER_PORT_START + id);
+    LOG("Proposer Port Id: %d\n", config::PROPOSER_PORT_START + id);
     network::startServerAtPort(config::PROPOSER_PORT_START + id,
            [&](const int socket, const WhoIsThis_Sender& whoIsThis) {
             switch (whoIsThis) {
                 case WhoIsThis_Sender_batcher:
-                    printf("Server %d connected to batcher\n", id);
+                    LOG("Server %d connected to batcher\n", id);
                     break;
                 case WhoIsThis_Sender_proxyLeader:
-                    printf("Server %d connected to proxy leader\n", id);
+                    LOG("Server %d connected to proxy leader\n", id);
                     proxyLeaders.addConnection(socket);
                     break;
                 case WhoIsThis_Sender_proposer: {
-                    printf("Server %d connected to proposer\n", id);
+                    LOG("Server %d connected to proposer\n", id);
                     std::unique_lock lock(proposerMutex);
                     proposerSockets.emplace_back(socket);
                     break;
@@ -93,7 +93,7 @@ void proposer::startServer() {
 }
 
 void proposer::listenToBatcher(const std::string& payload) {
-    printf("Proposer %d received a batch request\n", id);
+    LOG("Proposer %d received a batch request\n", id);
     if (isLeader) {
         std::shared_lock acceptorsLock(acceptorMutex, std::defer_lock);
         std::shared_lock ballotLock(ballotMutex, std::defer_lock);
@@ -139,7 +139,7 @@ void proposer::connectToProposers(const parser::idToIP& proposers) {
         const int proposerPort = config::PROPOSER_PORT_START + proposerID;
         std::thread thread([&, proposerPort, proposerIP]{
             const int socket = network::connectToServerAtAddress(proposerIP, proposerPort, WhoIsThis_Sender_proposer);
-            printf("Proposer %d connected to other proposer\n", id);
+            LOG("Proposer %d connected to other proposer\n", id);
             std::unique_lock lock(proposerMutex);
             proposerSockets.emplace_back(socket);
             lock.unlock();
@@ -153,7 +153,7 @@ void proposer::connectToProposers(const parser::idToIP& proposers) {
 
 void proposer::listenToProposer() {
     std::unique_lock lock(heartbeatMutex);
-    printf("%d received leader heartbeat for time: %s\n", id, std::asctime(std::localtime(&lastLeaderHeartbeat)));
+    LOG("%d received leader heartbeat for time: %s\n", id, std::asctime(std::localtime(&lastLeaderHeartbeat)));
     time(&lastLeaderHeartbeat); // store the time we received the heartbeat
     lock.unlock();
 
@@ -169,7 +169,7 @@ void proposer::sendScouts() {
     ballotNum += 1;
     currentBallotNum = ballotNum;
     ballotLock.unlock();
-    printf("P1A blasting out: id = %d, ballotNum = %d\n", id, currentBallotNum);
+    LOG("P1A blasting out: id = %d, ballotNum = %d\n", id, currentBallotNum);
 
     std::shared_lock acceptorsLock(acceptorMutex, std::defer_lock);
     std::shared_lock logLock(logMutex, std::defer_lock);
@@ -181,7 +181,7 @@ void proposer::sendScouts() {
 }
 
 void proposer::handleP1B(const ProxyLeaderToProposer& message) {
-    printf("Proposer %d received p1b from acceptor group: %d, committed log length: %d, uncommitted log length: %d\n", id,
+    LOG("Proposer %d received p1b from acceptor group: %d, committed log length: %d, uncommitted log length: %d\n", id,
            message.acceptorgroupid(), message.committedlog_size(), message.uncommittedlog_size());
 
     if (message.ballot().id() != id) { // we lost the election
@@ -204,7 +204,7 @@ void proposer::handleP1B(const ProxyLeaderToProposer& message) {
 
     //leader election complete
     isLeader = true;
-    printf("Proposer %d is leader\n", id);
+    LOG("Proposer %d is leader\n", id);
     const ProposerToProposer& iAmLeader = message::createIamLeader();
     std::shared_lock proposerLock(proposerMutex);
     for (const int proposerSocket: proposerSockets)
@@ -234,14 +234,14 @@ void proposer::mergeLogs() {
 }
 
 void proposer::handleP2B(const ProxyLeaderToProposer& message) {
-    printf("Proposer %d received p2b, highest ballot: [%d, %d]\n", id, message.ballot().id(), message.ballot().ballotnum());
+    LOG("Proposer %d received p2b, highest ballot: [%d, %d]\n", id, message.ballot().id(), message.ballot().ballotnum());
     if (message.ballot().id() != id) { //yikes, we got preempted
         noLongerLeader();
     }
 }
 
 void proposer::noLongerLeader() {
-    printf("Proposer %d is no longer the leader\n", id);
+    LOG("Proposer %d is no longer the leader\n", id);
     isLeader = false;
 
     std::scoped_lock lock(acceptorGroupLogsMutex, remainingAcceptorGroupsForScoutsMutex);
