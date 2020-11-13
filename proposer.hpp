@@ -7,7 +7,7 @@
 
 #include <shared_mutex>
 #include <vector>
-#include <deque>
+#include <queue>
 #include "utils/network.hpp"
 #include "utils/parser.hpp"
 #include "message.pb.h"
@@ -27,19 +27,12 @@ private:
     std::shared_mutex heartbeatMutex;
     time_t lastLeaderHeartbeat = 0;
 
-    std::atomic<bool> shouldSendScouts = true;
     std::shared_mutex remainingAcceptorGroupsForScoutsMutex;
     std::unordered_set<int> remainingAcceptorGroupsForScouts = {};
 
-    std::shared_mutex unproposedPayloadsMutex;
-    std::vector<std::string> unproposedPayloads = {};
-
     std::shared_mutex logMutex;
-    Log::stringLog log;
-    int lastCommittedSlot = 0;
-
-    std::shared_mutex uncommittedProposalsMutex;
-    Log::stringLog uncommittedProposals = {}; //invariant: empty until we are leader. Key = slot
+    std::queue<int> logHoles = {};
+    int nextSlot = 0;
 
     std::shared_mutex acceptorGroupLogsMutex;
     std::vector<Log::stringLog> acceptorGroupCommittedLogs = {};
@@ -55,19 +48,14 @@ private:
     heartbeat_component proxyLeaders;
 
     /**
-     * Set acceptorGroupIds. TODO not hardcode the IDs
+     * Set acceptorGroupIds.
      */
     void findAcceptorGroupIds(const std::unordered_map<int, parser::idToIP>& acceptors);
 
     /**
      * If isLeader = true, periodically tell other proposers.
      */
-    [[noreturn]] void broadcastIAmLeader();
-    /**
-     * 1. Check if a leader has sent us a heartbeat. If it timed out, prepare to send scouts.
-     * 2. Check if proxy leaders have sent us a heartbeat. If they timed out, remove it and send its messages to different proxy leaders.
-     */
-    [[noreturn]] void checkHeartbeats();
+    [[noreturn]] void leaderLoop();
 
     [[noreturn]] void startServer();
     void listenToBatcher(const std::string& payload);
@@ -75,10 +63,6 @@ private:
     void connectToProposers(const parser::idToIP& proposers);
     void listenToProposer();
 
-    /**
-     * Execute all scout/commander logic.
-     */
-    [[noreturn]] void mainLoop();
     /**
      * Broadcast p1a to acceptors to become the leader.
      * @invariant isLeader = false
@@ -100,11 +84,6 @@ private:
      */
     void mergeLogs();
     /**
-     * Assign the next available slots to unproposedPayloads and send p2a messages for them.
-     * @invariant isLeader = true
-     */
-    void sendCommandersForPayloads();
-    /**
      * Check if a proxy leader has committed values for a slot. If yes, then confirm that slot as committed.
      * If we've been preempted, then that means another has become the leader. Reset values.
      * @invariant isLeader = true
@@ -120,12 +99,6 @@ private:
      * @return The ID of the acceptor group to propose to.
      */
     int fetchNextAcceptorGroupId();
-
-    /**
-     * Find the newest slot in which all previous slots have been committed.
-     * @warning Does NOT lock logMutex. The caller MUST lock it
-     */
-    void calcLastCommittedSlot();
 };
 
 

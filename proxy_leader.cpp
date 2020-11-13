@@ -23,7 +23,6 @@ void proxy_leader::connectToUnbatchers(const parser::idToIP& unbatchersIdToIps) 
         [&](const int socket, const std::string& payload) {
         unbatchers.addHeartbeat(socket);
     });
-    unbatchers.waitForThreshold();
 }
 
 void proxy_leader::connectToProposers(const parser::idToIP& proposers) {
@@ -175,10 +174,7 @@ void proxy_leader::handleP2B(const AcceptorToProxyLeader& payload) {
         approvedCommanders[payload.messageid()] += 1;
 
         if (approvedCommanders[payload.messageid()] >= config::F + 1) {
-            //we have f+1 approved commanders, tell the proposer
-            const ProxyLeaderToProposer& messageToProposer = message::createProxyP2B(payload.messageid(), payload.acceptorgroupid(),
-                                                                                     payload.ballot(), payload.slot());
-            network::sendPayload(proposerSockets[sentValue.ballot().id()], messageToProposer);
+            //we have f+1 approved commanders, tell the unbatcher. No need to tell proposer
             unbatchers.send(sentMessages[payload.messageid()].payload());
             sentMessages.erase(payload.messageid());
             approvedCommanders.erase(payload.messageid());

@@ -39,6 +39,7 @@ void heartbeat_component::addConnection(const int socket) {
 void heartbeat_component::waitForThreshold() {
     std::shared_lock lock(componentMutex);
     componentCV.wait(lock, [&]{return thresholdMet();});
+    canSend = true;
 }
 
 bool heartbeat_component::thresholdMet() {

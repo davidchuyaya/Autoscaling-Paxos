@@ -21,9 +21,11 @@ public:
     void connectToServers(const parser::idToIP& idToIPs, int socketOffset, const WhoIsThis_Sender& whoIsThis,
                           const std::function<void(int, const std::string&)>& listener);
     void addConnection(int socket);
-    void waitForThreshold();
     template<typename Message> void send(const Message& payload) {
         std::shared_lock lock(componentMutex);
+        if (!canSend) { //block if not enough connections
+            waitForThreshold();
+        }
         int socket = nextComponentSocket();
         network::sendPayload(socket, payload);
     }
@@ -39,7 +41,9 @@ private:
     std::vector<int> fastComponents = {};
     std::vector<int> slowComponents = {};
     int next = 0;
+    bool canSend = false;
 
+    void waitForThreshold();
     bool thresholdMet();
     int nextComponentSocket();
     [[noreturn]] void checkHeartbeats();

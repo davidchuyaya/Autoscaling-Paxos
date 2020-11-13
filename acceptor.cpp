@@ -28,14 +28,12 @@ void acceptor::listenToProxyLeaders(const int socket, const ProposerToAcceptor& 
     std::scoped_lock lock(ballotMutex, logMutex);
     switch (payload.type()) {
         case ProposerToAcceptor_Type_p1a: {
-            printf("Acceptor [%d, %d] received p1a: [%d, %d], slot: %d, highestBallot: [%d, %d]\n",
+            printf("Acceptor [%d, %d] received p1a: [%d, %d], highestBallot: [%d, %d]\n",
                    acceptorGroupId, id, payload.ballot().id(),
-                   payload.ballot().ballotnum(), payload.slot(), highestBallot.id(), highestBallot.ballotnum());
+                   payload.ballot().ballotnum(), highestBallot.id(), highestBallot.ballotnum());
             if (Log::isBallotGreaterThan(payload.ballot(), highestBallot))
                 highestBallot = payload.ballot();
-            const Log::pValueLog& filteredLog = logAfterSlot(payload.slot());
-            network::sendPayload(socket, message::createP1B(payload.messageid(), acceptorGroupId, highestBallot,
-                                                            filteredLog));
+            network::sendPayload(socket, message::createP1B(payload.messageid(), acceptorGroupId, highestBallot, log));
             break;
         }
         case ProposerToAcceptor_Type_p2a:
@@ -52,14 +50,6 @@ void acceptor::listenToProxyLeaders(const int socket, const ProposerToAcceptor& 
             break;
         default: {}
     }
-}
-
-Log::pValueLog acceptor::logAfterSlot(const int slotToFilter) {
-    Log::pValueLog filteredLog = {};
-    for (const auto&[slot, pValue] : log)
-        if (slot > slotToFilter)
-            filteredLog[slot] = pValue;
-    return filteredLog;
 }
 
 int main(const int argc, const char** argv) {

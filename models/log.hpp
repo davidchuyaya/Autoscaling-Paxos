@@ -5,6 +5,7 @@
 #ifndef AUTOSCALING_PAXOS_LOG_HPP
 #define AUTOSCALING_PAXOS_LOG_HPP
 
+#include <queue>
 #include <vector>
 #include <string>
 #include <message.pb.h>
@@ -14,6 +15,8 @@ namespace Log {
     using pValueLog = std::unordered_map<int, PValue>;
     using acceptorGroupLog = std::vector<pValueLog>;
 
+    std::tuple<std::queue<int>, int>
+    findHolesInLog(const stringLog& committedLog, const pValueLog& uncommittedLog);
     /**
      * Merge the committed logs of acceptor groups into the existing committed log.
      * A committed log only contains slots in which all acceptors within a group agree on the value.
@@ -21,7 +24,7 @@ namespace Log {
      * @note Invariant: No 2 committed logs have values for the same slots; no conflicting keys
      * @param committedLogs List of acceptor groups' committed logs
      */
-    void mergeCommittedLogs(stringLog* committedLog, const std::vector<stringLog>& committedLogs);
+    stringLog mergeCommittedLogs(const std::vector<stringLog>& committedLogs);
     /**
      * Merge the uncommitted logs of acceptor groups. If 2 acceptor groups have values for the same slot, the value with
      * the higher ballot is chosen. An uncommitted log only contains slots in which < F+1 acceptors agree upon the value.

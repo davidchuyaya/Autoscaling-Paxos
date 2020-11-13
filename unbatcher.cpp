@@ -24,7 +24,7 @@ void unbatcher::startServer() {
            Batch batch;
            batch.ParseFromString(payload);
            for (const auto&[clientIp, requests] : batch.clienttorequests()) {
-               const int clientSocket = connectToClient(clientIp);
+               const int clientSocket = connectToClient(clientIp); //TODO first message sent after a connection is set up is always lost
                for (const std::string& request : requests.requests())
                    network::sendPayload(clientSocket, request);
            }
