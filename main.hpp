@@ -20,10 +20,10 @@ public:
     [[noreturn]] paxos();
 private:
     int batcherIndex = 0;
-    std::vector<std::thread> participants {};  // A place to put threads so they don't get freed
-    std::mutex clientsMutex;
-    std::vector<int> clientSockets {};
+    std::mutex batcherMutex;
+    std::vector<int> batcherSockets {};
 
+    [[noreturn]] void startServer();
     void connectToBatcher();
     [[noreturn]] void readInput();
     void sendToBatcher(const std::string& payload);

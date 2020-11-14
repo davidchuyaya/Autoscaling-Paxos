@@ -47,6 +47,7 @@ int network::connectToServerAtAddress(const std::string& address, const int port
         if (connectResult < 0) {
             std::this_thread::sleep_for(std::chrono::seconds(config::TCP_RETRY_TIMEOUT_SEC));
         }
+//        close(socketId);
     }
     return socketId;
 }

@@ -4,7 +4,7 @@
 
 #include "proposer.hpp"
 
-proposer::proposer(const int id, std::map<int, std::string> proposers, std::map<int, std::map<int, std::string>> acceptors) : id(id) {
+proposer::proposer(const int id, const parser::idToIP& proposers, const std::unordered_map<int, parser::idToIP>& acceptors) : id(id) {
     findAcceptorGroupIds(acceptors);
     const std::thread server([&] {startServer(); });
     connectToProposers(proposers);
@@ -21,10 +21,10 @@ proposer::proposer(const int id, std::map<int, std::string> proposers, std::map<
     mainLoop();
 }
 
-void proposer::findAcceptorGroupIds(std::map<int, std::map<int, std::string>> acceptors) {
+void proposer::findAcceptorGroupIds(const std::unordered_map<int, parser::idToIP>& acceptors) {
     std::lock_guard<std::mutex> lock(acceptorMutex);
-    for (const auto pair : acceptors)
-        acceptorGroupIds.emplace_back(pair.first);
+    for (const auto& [acceptorGroupId, acceptorGroupMembers] : acceptors)
+        acceptorGroupIds.emplace_back(acceptorGroupId);
 }
 
 [[noreturn]]
@@ -95,9 +95,9 @@ void proposer::checkHeartbeats() {
 [[noreturn]]
 void proposer::startServer() {
     printf("Proposer Port Id: %d\n", config::PROPOSER_PORT_START + id);
-    network::startServerAtPort(config::PROPOSER_PORT_START + id, [&](const int clientSocket) {
-        //read first incoming message to tell who the connecting node is
-        const std::optional<std::string>& incoming = network::receivePayload(clientSocket);
+    network::startServerAtPort(config::PROPOSER_PORT_START + id, [&](const int socket) {
+        // read first incoming message to tell who the connecting node is
+        const std::optional<std::string>& incoming = network::receivePayload(socket);
         if (incoming->empty())
             return;
         WhoIsThis whoIsThis;
@@ -105,36 +105,33 @@ void proposer::startServer() {
         switch (whoIsThis.sender()) {
             case WhoIsThis_Sender_batcher:
                 printf("Server %d connected to batcher\n", id);
-                listenToBatcher(clientSocket);
+                listenToBatcher(socket);
             case WhoIsThis_Sender_proxyLeader:
                 printf("Server %d connected to proxy leader\n", id);
-                listenToProxyLeader(clientSocket);
+                listenToProxyLeader(socket);
             case WhoIsThis_Sender_proposer:
                 printf("Server %d connected to proposer\n", id);
                 {std::lock_guard<std::mutex> lock(proposerMutex);
-                    proposerSockets.emplace_back(clientSocket);}
-                listenToProposer(clientSocket);
+                    proposerSockets.emplace_back(socket);}
+                listenToProposer(socket);
             default: {}
         }
+        close(socket);
     });
 }
 
-void proposer::listenToBatcher(int socket) {
-    BatcherToProposer payload;
+void proposer::listenToBatcher(const int socket) {
     while (true) {
         const std::optional<std::string>& incoming = network::receivePayload(socket);
         if (incoming->empty())
             return;
-        payload.ParseFromString(incoming.value());
         printf("Proposer %d received a batch request\n", id);
         std::lock_guard<std::mutex> lock(unproposedPayloadsMutex);
-        unproposedPayloads.insert(unproposedPayloads.end(), payload.requests().begin(), payload.requests().end());
-
-        payload.Clear();
+        unproposedPayloads.emplace_back(incoming.value());
     }
 }
 
-void proposer::listenToProxyLeader(int socket) {
+void proposer::listenToProxyLeader(const int socket) {
     {std::lock_guard<std::mutex> lock(proxyLeaderMutex);
     fastProxyLeaders.emplace_back(socket);}
     proxyLeaderCV.notify_one();
@@ -170,22 +167,25 @@ void proposer::listenToProxyLeader(int socket) {
     }
 }
 
-void proposer::connectToProposers(std::map<int, std::string> proposers) {
-    //Protocol is "connect to servers with a higher id than yourself, so we don't end up as both server & client for anyone
-    for (const auto pair : proposers) {
-        int p_id = pair.first;
-        std::string ip_addr = pair.second;
-        if (p_id > id) {
-            const int proposerPort = config::PROPOSER_PORT_START + p_id;
-            threads.emplace_back(std::thread([&, proposerPort, ip_addr]{
-                const int proposerSocket = network::connectToServerAtAddress(ip_addr, proposerPort);
-                network::sendPayload(proposerSocket, message::createWhoIsThis(WhoIsThis_Sender_proposer));
-                printf("Proposer %d connected to other proposer\n", id);
-                {std::lock_guard<std::mutex> lock(proposerMutex);
-                    proposerSockets.emplace_back(proposerSocket);}
-                listenToProposer(proposerSocket);
-            }));
-        }
+void proposer::connectToProposers(const parser::idToIP& proposers) {
+    for (const auto& idToIP : proposers) {
+        int proposerID = idToIP.first;
+        std::string proposerIP = idToIP.second;
+
+        // Protocol is "connect to servers with a higher id than yourself, so we don't end up as both server & client for anyone
+        if (proposerID <= id)
+            continue;
+
+        const int proposerPort = config::PROPOSER_PORT_START + proposerID;
+        threads.emplace_back(std::thread([&, proposerPort, proposerIP]{
+            const int socket = network::connectToServerAtAddress(proposerIP, proposerPort);
+            network::sendPayload(socket, message::createWhoIsThis(WhoIsThis_Sender_proposer));
+            printf("Proposer %d connected to other proposer\n", id);
+            {std::lock_guard<std::mutex> lock(proposerMutex);
+                proposerSockets.emplace_back(socket);}
+            listenToProposer(socket);
+            close(socket);
+        }));
     }
 }
 
@@ -243,8 +243,8 @@ void proposer::handleP1B(const ProxyLeaderToProposer& message) {
     printf("Proposer %d received p1b from acceptor group: %d, committed log length: %d, uncommitted log length: %d\n", id,
            message.acceptorgroupid(), message.committedlog_size(), message.uncommittedlog_size());
 
-    if (message.ballot().id() != id) { //we lost the election
-        //store the largest ballot we last saw so we can immediately catch up
+    if (message.ballot().id() != id) { // we lost the election
+        // store the largest ballot we last saw so we can immediately catch up
         {std::lock_guard lock(ballotMutex);
         ballotNum = message.ballot().ballotnum();}
         noLongerLeader();
@@ -389,16 +389,16 @@ void proposer::calcLastCommittedSlot() {
         lastCommittedSlot += 1;
 }
 
-int main(int argc, char** argv) {
-    if(argc != 4) {
-        printf("Please follow the format for running this function: ./proposer <PROPOSER ID> <PROPOSER FILE NAME> <ACCEPTORS FILE NAME>.\n");
+int main(const int argc, const char** argv) {
+    if (argc != 4) {
+        printf("Usage: ./proposer <PROPOSER ID> <PROPOSER FILE NAME> <ACCEPTORS FILE NAME>.\n");
         exit(0);
     }
-    int proposer_id = atoi( argv[1] );
-    std::string proposer_file = argv[2];
-    std::map<int, std::string> proposers = parser::parse_proposer(proposer_file);
-    std::string acceptor_file = argv[3];
-    std::map<int, std::map<int, std::string>> acceptors = parser::parse_acceptors(acceptor_file);
-    proposer(proposer_id, proposers, acceptors);
+    const int id = atoi( argv[1] );
+    const std::string& proposerFileName = argv[2];
+    const parser::idToIP& proposers = parser::parseProposer(proposerFileName);
+    const std::string& acceptorFileName = argv[3];
+    const std::unordered_map<int, parser::idToIP>& acceptors = parser::parseAcceptors(acceptorFileName);
+    proposer(id, proposers, acceptors);
 }
 

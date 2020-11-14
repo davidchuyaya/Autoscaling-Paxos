@@ -22,6 +22,12 @@ message PValue {
     Ballot ballot = 1;
     string payload = 2;
 }
+message Batch {
+    message Requests {
+        repeated string requests = 1;
+    }
+    map<string, Requests> clientToRequests = 1;
+}
 
 /**
 Official Paxos protocol messages: p1a, p1b, p2a, p2b
@@ -68,10 +74,6 @@ message ProxyLeaderToProposer {
     int32 slot = 5;
     map<int32, string> committedLog = 6;
     map<int32, PValue> uncommittedLog = 7;
-}
-
-message BatcherToProposer {
-    repeated string requests = 1;
 }
 
 message ProposerToProposer {

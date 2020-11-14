@@ -21,7 +21,7 @@ namespace message {
     ProxyLeaderToProposer createProxyP2B(int messageId, int acceptorGroupId, const Ballot& highestBallot, int slot);
     ProxyLeaderToProposer createProxyLeaderHeartbeat();
     ProposerToProposer createIamLeader();
-    BatcherToProposer createBatchMessage(const std::vector<std::string>& requests);
+    Batch createBatchMessage(const std::unordered_map<std::string, std::vector<std::string>>& requests);
 }
 
 #endif //AUTOSCALING_PAXOS_MESSAGE_HPP

@@ -94,8 +94,12 @@ ProposerToProposer message::createIamLeader() {
     return iAmLeader;
 }
 
-BatcherToProposer message::createBatchMessage(const std::vector<std::string>& requests) {
-    BatcherToProposer receiverMessage;
-    *receiverMessage.mutable_requests() = {requests.begin(), requests.end()};
-    return receiverMessage;
+Batch message::createBatchMessage(const std::unordered_map<std::string, std::vector<std::string>>& requests) {
+    std::unordered_map<std::string, Batch_Requests> protobufRequests = {};
+    for (const auto& [ip, requestsForIp] : requests)
+        *protobufRequests[ip].mutable_requests() = {requestsForIp.begin(), requestsForIp.end()};
+
+    Batch batch;
+    *batch.mutable_clienttorequests() = {protobufRequests.begin(), protobufRequests.end()};
+    return batch;
 }

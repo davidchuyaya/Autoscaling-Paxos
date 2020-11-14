@@ -2,6 +2,7 @@
 // Created by David Chu on 10/4/20.
 //
 
+#include <unistd.h>
 #include "acceptor.hpp"
 
 acceptor::acceptor(const int id, const int acceptorGroupId) : id(id), acceptorGroupId(acceptorGroupId) {
@@ -12,13 +13,14 @@ acceptor::acceptor(const int id, const int acceptorGroupId) : id(id), acceptorGr
 void acceptor::startServer() {
     const int acceptorGroupPortOffset = config::ACCEPTOR_GROUP_PORT_OFFSET * acceptorGroupId;
     printf("Acceptor Port: %d\n", config::ACCEPTOR_PORT_START + acceptorGroupPortOffset + id);
-    network::startServerAtPort(config::ACCEPTOR_PORT_START + acceptorGroupPortOffset + id, [&](const int proposerSocketId) {
+    network::startServerAtPort(config::ACCEPTOR_PORT_START + acceptorGroupPortOffset + id, [&](const int socket) {
         printf("Acceptor [%d, %d] connected to proxy leader\n", acceptorGroupId, id);
-        listenToProxyLeaders(proposerSocketId);
+        listenToProxyLeaders(socket);
+        close(socket);
     });
 }
 
-void acceptor::listenToProxyLeaders(int socket) {
+void acceptor::listenToProxyLeaders(const int socket) {
     ProposerToAcceptor payload;
 
     while (true) {
@@ -57,7 +59,7 @@ void acceptor::listenToProxyLeaders(int socket) {
     }
 }
 
-Log::pValueLog acceptor::logAfterSlot(int slotToFilter) {
+Log::pValueLog acceptor::logAfterSlot(const int slotToFilter) {
     Log::pValueLog filteredLog = {};
     for (const auto&[slot, pValue] : log)
         if (slot > slotToFilter)
@@ -65,12 +67,12 @@ Log::pValueLog acceptor::logAfterSlot(int slotToFilter) {
     return filteredLog;
 }
 
-int main(int argc, char** argv) {
-    if(argc != 3) {
-        printf("Please follow the format for running this function: ./acceptor <ACCEPTOR GROUP ID> <ACCEPTOR ID>.\n");
+int main(const int argc, const char** argv) {
+    if (argc != 3) {
+        printf("Usage: ./acceptor <ACCEPTOR GROUP ID> <ACCEPTOR ID>.\n");
         exit(0);
     }
-    int acceptor_group_id = atoi( argv[1] );
-    int acceptor_id = atoi( argv[2] );
-    acceptor(acceptor_id, acceptor_group_id);
+    const int acceptorGroupId = atoi(argv[1] );
+    const int id = atoi(argv[2] );
+    acceptor(id, acceptorGroupId);
 }
