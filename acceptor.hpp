@@ -4,8 +4,13 @@
 
 #ifndef C__PAXOS_ACCEPTOR_HPP
 #define C__PAXOS_ACCEPTOR_HPP
+
+#include <shared_mutex>
 #include <vector>
+#include <mutex>
 #include "models/log.hpp"
+#include "utils/network.hpp"
+#include "models/message.hpp"
 #include "message.pb.h"
 
 class acceptor {
@@ -15,10 +20,10 @@ private:
     const int id;
     const int acceptorGroupId;
 
-    std::mutex ballotMutex;
+    std::shared_mutex ballotMutex;
     Ballot highestBallot = {};
 
-    std::mutex logMutex;
+    std::shared_mutex logMutex;
     Log::pValueLog log = {};
 
     [[noreturn]] void startServer();
@@ -26,15 +31,7 @@ private:
      * Process p1a and p2a messages from proxy leaders.
      * @param socket Socket ID of proxy leader
      */
-    [[noreturn]] void listenToProxyLeaders(int socket);
-    /**
-     * Returns the log with only slots larger than the one provided.
-     * @warning Does NOT lock logMutex. The caller MUST lock it
-     * @param slotToFilter
-     * @return
-     */
-    Log::pValueLog logAfterSlot(int slotToFilter);
+    void listenToProxyLeaders(int socket, const ProposerToAcceptor& payload);
 };
-
 
 #endif //C__PAXOS_ACCEPTOR_HPP

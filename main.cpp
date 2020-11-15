@@ -1,58 +1,32 @@
-#include <iostream>
-#include <thread>
-#include <numeric>
-#include "main.hpp"
-#include "proposer.hpp"
-#include "utils/config.hpp"
-#include "proxy_leader.hpp"
 
-int main() {
-    paxos p{};
-}
+#include "main.hpp"
 
 [[noreturn]]
-paxos::paxos() {
-    std::cout << "F: " << config::F << std::endl;
-    setbuf(stdout, nullptr); //TODO force flush to stdout. Disable when doing metrics or in prod
-    std::thread server([&]{startServer();});
-    startProposers();
-    startAcceptors();
-    startBatchers();
-    startProxyLeaders();
+paxos::paxos(const parser::idToIP& batcherIdToIPs): batchers(config::F+1) {
+    LOG("F: %d\n", config::F);
+#ifdef DEBUG
+    setbuf(stdout, nullptr);
+#endif
+    const std::thread server([&] {startServer(); });
+    connectToBatchers(batcherIdToIPs);
     readInput();
 }
 
+[[noreturn]]
 void paxos::startServer() {
-    network::startServerAtPort(config::MAIN_PORT, [&](int clientSocketId) {
-        std::lock_guard<std::mutex> lock(clientsMutex);
-        clientSockets.emplace_back(clientSocketId);
+    network::startServerAtPort(config::CLIENT_PORT,
+       [](const int socket, const WhoIsThis_Sender& whoIsThis) {
+            LOG("Main connected to unbatcher\n");
+    }, [](const int socket, const WhoIsThis_Sender& whoIsThis, const std::string& payload) {
+            LOG("--Acked: {%s}--\n", payload.c_str());
     });
 }
 
-void paxos::startProposers() {
-    for (int i = 0; i < config::F + 1; i++) {
-        participants.emplace_back(std::thread([i]{proposer {i};}));
-    }
-}
-
-void paxos::startAcceptors() {
-    for (int acceptorGroupId = 0; acceptorGroupId < config::NUM_ACCEPTOR_GROUPS; acceptorGroupId++) {
-        for (int i = 0; i < 2 * config::F + 1; i++) {
-            participants.emplace_back(std::thread([i, acceptorGroupId]{acceptor(i, acceptorGroupId);}));
-        }
-    }
-}
-
-void paxos::startBatchers() {
-    for (int i = 0; i < config::F + 1; i++) {
-        participants.emplace_back(std::thread([i]{batcher {i};}));
-    }
-}
-
-void paxos::startProxyLeaders() {
-    for (int i = 0; i < config::F + 1; i++) {
-        participants.emplace_back(std::thread([i]{proxy_leader {i};}));
-    }
+void paxos::connectToBatchers(const parser::idToIP& batcherIdToIPs) {
+    batchers.connectToServers(batcherIdToIPs, config::BATCHER_PORT_START, WhoIsThis_Sender_client,
+    [&](const int socket, const std::string& payload) {
+        batchers.addHeartbeat(socket);
+    });
 }
 
 [[noreturn]]
@@ -60,13 +34,18 @@ void paxos::readInput() {
     while (true) {
         std::string input;
         std::cin >> input;
-        sendToBatcher(input);
+        //TODO replace localhost with IP address, retry on timeout with different batcher
+        const ClientToBatcher& request = message::createClientRequest("127.0.0.1", input);
+        batchers.send(request);
     }
 }
 
-// TODO retry on timeout with different batcher
-void paxos::sendToBatcher(const std::string& payload) {
-    std::lock_guard<std::mutex> lock(clientsMutex);
-    network::sendPayload(clientSockets[batcherIndex], payload);
-    batcherIndex = (batcherIndex + 1) % (clientSockets.size());
+int main(const int argc, const char** argv) {
+    if (argc != 2) {
+        printf("Usage: ./Autoscaling_Paxos <BATCHER FILE NAME>.\n");
+        exit(0);
+    }
+    const std::string& batcherFileName = argv[1];
+    const parser::idToIP& batchers = parser::parseIDtoIPs(batcherFileName);
+    paxos p {batchers};
 }

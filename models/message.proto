@@ -3,9 +3,12 @@ syntax = "proto3";
 message WhoIsThis {
     enum Sender {
         null = 0; //this value is not to be used. Protobuf will ignore this entire message if the only value (sender) is 0.
-        proposer = 1;
+        client = 1;
         batcher = 2;
-        proxyLeader = 3;
+        proposer = 3;
+        proxyLeader = 4;
+        acceptor = 5;
+        unbatcher = 6;
     }
 
     Sender sender = 1;
@@ -21,6 +24,12 @@ message Ballot {
 message PValue {
     Ballot ballot = 1;
     string payload = 2;
+}
+message Batch {
+    message Requests {
+        repeated string requests = 1;
+    }
+    map<string, Requests> clientToRequests = 1;
 }
 
 /**
@@ -70,10 +79,11 @@ message ProxyLeaderToProposer {
     map<int32, PValue> uncommittedLog = 7;
 }
 
-message BatcherToProposer {
-    repeated string requests = 1;
-}
-
 message ProposerToProposer {
     bool iAmLeader = 1;
+}
+
+message ClientToBatcher {
+    string ipAddress = 1;
+    string request = 2;
 }

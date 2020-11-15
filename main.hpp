@@ -5,26 +5,25 @@
 #ifndef C__PAXOS_MAIN_HPP
 #define C__PAXOS_MAIN_HPP
 
-#include "proposer.hpp"
+#include <iostream>
+#include <thread>
+#include <mutex>
+#include <numeric>
+
+#include "utils/config.hpp"
 #include "acceptor.hpp"
 #include "batcher.hpp"
+#include "proposer.hpp"
 
 class paxos {
 public:
-    [[noreturn]] paxos();
+    [[noreturn]] explicit paxos(const parser::idToIP& batchers);
 private:
-    int batcherIndex = 0;
-    std::vector<std::thread> participants {};  // A place to put threads so they don't get freed
-    std::mutex clientsMutex;
-    std::vector<int> clientSockets {};
+    heartbeat_component batchers;
 
-    void startServer();
-    void startProposers();
-    void startAcceptors();
-    void startBatchers();
-    void startProxyLeaders();
+    [[noreturn]] void startServer();
+    void connectToBatchers(const parser::idToIP& batcherIdToIPs);
     [[noreturn]] void readInput();
-    void sendToBatcher(const std::string& payload);
 };
 
 #endif //C__PAXOS_MAIN_HPP

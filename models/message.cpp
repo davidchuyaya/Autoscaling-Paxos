@@ -12,7 +12,7 @@ WhoIsThis message::createWhoIsThis(const WhoIsThis_Sender& sender) {
     return whoIsThis;
 }
 
-ProposerToAcceptor message::createP1A(const int id, const int ballotNum, const int acceptorGroupId, const int lastCommittedSlot) {
+ProposerToAcceptor message::createP1A(const int id, const int ballotNum, const int acceptorGroupId) {
     ProposerToAcceptor p1a;
     p1a.set_messageid(uuid::generate());
     p1a.set_type(ProposerToAcceptor_Type_p1a);
@@ -20,7 +20,6 @@ ProposerToAcceptor message::createP1A(const int id, const int ballotNum, const i
     Ballot* ballot = p1a.mutable_ballot();
     ballot->set_id(id);
     ballot->set_ballotnum(ballotNum);
-    p1a.set_slot(lastCommittedSlot);
     return p1a;
 }
 
@@ -94,8 +93,19 @@ ProposerToProposer message::createIamLeader() {
     return iAmLeader;
 }
 
-BatcherToProposer message::createBatchMessage(const std::vector<std::string>& requests) {
-    BatcherToProposer receiverMessage;
-    *receiverMessage.mutable_requests() = {requests.begin(), requests.end()};
-    return receiverMessage;
+ClientToBatcher message::createClientRequest(const std::string& ipAddress, const std::string& payload) {
+    ClientToBatcher clientToBatcher;
+    clientToBatcher.set_ipaddress(ipAddress);
+    clientToBatcher.set_request(payload);
+    return clientToBatcher;
+}
+
+Batch message::createBatchMessage(const std::unordered_map<std::string, std::vector<std::string>>& requests) {
+    std::unordered_map<std::string, Batch_Requests> protobufRequests = {};
+    for (const auto& [ip, requestsForIp] : requests)
+        *protobufRequests[ip].mutable_requests() = {requestsForIp.begin(), requestsForIp.end()};
+
+    Batch batch;
+    *batch.mutable_clienttorequests() = {protobufRequests.begin(), protobufRequests.end()};
+    return batch;
 }
