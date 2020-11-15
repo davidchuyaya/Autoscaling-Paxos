@@ -1,8 +1,8 @@
 name: Build Autoscaling Paxos
 on:
   push:
-      branches:
-          - main
+    branches:    
+      - '**' 
 jobs:
     main:
         runs-on: ubuntu-18.04
@@ -13,14 +13,9 @@ jobs:
         - name: Building binaries w/ CMake
           run: |
             sudo apt-get update
-            sudo apt-get install -y wget unzip git ca-certificates net-tools curl apt-transport-https libpq-dev libzmq3-dev curl libprotobuf-dev protobuf-compiler software-properties-common
-            sudo snap install cmake --classic
-            sudo wget https://github.com/protocolbuffers/protobuf/releases/download/v3.13.0/protobuf-all-3.13.0.zip
-            sudo unzip protobuf-all-3.13.0.zip -d /usr/local
-            sudo cmake -DCMAKE_CXX_COMPILER=/usr/bin/g++ .
-            sudo cmake --build . --target all -- -j 2
-            sudo mkdir build
-            find . -maxdepth 1 -type f  -executable | xargs -I {} sudo mv {} build
+            mv scripts/compile_aspaxos.sh .
+            sudo chmod +x ./compile_aspaxos.sh
+            sudo ./compile_aspaxos.sh
         - name: Pushing binaries to S3
           uses: jakejarvis/s3-sync-action@master
           with:
