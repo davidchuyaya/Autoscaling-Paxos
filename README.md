@@ -9,3 +9,6 @@ Compile flags are set in `CMakeLists.txt`. I recommend using CLion as your IDE t
 
 ### Protobuf
 Messaging between nodes uses Google's Protobuf. Follow the [instructions here](https://github.com/protocolbuffers/protobuf/blob/master/src/README.md) to install it on your machine.
+
+### Anna
+We port Anna client code [here](https://github.com/tajshaik24/anna-client) to be able to communicate with it. Remember to run `git submodule init` and `git submodule update` in order to have that code downloaded as well.
