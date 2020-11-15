@@ -1,8 +1,4 @@
 name: Build Autoscaling Paxos
-on:
-  push:
-      branches:
-          - main
 jobs:
     main:
         runs-on: ubuntu-18.04
