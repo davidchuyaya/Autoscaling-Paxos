@@ -8,6 +8,8 @@ jobs:
         runs-on: ubuntu-18.04
         steps:
         - uses: actions/checkout@v2
+        - name: Checkout submodules
+          uses: textbook/git-checkout-submodule-action@master
         - name: Building binaries w/ CMake
           run: |
             sudo apt-get update
