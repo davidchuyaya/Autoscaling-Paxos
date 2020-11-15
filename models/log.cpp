@@ -6,9 +6,26 @@
 #include <sstream>
 #include "log.hpp"
 
-void Log::mergeCommittedLogs(stringLog* committedLog, const std::vector<stringLog>& committedLogs) {
+std::tuple<std::queue<int>, int>
+Log::findHolesInLog(const stringLog& committedLog, const pValueLog& uncommittedLog) {
+    std::queue<int> holes = {};
+    int count = 0;
+    int slot = 1; //log is 1-indexed, because 0 = null in protobuf & will be ignored
+    while (count < (committedLog.size() + uncommittedLog.size())) {
+        if (committedLog.find(slot) == committedLog.end() && uncommittedLog.find(slot) == uncommittedLog.end())
+            holes.emplace(slot);
+        else
+            count += 1;
+        slot += 1;
+    }
+    return {holes, slot};
+}
+
+Log::stringLog Log::mergeCommittedLogs(const std::vector<stringLog>& committedLogs) {
+    stringLog committedLog = {};
     for (const stringLog& log : committedLogs)
-        committedLog->insert(log.begin(), log.end());
+        committedLog.insert(log.begin(), log.end());
+    return committedLog;
 }
 
 std::tuple<Log::pValueLog, std::unordered_map<int, int>>

@@ -14,15 +14,15 @@ void parser::parseFileByLine(const std::string& fileName, const std::function<vo
     }
 }
 
-parser::idToIP parser::parseProposer(const std::string& fileName) {
-    idToIP proposerIDtoIPs;
-    parseFileByLine(fileName, [&proposerIDtoIPs](std::istringstream& iss) {
+parser::idToIP parser::parseIDtoIPs(const std::string& fileName) {
+    idToIP iDtoIPs;
+    parseFileByLine(fileName, [&iDtoIPs](std::istringstream& iss) {
         int ID;
         std::string IP;
         iss >> ID >> IP;
-        proposerIDtoIPs[ID] = IP;
+        iDtoIPs[ID] = IP;
     });
-    return proposerIDtoIPs;
+    return iDtoIPs;
 }
 
 std::unordered_map<int, parser::idToIP> parser::parseAcceptors(const std::string& fileName) {

@@ -5,6 +5,7 @@
 #ifndef AUTOSCALING_PAXOS_BATCHER_HPP
 #define AUTOSCALING_PAXOS_BATCHER_HPP
 
+#include <shared_mutex>
 #include <vector>
 #include <thread>
 #include <mutex>
@@ -20,15 +21,17 @@ public:
     explicit batcher(int id, const parser::idToIP& proposerIDtoIPs);
 private:
     int id = 0;
-    std::mutex lastBatchTimeMutex;
+    std::shared_mutex lastBatchTimeMutex;
     time_t lastBatchTime = 0;
 
-    std::mutex payloadsMutex;
+    std::shared_mutex payloadsMutex;
     std::unordered_map<std::string, std::vector<std::string>> clientToPayloads = {};
-    std::vector<std::thread> threads = {}; // A place to put threads so they don't get freed
 
-    std::mutex proposerMutex;
+    std::shared_mutex proposerMutex;
     std::vector<int> proposerSockets = {};
+
+    std::shared_mutex clientMutex;
+    std::vector<int> clientSockets = {};
 
     /**
      * Starts the server the clients connect to.
@@ -42,7 +45,7 @@ private:
      *
      * @param client_address Address of the client
      */
-    void listenToClient(int clientSocketId);
+    void listenToClient(const ClientToBatcher& payload);
     void connectToProposers(const parser::idToIP& proposerIDtoIPs);
 };
 

@@ -1,47 +1,32 @@
 
-#include <unistd.h>
 #include "main.hpp"
 
-int main(const int argc, const char** argv) {
-    paxos p {};
-}
-
-
 [[noreturn]]
-paxos::paxos() {
-    std::cout << "F: " << config::F << std::endl;
-    setbuf(stdout, nullptr); //TODO force flush to stdout. Disable when doing metrics or in prod
+paxos::paxos(const parser::idToIP& batcherIdToIPs): batchers(config::F+1) {
+    LOG("F: %d\n", config::F);
+#ifdef DEBUG
+    setbuf(stdout, nullptr);
+#endif
     const std::thread server([&] {startServer(); });
-    connectToBatcher();
+    connectToBatchers(batcherIdToIPs);
     readInput();
 }
 
 [[noreturn]]
 void paxos::startServer() {
-    network::startServerAtPort(config::CLIENT_PORT, [](int socket) {
-        while (true) {
-            std::optional<std::string> payload = network::receivePayload(socket);
-            if (payload->empty())
-                break;
-            printf("Acked: %s\n", payload.value().c_str());
-        }
-        close(socket);
+    network::startServerAtPort(config::CLIENT_PORT,
+       [](const int socket, const WhoIsThis_Sender& whoIsThis) {
+            LOG("Main connected to unbatcher\n");
+    }, [](const int socket, const WhoIsThis_Sender& whoIsThis, const std::string& payload) {
+            LOG("--Acked: {%s}--\n", payload.c_str());
     });
 }
 
-// TODO Connect to Multiple Batchers
-void paxos::connectToBatcher() {
-    printf("Input the IP Address of the Batcher to connect to: ");
-    std::string batcherIp;
-    std::cin >> batcherIp;
-    printf("Input the ID of the batcher: ");
-    int batcherId;
-    std::cin >> batcherId;
-    const int batcherSocketId = network::connectToServerAtAddress(batcherIp, config::BATCHER_PORT_START + batcherId);
-    {std::lock_guard<std::mutex> lock(batcherMutex);
-    batcherSockets.push_back(batcherSocketId);}
-    //TODO replace localhost with IP address
-    network::sendPayload(batcherSocketId, "127.0.0.1");
+void paxos::connectToBatchers(const parser::idToIP& batcherIdToIPs) {
+    batchers.connectToServers(batcherIdToIPs, config::BATCHER_PORT_START, WhoIsThis_Sender_client,
+    [&](const int socket, const std::string& payload) {
+        batchers.addHeartbeat(socket);
+    });
 }
 
 [[noreturn]]
@@ -49,13 +34,18 @@ void paxos::readInput() {
     while (true) {
         std::string input;
         std::cin >> input;
-        sendToBatcher(input);
+        //TODO replace localhost with IP address, retry on timeout with different batcher
+        const ClientToBatcher& request = message::createClientRequest("127.0.0.1", input);
+        batchers.send(request);
     }
 }
 
-// TODO retry on timeout with different batcher
-void paxos::sendToBatcher(const std::string& payload) {
-    std::lock_guard<std::mutex> lock(batcherMutex);
-    network::sendPayload(batcherSockets[batcherIndex], payload);
-    batcherIndex = (batcherIndex + 1) % (batcherSockets.size());
+int main(const int argc, const char** argv) {
+    if (argc != 2) {
+        printf("Usage: ./Autoscaling_Paxos <BATCHER FILE NAME>.\n");
+        exit(0);
+    }
+    const std::string& batcherFileName = argv[1];
+    const parser::idToIP& batchers = parser::parseIDtoIPs(batcherFileName);
+    paxos p {batchers};
 }

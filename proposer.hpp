@@ -12,91 +12,65 @@
 #include <mutex>
 #include <atomic>
 #include <condition_variable>
-#include <deque>
+#include <queue>
 #include <google/protobuf/message.h>
-
 #include "utils/network.hpp"
 #include "utils/config.hpp"
 #include "models/message.hpp"
 #include "utils/parser.hpp"
 #include "message.pb.h"
 #include "models/log.hpp"
+#include "models/heartbeat_component.hpp"
 
 class proposer {
 public:
-    explicit proposer(const int id, const parser::idToIP& proposers, const std::unordered_map<int, parser::idToIP>& acceptors);
+    explicit proposer(int id, const parser::idToIP& proposers, const std::unordered_map<int, parser::idToIP>& acceptors);
 private:
     const int id; // 0 indexed, no gaps
 
-    std::mutex ballotMutex;
+    std::shared_mutex ballotMutex;
     int ballotNum = 0; // must be at least 1 the first time it is sent
 
     std::atomic<bool> isLeader = false;
-    std::mutex heartbeatMutex;
+    std::shared_mutex heartbeatMutex;
     time_t lastLeaderHeartbeat = 0;
-    std::unordered_map<int, time_t> proxyLeaderHeartbeats = {}; //key = socket
 
-    std::atomic<bool> shouldSendScouts = true;
-    std::mutex remainingAcceptorGroupsForScoutsMutex;
+    std::shared_mutex remainingAcceptorGroupsForScoutsMutex;
     std::unordered_set<int> remainingAcceptorGroupsForScouts = {};
 
-    std::mutex unproposedPayloadsMutex;
-    std::vector<std::string> unproposedPayloads = {};
+    std::shared_mutex logMutex;
+    std::queue<int> logHoles = {};
+    int nextSlot = 0;
 
-    std::mutex logMutex;
-    Log::stringLog log;
-    int lastCommittedSlot = 0;
-
-    std::mutex uncommittedProposalsMutex;
-    Log::stringLog uncommittedProposals = {}; //invariant: empty until we are leader. Key = slot
-
-    std::mutex acceptorGroupLogsMutex;
+    std::shared_mutex acceptorGroupLogsMutex;
     std::vector<Log::stringLog> acceptorGroupCommittedLogs = {};
     std::unordered_map<int, Log::pValueLog> acceptorGroupUncommittedLogs = {}; //key = acceptor group ID
 
-    std::mutex proposerMutex;
+    std::shared_mutex proposerMutex;
     std::vector<int> proposerSockets = {};
 
-    std::mutex acceptorMutex;
+    std::shared_mutex acceptorMutex;
     std::vector<int> acceptorGroupIds = {};
-
     int nextAcceptorGroup = 0;
 
-    std::mutex proxyLeaderMutex;
-    std::condition_variable proxyLeaderCV;
-    std::vector<int> fastProxyLeaders = {};
-    std::vector<int> slowProxyLeaders = {};
-    std::unordered_map<int, std::unordered_map<int, ProposerToAcceptor>> proxyLeaderSentMessages = {}; //{socket: {messageID: message}}
-
-    int nextProxyLeader = 0;
-
-    std::vector<std::thread> threads = {}; // A place to put threads so they don't get freed
+    heartbeat_component proxyLeaders;
 
     /**
-     * Set acceptorGroupIds. TODO not hardcode the IDs
+     * Set acceptorGroupIds.
      */
     void findAcceptorGroupIds(const std::unordered_map<int, parser::idToIP>& acceptors);
 
     /**
      * If isLeader = true, periodically tell other proposers.
      */
-    [[noreturn]] void broadcastIAmLeader();
-    /**
-     * 1. Check if a leader has sent us a heartbeat. If it timed out, prepare to send scouts.
-     * 2. Check if proxy leaders have sent us a heartbeat. If they timed out, remove it and send its messages to different proxy leaders.
-     */
-    [[noreturn]] void checkHeartbeats();
+    [[noreturn]] void leaderLoop();
 
     [[noreturn]] void startServer();
-    void listenToBatcher(int socket);
-    void listenToProxyLeader(int socket);
+    void listenToBatcher(const std::string& payload);
+    void listenToProxyLeader(int socket, const ProxyLeaderToProposer& payload);
     void connectToProposers(const parser::idToIP& proposers);
-    void listenToProposer(int socket);
+    void listenToProposer();
 
-    /**
-     * Execute all scout/commander logic.
-     */
-    [[noreturn]] void mainLoop();
     /**
      * Broadcast p1a to acceptors to become the leader.
      * @invariant isLeader = false
@@ -118,21 +92,6 @@ private:
      */
     void mergeLogs();
     /**
-     * Assign the next available slots to unproposedPayloads and send p2a messages for them.
-     * @invariant isLeader = true
-     */
-    void sendCommandersForPayloads();
-    /**
-     * Send p2a messages for a given payload.
-     * Stores this event by calling sendToProxyLeader().
-     *
-     * @warning Does NOT lock proxyLeaderMutex or ballotMutex. The caller MUST lock both.
-     * @param acceptorGroupId
-     * @param slot
-     * @param payload
-     */
-    void sendCommanders(int acceptorGroupId, int slot, const std::string& payload);
-    /**
      * Check if a proxy leader has committed values for a slot. If yes, then confirm that slot as committed.
      * If we've been preempted, then that means another has become the leader. Reset values.
      * @invariant isLeader = true
@@ -148,26 +107,6 @@ private:
      * @return The ID of the acceptor group to propose to.
      */
     int fetchNextAcceptorGroupId();
-    /**
-     * Increments (round robin) the next proxy leader a payload will be sent to.
-     * @warning Does NOT lock proxyLeaderMutex. The caller MUST lock it.
-     * @return The socket of the proxy leader to send to.
-     */
-    int fetchNextProxyLeaderSocket();
-    /**
-     * Stores the fact that we've sent this message to this proxy leader so we can resend if the proxy leader fails.
-     *
-     * @warning Does NOT lock proxyLeaderMutex. The caller MUST lock it.
-     * @param proxyLeaderSocket
-     * @param message
-     */
-    void sendToProxyLeader(int proxyLeaderSocket, const ProposerToAcceptor& message);
-
-    /**
-     * Find the newest slot in which all previous slots have been committed.
-     * @warning Does NOT lock logMutex. The caller MUST lock it
-     */
-    void calcLastCommittedSlot();
 };
 
 

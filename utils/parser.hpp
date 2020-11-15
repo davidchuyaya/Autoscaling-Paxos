@@ -15,7 +15,7 @@ namespace parser {
     using idToIP = std::unordered_map<int, std::string>;
 
     void parseFileByLine(const std::string& fileName, const std::function<void(std::istringstream&)>& lineParser);
-    idToIP parseProposer(const std::string& fileName);
+    idToIP parseIDtoIPs(const std::string& fileName);
     std::unordered_map<int, idToIP> parseAcceptors(const std::string& fileName);
 }
 
