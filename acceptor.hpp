@@ -5,7 +5,10 @@
 #ifndef C__PAXOS_ACCEPTOR_HPP
 #define C__PAXOS_ACCEPTOR_HPP
 #include <vector>
+#include <mutex>
 #include "models/log.hpp"
+#include "utils/network.hpp"
+#include "models/message.hpp"
 #include "message.pb.h"
 
 class acceptor {
@@ -35,6 +38,5 @@ private:
      */
     Log::pValueLog logAfterSlot(int slotToFilter);
 };
-
 
 #endif //C__PAXOS_ACCEPTOR_HPP

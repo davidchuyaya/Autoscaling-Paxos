@@ -15,7 +15,6 @@ namespace config {
     const static int F = 1;
     const static int NUM_ACCEPTOR_GROUPS = 2;
     const static int THRESHOLD_BATCH_SIZE = 2;
-    const static int CLIENT_PORT = 10000;
     const static int PROPOSER_PORT_START = 11000;
     const static int ACCEPTOR_PORT_START = 12000;
     const static int BATCHER_PORT_START = 13000;

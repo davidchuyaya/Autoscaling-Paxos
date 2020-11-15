@@ -7,6 +7,7 @@
 
 #include <iostream>
 #include <thread>
+#include <mutex>
 #include <numeric>
 
 #include "utils/config.hpp"

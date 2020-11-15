@@ -9,6 +9,12 @@
 
 #include <netinet/in.h>
 #include <google/protobuf/message.h>
+#include <sys/socket.h>
+#include <arpa/inet.h>
+#include <unistd.h>
+#include <thread>
+#include <functional>
+#include <vector>
 #include "config.hpp"
 
 namespace network {

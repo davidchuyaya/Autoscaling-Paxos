@@ -1,0 +1,31 @@
+name: Build Autoscaling Paxos
+on:
+  push:
+      branches:
+          - main
+jobs:
+    main:
+        runs-on: ubuntu-18.04
+        steps:
+        - uses: actions/checkout@v2
+        - name: Building binaries w/ CMake
+          run: |
+            sudo apt-get update
+            sudo apt-get install -y wget unzip git ca-certificates net-tools curl apt-transport-https libpq-dev libzmq3-dev curl libprotobuf-dev protobuf-compiler software-properties-common
+            sudo snap install cmake
+            sudo wget https://github.com/protocolbuffers/protobuf/releases/download/v3.13.0/protobuf-all-3.13.0.zip
+            sudo unzip protobuf-all-3.13.0.zip -d /usr/local
+            sudo cmake -DCMAKE_CXX_COMPILER=/usr/bin/g++ .
+            sudo cmake --build . --target all -- -j 2
+            sudo mkdir build
+            find . -maxdepth 1 -type f  -executable | xargs -I {} mv {} build
+        - name: Pushing binaries to S3
+          uses: jakejarvis/s3-sync-action@master
+          with:
+            args: --acl public-read --delete
+          env:
+            AWS_S3_BUCKET: ${{ secrets.AWS_PRODUCTION_BUCKET_NAME }}
+            AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+            AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+            AWS_REGION: ${{ secrets.AWS_REGION }}
+            SOURCE_DIR: "build"

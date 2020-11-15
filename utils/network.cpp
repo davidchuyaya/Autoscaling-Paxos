@@ -1,11 +1,7 @@
 //
 // Created by David Chu on 10/4/20.
 //
-#include <sys/socket.h>
-#include <arpa/inet.h>
-#include <unistd.h>
-#include <thread>
-#include <vector>
+
 #include "network.hpp"
 
 [[noreturn]]

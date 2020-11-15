@@ -4,10 +4,6 @@
 
 #include <unistd.h>
 #include "proxy_leader.hpp"
-#include "utils/config.hpp"
-#include "utils/network.hpp"
-#include "models/message.hpp"
-#include <thread>
 
 proxy_leader::proxy_leader(const int id, const parser::idToIP& proposers, const std::unordered_map<int, parser::idToIP>& acceptors) : id(id) {
     connectToProposers(proposers);

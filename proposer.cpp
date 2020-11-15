@@ -1,13 +1,8 @@
 //
 // Created by David Chu on 10/4/20.
 //
-#include <unistd.h>
-#include <thread>
-#include <algorithm>
-#include <google/protobuf/message.h>
+
 #include "proposer.hpp"
-#include "utils/config.hpp"
-#include "models/message.hpp"
 
 proposer::proposer(const int id, const parser::idToIP& proposers, const std::unordered_map<int, parser::idToIP>& acceptors) : id(id) {
     findAcceptorGroupIds(acceptors);
