@@ -7,7 +7,10 @@
 
 #include <shared_mutex>
 #include <vector>
+#include <mutex>
 #include "models/log.hpp"
+#include "utils/network.hpp"
+#include "models/message.hpp"
 #include "message.pb.h"
 
 class acceptor {
@@ -30,6 +33,5 @@ private:
      */
     void listenToProxyLeaders(int socket, const ProposerToAcceptor& payload);
 };
-
 
 #endif //C__PAXOS_ACCEPTOR_HPP

@@ -5,7 +5,8 @@
 #ifndef AUTOSCALING_PAXOS_UUID_HPP
 #define AUTOSCALING_PAXOS_UUID_HPP
 
-
+#include <random>
+#include <mutex>
 #include <random>
 
 namespace uuid {
@@ -21,6 +22,5 @@ namespace uuid {
      */
     int generate();
 };
-
 
 #endif //AUTOSCALING_PAXOS_UUID_HPP

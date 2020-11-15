@@ -5,10 +5,18 @@
 #ifndef C__PAXOS_PROPOSER_HPP
 #define C__PAXOS_PROPOSER_HPP
 
-#include <shared_mutex>
 #include <vector>
+#include <thread>
+#include <algorithm>
+#include <functional>
+#include <mutex>
+#include <atomic>
+#include <condition_variable>
 #include <queue>
+#include <google/protobuf/message.h>
 #include "utils/network.hpp"
+#include "utils/config.hpp"
+#include "models/message.hpp"
 #include "utils/parser.hpp"
 #include "message.pb.h"
 #include "models/log.hpp"
