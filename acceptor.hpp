@@ -8,6 +8,7 @@
 #include <shared_mutex>
 #include <vector>
 #include <mutex>
+#include <thread>
 #include "models/log.hpp"
 #include "utils/network.hpp"
 #include "models/message.hpp"

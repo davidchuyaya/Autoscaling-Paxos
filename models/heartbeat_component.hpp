@@ -14,6 +14,7 @@
 #include "message.pb.h"
 #include "../utils/parser.hpp"
 #include "../utils/network.hpp"
+#include "message.hpp"
 
 class heartbeat_component {
 public:

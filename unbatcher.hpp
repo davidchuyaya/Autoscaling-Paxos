@@ -11,6 +11,8 @@
 #include <thread>
 #include <unordered_map>
 #include <message.pb.h>
+#include "utils/network.hpp"
+#include "utils/heartbeater.hpp"
 
 class unbatcher {
 public:

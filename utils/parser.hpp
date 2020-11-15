@@ -5,6 +5,7 @@
 #ifndef AUTOSCALING_PAXOS_PARSER_HPP
 #define AUTOSCALING_PAXOS_PARSER_HPP
 
+#include <functional>
 #include <unordered_map>
 #include <fstream>
 #include <sstream>

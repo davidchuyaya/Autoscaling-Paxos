@@ -15,6 +15,8 @@
 #include <thread>
 #include <functional>
 #include <vector>
+#include <tuple>
+#include <optional>
 #include <message.pb.h>
 #include "config.hpp"
 

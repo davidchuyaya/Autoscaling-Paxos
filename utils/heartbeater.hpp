@@ -7,6 +7,7 @@
 
 #include <shared_mutex>
 #include <thread>
+#include <vector>
 #include "config.hpp"
 #include "network.hpp"
 

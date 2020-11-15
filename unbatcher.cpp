@@ -2,8 +2,6 @@
 // Created by David Chu on 11/11/20.
 //
 
-#include "utils/network.hpp"
-#include "utils/heartbeater.hpp"
 #include "unbatcher.hpp"
 
 unbatcher::unbatcher(const int id) : id(id) {

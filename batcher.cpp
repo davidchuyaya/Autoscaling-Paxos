@@ -1,9 +1,8 @@
 //
 // Created by Taj Shaik on 10/15/20.
 //
-#include <unistd.h>
+
 #include "batcher.hpp"
-#include "utils/heartbeater.hpp"
 
 batcher::batcher(const int id, const parser::idToIP& proposerIDtoIPs) : id(id) {
     connectToProposers(proposerIDtoIPs);

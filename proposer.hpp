@@ -5,6 +5,9 @@
 #ifndef C__PAXOS_PROPOSER_HPP
 #define C__PAXOS_PROPOSER_HPP
 
+#include <string>
+#include <unordered_map>
+#include <unordered_set>
 #include <vector>
 #include <thread>
 #include <algorithm>

@@ -5,6 +5,8 @@
 #ifndef AUTOSCALING_PAXOS_PROXY_LEADER_HPP
 #define AUTOSCALING_PAXOS_PROXY_LEADER_HPP
 
+#include <string>
+#include <unordered_map>
 #include <shared_mutex>
 #include <condition_variable>
 #include <vector>
@@ -17,6 +19,7 @@
 #include "models/message.hpp"
 #include "models/log.hpp"
 #include "models/heartbeat_component.hpp"
+#include "utils/heartbeater.hpp"
 
 class proxy_leader {
 public:

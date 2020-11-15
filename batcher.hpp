@@ -8,12 +8,15 @@
 #include <shared_mutex>
 #include <vector>
 #include <thread>
-#include <mutex>
+#include <string>
+#include <unordered_map>
+#include <unistd.h>
 #include <google/protobuf/message.h>
 #include "utils/config.hpp"
 #include "models/message.hpp"
 #include "utils/network.hpp"
 #include "utils/parser.hpp"
+#include "utils/heartbeater.hpp"
 #include "message.pb.h"
 
 class batcher {

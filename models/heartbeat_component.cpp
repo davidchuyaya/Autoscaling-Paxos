@@ -3,7 +3,6 @@
 //
 
 #include "heartbeat_component.hpp"
-#include "message.hpp"
 
 heartbeat_component::heartbeat_component(const int waitThreshold) : waitThreshold(waitThreshold) {
     std::thread thread([&]{checkHeartbeats();});

@@ -7,7 +7,6 @@
 
 #include <random>
 #include <mutex>
-#include <random>
 
 namespace uuid {
     // generate random message IDs

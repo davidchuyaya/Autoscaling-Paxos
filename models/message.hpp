@@ -7,8 +7,11 @@
 
 #include <string>
 #include <random>
+#include <vector>
+#include <unordered_map>
 #include "message.pb.h"
 #include "log.hpp"
+#include "../utils/uuid.hpp"
 
 namespace message {
     WhoIsThis createWhoIsThis(const WhoIsThis_Sender& sender);

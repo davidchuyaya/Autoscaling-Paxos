@@ -9,6 +9,10 @@
 #include <vector>
 #include <string>
 #include <message.pb.h>
+#include <sstream>
+#include <tuple>
+#include <unordered_map>
+#include <queue>
 
 namespace Log {
     using stringLog = std::unordered_map<int, std::string>; //key = slot

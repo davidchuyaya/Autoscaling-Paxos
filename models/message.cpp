@@ -2,9 +2,7 @@
 // Created by David Chu on 10/6/20.
 //
 
-#include <message.pb.h>
 #include "message.hpp"
-#include "../utils/uuid.hpp"
 
 WhoIsThis message::createWhoIsThis(const WhoIsThis_Sender& sender) {
     WhoIsThis whoIsThis;
