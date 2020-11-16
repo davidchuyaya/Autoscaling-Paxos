@@ -55,7 +55,7 @@ set(PROPOSER_SRC proposer.cpp proposer.hpp)
 set(ACCEPTOR_SRC acceptor.cpp acceptor.hpp)
 set(UNBATCHER_SRC unbatcher.cpp unbatcher.hpp)
 set(MAIN_SRC main.cpp main.hpp)
-set(STORAGE_SRC "lib/storage/storage.hpp")
+file(GLOB STORAGE_SRC "lib/storage/*.hpp" "lib/storage/*.cpp")
 
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 add_executable(Autoscaling_Paxos ${MAIN_SRC} ${UTILS_SRC} ${STORAGE_SRC} ${MODELS_SRC} ${PROTO_SRC} ${PROTO_HDRS})
