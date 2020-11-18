@@ -35,8 +35,8 @@ void paxos::readInput() {
     while (true) {
         std::string input;
         std::cin >> input;
-        //TODO replace localhost with IP address, retry on timeout with different batcher
-        const ClientToBatcher& request = message::createClientRequest(network::getIp(), input);
+        //TODO do not resend until current value is acked
+        const ClientToBatcher& request = message::createClientRequest(config::IP_ADDRESS, input);
         batchers.send(request);
     }
 }

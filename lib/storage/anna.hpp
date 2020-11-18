@@ -5,10 +5,9 @@
 #ifndef AUTOSCALING_PAXOS_ANNA_HPP
 #define AUTOSCALING_PAXOS_ANNA_HPP
 
-#include "client/kvs_client.hpp"
 #include <string>
+#include "client/kvs_client.hpp"
 #include "two_p_set.hpp"
-#include "utils/network.hpp"
 #include "utils/config.hpp"
 
 class anna {

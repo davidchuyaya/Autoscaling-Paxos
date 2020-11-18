@@ -9,7 +9,7 @@ ZmqUtil zmq_util;
 ZmqUtilInterface *kZmqUtil = &zmq_util;
 
 anna::anna(const std::optional<std::function<void(two_p_set&)>>& listener) :
-    client({UserRoutingThread(network::getIp(), 0)}, network::getIp()) {
+    client({UserRoutingThread(config::ANNA_ROUTING_ADDRESS, 0)}, config::IP_ADDRESS) {
     if (listener.has_value()) {
         std::thread t([&]{
             listenerThread(listener.value());

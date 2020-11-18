@@ -18,9 +18,6 @@
 #   define LOG(...) do{}while(0)
 #endif
 
-//TODO un-define once we're remote
-#define LOCAL
-
 namespace config {
     const static int F = 1;
     const static int NUM_ACCEPTOR_GROUPS = 2;
@@ -32,7 +29,11 @@ namespace config {
     const static int BATCHER_PORT_START = 13000;
     const static int UNBATCHER_PORT_START = 14000;
 
-    const static inline std::string LOCALHOST = "127.0.0.1";
+    //TODO Store result from "curl http://169.254.169.254/latest/meta-data/public-ipv4" into env
+    const static inline std::string IP_ADDRESS = std::getenv("IP");
+    const static inline std::string ANNA_ROUTING_ADDRESS = std::getenv("ANNA_ROUTING");
+    const static inline std::string ANNA_FUNCTION_ADDRESS = std::getenv("ANNA_FUNCTION");
+
     const static int BATCH_TIME_SEC = 5;
     const static int TCP_RETRY_TIMEOUT_SEC = 10;
     const static int HEARTBEAT_TIMEOUT_SEC = 20; // this - HEARTBEAT_SLEEP_SEC = time allowed between message send & receive
