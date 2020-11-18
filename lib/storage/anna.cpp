@@ -3,7 +3,6 @@
 //
 
 #include "anna.hpp"
-#include "anna-client/client/kvs_client.hpp"
 
 void anna::initClient() {
     return;
@@ -13,4 +12,14 @@ std::string anna::getRequest(std::string key) {
 }
 void anna::putRequest(std::string key, std::string value) {
     return;
+}
+
+two_p_set<std::string> anna::get2Pset(const string& key) {
+    return two_p_set {getLattice<std::string>(KEY_OBSERVED_PREFIX + key),
+            getLattice<std::string>(KEY_REMOVED_PREFIX + key)};
+}
+
+void anna::put2Pset(const std::string& key, const two_p_set<std::string>& twoPSet) {
+    putLattice(KEY_OBSERVED_PREFIX + key, twoPSet.getObserved());
+    putLattice(KEY_REMOVED_PREFIX + key, twoPSet.getRemoved());
 }
