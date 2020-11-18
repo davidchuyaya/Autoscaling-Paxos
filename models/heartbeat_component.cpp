@@ -25,6 +25,26 @@ void heartbeat_component::connectToServers(const parser::idToIP& idToIPs, const 
     }
 }
 
+void heartbeat_component::connectToServers(const two_p_set& newMembers, const int socketOffset,
+                                           const WhoIsThis_Sender& whoIsThis,
+                                           const std::function<void(int, const std::string&)>& listener) {
+    const two_p_set& updates = members.updatesFrom(newMembers);
+
+    for (const std::string& ip : updates.getObserved()) {
+        LOG("Connecting to new member: %s\n", ip.c_str());
+        std::thread thread([&, ip, whoIsThis, socketOffset, listener]{
+            int socket = network::connectToServerAtAddress(ip, socketOffset, whoIsThis);
+            addConnection(socket);
+            network::listenToSocketUntilClose(socket, listener);
+        });
+        thread.detach();
+    }
+
+    //TODO remove dead members
+
+    members.merge(newMembers);
+}
+
 void heartbeat_component::addConnection(const int socket) {
     std::unique_lock lock(componentMutex);
     fastComponents.emplace_back(socket);

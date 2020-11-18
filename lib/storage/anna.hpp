@@ -5,31 +5,26 @@
 #ifndef AUTOSCALING_PAXOS_ANNA_HPP
 #define AUTOSCALING_PAXOS_ANNA_HPP
 
+#include "client/kvs_client.hpp"
 #include <string>
-#include "storage.hpp"
 #include "two_p_set.hpp"
+#include "utils/network.hpp"
+#include "utils/config.hpp"
 
-
-class anna : public Storage {
+class anna {
 public:
-    void initClient();
-    std::string getRequest(std::string key);
-    void putRequest(std::string key, std::string value);
-    two_p_set<std::string> get2Pset(const std::string& key);
-    void put2Pset(const std::string& key, const two_p_set<std::string>& twoPSet);
+    explicit anna(const std::optional<std::function<void(two_p_set&)>>& listener);
+    anna(const std::string& key, const std::string& value, const std::optional<std::function<void(two_p_set&)>>& listener);
+    void periodicGet2PSet(const std::string& key);
+    void put2Pset(const std::string& key, const two_p_set& twoPSet);
 
 private:
-    inline static const std::string KEY_OBSERVED_PREFIX = "observed";
-    inline static const std::string KEY_REMOVED_PREFIX = "removed";
+    //TODO find out if we need to lock the client for async receive
+    KvsClient client;
 
-    template<typename T>
-    SetLattice<T> getLattice(const std::string& key) {
-        //TODO anna stuff
-    }
-    template<typename T>
-    void putLattice(const std::string& key, const SetLattice<T>& lattice) {
-        //TODO anna stuff
-    }
+    [[noreturn]]
+    void listenerThread(const std::function<void(two_p_set&)>& listener); //TODO don't just listen to 2p-sets?
+    void putLattice(const std::string& key, const SetLattice<std::string>& lattice);
 };
 
 #endif //AUTOSCALING_PAXOS_ANNA_HPP

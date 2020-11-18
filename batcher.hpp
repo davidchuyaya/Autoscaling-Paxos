@@ -18,6 +18,8 @@
 #include "utils/parser.hpp"
 #include "utils/heartbeater.hpp"
 #include "message.pb.h"
+#include "lib/storage/anna.hpp"
+#include "lib/storage/two_p_set.hpp"
 
 class batcher {
 public:

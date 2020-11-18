@@ -11,6 +11,7 @@
 #include <vector>
 #include <thread>
 #include <functional>
+#include "lib/storage/two_p_set.hpp"
 #include "message.pb.h"
 #include "../utils/parser.hpp"
 #include "../utils/network.hpp"
@@ -21,7 +22,10 @@ public:
     explicit heartbeat_component(int waitThreshold);
     void connectToServers(const parser::idToIP& idToIPs, int socketOffset, const WhoIsThis_Sender& whoIsThis,
                           const std::function<void(int, const std::string&)>& listener);
+    void connectToServers(const two_p_set& newMembers, int socketOffset, const WhoIsThis_Sender& whoIsThis,
+                          const std::function<void(int, const std::string&)>& listener);
     void addConnection(int socket);
+    //TODO remove connection based on IP address (for remote). Store IP address of connections.
     template<typename Message> void send(const Message& payload) {
         std::shared_lock lock(componentMutex);
         if (!canSend) { //block if not enough connections
@@ -36,6 +40,9 @@ private:
 
     std::shared_mutex heartbeatMutex;
     std::unordered_map<int, time_t> heartbeats = {}; //key = socket
+
+    two_p_set members;
+    std::unordered_map<std::string, int> ipToSocket = {};
 
     std::shared_mutex componentMutex;
     std::condition_variable_any componentCV;

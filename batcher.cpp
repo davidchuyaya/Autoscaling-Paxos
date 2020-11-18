@@ -7,6 +7,14 @@
 batcher::batcher(const int id, const parser::idToIP& proposerIDtoIPs) : id(id) {
     connectToProposers(proposerIDtoIPs);
     const std::thread server([&] {startServer(); });
+
+#ifdef LOCAL
+    const std::string& value = std::to_string(id);
+#else
+    const std::string& value = network::getIp();
+#endif
+    anna annaClient(config::KEY_BATCHERS, value, {});
+
     heartbeater::heartbeat("i'm alive", clientMutex, clientSockets);
     pthread_exit(nullptr);
 }

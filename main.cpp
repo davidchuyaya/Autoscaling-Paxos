@@ -2,13 +2,14 @@
 #include "main.hpp"
 
 [[noreturn]]
-paxos::paxos(const parser::idToIP& batcherIdToIPs): batchers(config::F+1) {
+paxos::paxos() :
+    batchers(config::F+1), annaClient([&](two_p_set& twoPSet){connectToBatchers(twoPSet);}) {
     LOG("F: %d\n", config::F);
 #ifdef DEBUG
     setbuf(stdout, nullptr);
 #endif
     const std::thread server([&] {startServer(); });
-    connectToBatchers(batcherIdToIPs);
+    annaClient.periodicGet2PSet(config::KEY_BATCHERS);
     readInput();
 }
 
@@ -22,8 +23,8 @@ void paxos::startServer() {
     });
 }
 
-void paxos::connectToBatchers(const parser::idToIP& batcherIdToIPs) {
-    batchers.connectToServers(batcherIdToIPs, config::BATCHER_PORT_START, WhoIsThis_Sender_client,
+void paxos::connectToBatchers(two_p_set& twoPSet) {
+    batchers.connectToServers(twoPSet, config::BATCHER_PORT_START, WhoIsThis_Sender_client,
     [&](const int socket, const std::string& payload) {
         batchers.addHeartbeat(socket);
     });
@@ -35,17 +36,15 @@ void paxos::readInput() {
         std::string input;
         std::cin >> input;
         //TODO replace localhost with IP address, retry on timeout with different batcher
-        const ClientToBatcher& request = message::createClientRequest("127.0.0.1", input);
+        const ClientToBatcher& request = message::createClientRequest(network::getIp(), input);
         batchers.send(request);
     }
 }
 
 int main(const int argc, const char** argv) {
-    if (argc != 2) {
-        printf("Usage: ./Autoscaling_Paxos <BATCHER FILE NAME>.\n");
+    if (argc != 1) {
+        printf("Usage: ./Autoscaling_Paxos\n");
         exit(0);
     }
-    const std::string& batcherFileName = argv[1];
-    const parser::idToIP& batchers = parser::parseIDtoIPs(batcherFileName);
-    paxos p {batchers};
+    paxos p {};
 }

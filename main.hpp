@@ -17,12 +17,13 @@
 
 class paxos {
 public:
-    [[noreturn]] explicit paxos(const parser::idToIP& batchers);
+    [[noreturn]] explicit paxos();
 private:
+    anna annaClient;
     heartbeat_component batchers;
 
     [[noreturn]] void startServer();
-    void connectToBatchers(const parser::idToIP& batcherIdToIPs);
+    void connectToBatchers(two_p_set& twoPSet);
     [[noreturn]] void readInput();
 };
 

@@ -5,9 +5,11 @@
 #ifndef AUTOSCALING_PAXOS_TWO_P_SET_HPP
 #define AUTOSCALING_PAXOS_TWO_P_SET_HPP
 
+#include <string>
 #include <unordered_set>
 #include <algorithm>
-#include <common/include/lattices/core_lattices.hpp>
+#include "lattices/core_lattices.hpp"
+#include "utils/config.hpp"
 
 enum partial_order {
     GREATER_THAN,
@@ -16,58 +18,27 @@ enum partial_order {
     EQUAL_TO
 };
 
-template<typename T>
 class two_p_set {
 public:
-    two_p_set<T>() : observed(), removed() {}
-    two_p_set<T>(const SetLattice<T>& observed, const SetLattice<T>& removed) : observed(observed), removed(removed) {}
+    two_p_set();
+    two_p_set(std::unordered_set<std::string>&& observed, std::unordered_set<std::string>&& removed);
+    two_p_set(const SetLattice<std::string>& observed, const SetLattice<std::string>& removed);
 
-    void add(const T& t) {
-        observed.insert(t);
-    }
-
-    void remove(const T& t) {
-        removed.insert(t);
-    }
-
-    void merge(const two_p_set<T>& other) {
-        observed.merge(other.observed);
-        removed.merge(other.removed);
-    }
-
-    partial_order compare(const two_p_set<T>& other) const {
-        partial_order observedCompare = compareSets(observed.reveal(), other.observed.reveal());
-        partial_order removedCompare = compareSets(removed.reveal(), other.removed.reveal());
-
-        if (observedCompare == removedCompare)
-            return observedCompare;
-        if (observedCompare == EQUAL_TO)
-            return removedCompare;
-        if (removedCompare == EQUAL_TO)
-            return observedCompare;
-        return NOT_COMPARABLE;
-    }
-
-    std::unordered_set<T> toSet() const {
-        std::unordered_set<T> output;
-        const std::unordered_set<T>& observedSet = observed.reveal();
-        const std::unordered_set<T>& removedSet = removed.reveal();
-        std::set_difference(observedSet.begin(), observedSet.end(), removedSet.begin(), removedSet.end(),
-                            std::inserter(output, output.end()));
-        return output;
-    }
-
-    const SetLattice<T>& getObserved() const {
-        return observed;
-    }
-
-    const SetLattice<T>& getRemoved() const {
-        return removed;
-    }
+    void add(const std::string& s);
+    void remove(const std::string& s);
+    void merge(const two_p_set& other);
+    void merge(const std::string& key, const SetLattice<std::string>& set);
+    two_p_set updatesFrom(const two_p_set& other);
+    partial_order compare(const two_p_set& other) const;
+    std::unordered_set<std::string> toSet() const;
+    const std::unordered_set<std::string>& getObserved() const;
+    const std::unordered_set<std::string>& getRemoved() const;
 private:
-    SetLattice<T> observed;
-    SetLattice<T> removed;
+    std::unordered_set<std::string> observed;
+    std::unordered_set<std::string> removed;
 
+    bool isPrefix(const std::string& prefix, const std::string& target);
+    template<typename T>
     partial_order compareSets(const std::unordered_set<T>& s1, const std::unordered_set<T>& s2) const {
         bool s1ContainsAllInS2 = true;
         int matches = 0;

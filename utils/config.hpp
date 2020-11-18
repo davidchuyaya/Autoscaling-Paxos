@@ -18,6 +18,9 @@
 #   define LOG(...) do{}while(0)
 #endif
 
+//TODO un-define once we're remote
+#define LOCAL
+
 namespace config {
     const static int F = 1;
     const static int NUM_ACCEPTOR_GROUPS = 2;
@@ -35,6 +38,16 @@ namespace config {
     const static int HEARTBEAT_TIMEOUT_SEC = 20; // this - HEARTBEAT_SLEEP_SEC = time allowed between message send & receive
     const static int HEARTBEAT_SLEEP_SEC = 5;
     const static int ID_SCOUT_DELAY_MULTIPLIER = 5; // this * proposer ID = number of seconds to delay before sending scouts
+    const static int ZMQ_RECEIVE_RETRY_SEC = 1;
+    const static int ANNA_RECHECK_SEC = 10;
+
+    const static inline std::string KEY_OBSERVED_PREFIX = "observed";
+    const static inline std::string KEY_REMOVED_PREFIX = "removed";
+    const static inline std::string KEY_BATCHERS = "Batchers";
+    const static inline std::string KEY_PROPOSERS = "Proposers";
+    const static inline std::string KEY_PROXY_LEADERS = "ProxyLeaders";
+    const static inline std::string KEY_ACCEPTORS = "Acceptors";
+    const static inline std::string KEY_UNBATCHERS = "Unbatchers";
 }
 
 #endif //AUTOSCALING_PAXOS_CONFIG_HPP
