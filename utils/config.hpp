@@ -25,14 +25,12 @@ namespace config {
     const static int CLIENT_PORT = 10000;
     const static int PROPOSER_PORT_START = 11000;
     const static int ACCEPTOR_PORT_START = 12000;
-    const static int ACCEPTOR_GROUP_PORT_OFFSET = 100;
     const static int BATCHER_PORT_START = 13000;
     const static int UNBATCHER_PORT_START = 14000;
 
     //TODO Store result from "curl http://169.254.169.254/latest/meta-data/public-ipv4" into env
     const static inline std::string IP_ADDRESS = std::getenv("IP");
     const static inline std::string ANNA_ROUTING_ADDRESS = std::getenv("ANNA_ROUTING");
-    const static inline std::string ANNA_FUNCTION_ADDRESS = std::getenv("ANNA_FUNCTION");
 
     const static int BATCH_TIME_SEC = 5;
     const static int TCP_RETRY_TIMEOUT_SEC = 10;

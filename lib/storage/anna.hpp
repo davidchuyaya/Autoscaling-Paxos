@@ -15,7 +15,7 @@
 
 class anna {
 public:
-     anna();
+    explicit anna();
     anna(const std::unordered_set<std::string>& keysToListenTo,
          const std::function<void(const std::string&, const two_p_set&)>& listener);
     anna(const std::string& key, const std::unordered_set<std::string>& keysToListenTo,
@@ -26,7 +26,7 @@ public:
     void unsubscribeFrom(const std::string& key);
 
 private:
-    //TODO find out if we need to lock the client for async receive
+    std::shared_mutex clientMutex;
     KvsClient client;
 
     std::shared_mutex keysToListenToMutex;

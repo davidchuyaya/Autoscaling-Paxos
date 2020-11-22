@@ -2,8 +2,7 @@
 #include "main.hpp"
 
 [[noreturn]]
-paxos::paxos() :
-    batchers(config::F+1) {
+paxos::paxos() : batchers(config::F+1) {
     LOG("F: %d\n", config::F);
     const std::thread server([&] {startServer(); });
     anna annaClient({config::KEY_BATCHERS}, [&](const std::string& key, const two_p_set& twoPSet) {

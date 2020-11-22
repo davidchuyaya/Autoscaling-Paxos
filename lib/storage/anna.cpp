@@ -34,7 +34,7 @@ void anna::put2Pset(const std::string& key, const two_p_set& twoPSet) {
 void anna::putSingletonSet(const std::string& key, const std::string& value) {
 	two_p_set set;
 	set.add(value);
-	put2Pset(config::KEY_OBSERVED_PREFIX + key, set);
+	put2Pset(key, set);
 }
 
 void anna::subscribeTo(const std::string& key) {
@@ -50,7 +50,10 @@ void anna::unsubscribeFrom(const std::string& key) {
 [[noreturn]]
 void anna::listenerThread(const std::function<void(const std::string&, const two_p_set&)>& listener) {
     while (true) {
+	    std::unique_lock lock(clientMutex);
         const std::vector<KeyResponse>& responses = client.receive_async();
+        lock.unlock();
+
         for (const KeyResponse& response : responses) {
             if (response.type() != GET)
                 continue;
@@ -69,16 +72,18 @@ void anna::listenerThread(const std::function<void(const std::string&, const two
 
 void anna::periodicGet2PSet() {
     while (true) {
-        std::shared_lock lock(keysToListenToMutex);
+	    std::this_thread::sleep_for(std::chrono::seconds(config::ANNA_RECHECK_SEC));
+
+	    std::shared_lock keysLock(keysToListenToMutex, std::defer_lock);
+	    std::scoped_lock lock(keysLock, clientMutex);
         for (const std::string& key : keysToListenTo) {
             client.get_async(config::KEY_OBSERVED_PREFIX + key);
             client.get_async(config::KEY_REMOVED_PREFIX + key);
         }
-        lock.unlock();
-        std::this_thread::sleep_for(std::chrono::seconds(config::ANNA_RECHECK_SEC));
     }
 }
 
 void anna::putLattice(const std::string& key, const SetLattice<std::string>& lattice) {
+	std::unique_lock lock(clientMutex);
     client.put_async(key, serialize(lattice), SET);
 }
