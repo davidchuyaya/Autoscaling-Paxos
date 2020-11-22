@@ -23,15 +23,22 @@ void two_p_set::merge(const two_p_set& other) {
     removed.insert(other.removed.begin(), other.removed.end());
 }
 
-void two_p_set::merge(const std::string& key, const SetLattice<std::string>& set) {
+std::string two_p_set::mergeAndStripKey(std::string key, const SetLattice<std::string>& set) {
     const std::unordered_set<std::string>& revealed = set.reveal();
-    if (isPrefix(config::KEY_OBSERVED_PREFIX, key))
+
+    auto observedPrefixPos = key.find(config::KEY_OBSERVED_PREFIX);
+    if (observedPrefixPos != std::string::npos) {
         observed.insert(revealed.begin(), revealed.end());
-    else if (isPrefix(config::KEY_REMOVED_PREFIX, key))
+        return key.erase(observedPrefixPos, config::KEY_OBSERVED_PREFIX.size());
+    }
+    else {
+        auto removedPrefixPos = key.find(config::KEY_REMOVED_PREFIX);
         removed.insert(revealed.begin(), revealed.end());
+        return key.erase(removedPrefixPos, config::KEY_REMOVED_PREFIX.size());
+    }
 }
 
-two_p_set two_p_set::updatesFrom(const two_p_set& other) {
+two_p_set two_p_set::updatesFrom(const two_p_set& other) const {
     std::unordered_set<std::string> outputObserved;
     std::unordered_set<std::string> outputRemoved;
     std::set_difference(other.observed.begin(), other.observed.end(), observed.begin(), observed.end(),
@@ -39,26 +46,6 @@ two_p_set two_p_set::updatesFrom(const two_p_set& other) {
     std::set_difference(other.removed.begin(), other.removed.end(), removed.begin(), removed.end(),
                         std::inserter(outputObserved, outputObserved.end()));
     return {outputObserved, outputRemoved};
-}
-
-partial_order two_p_set::compare(const two_p_set& other) const {
-    partial_order observedCompare = compareSets(observed, other.observed);
-    partial_order removedCompare = compareSets(removed, other.removed);
-
-    if (observedCompare == removedCompare)
-        return observedCompare;
-    if (observedCompare == EQUAL_TO)
-        return removedCompare;
-    if (removedCompare == EQUAL_TO)
-        return observedCompare;
-    return NOT_COMPARABLE;
-}
-
-std::unordered_set<std::string> two_p_set::toSet() const {
-    std::unordered_set<std::string> output;
-    std::set_difference(observed.begin(), observed.end(), removed.begin(), removed.end(),
-                        std::inserter(output, output.end()));
-    return output;
 }
 
 const std::unordered_set<std::string>& two_p_set::getObserved() const {
@@ -69,7 +56,10 @@ const std::unordered_set<std::string>& two_p_set::getRemoved() const {
     return removed;
 }
 
-bool two_p_set::isPrefix(const std::string& prefix, const std::string& target) {
-    //from https://stackoverflow.com/a/7913978/4028758
-    return std::mismatch(prefix.begin(), prefix.end(), target.begin()).first == prefix.end();
+bool two_p_set::empty() const {
+    if (removed.size() < observed.size())
+        return false;
+    return std::all_of(observed.begin(), observed.end(), [&](const std::string& elem){
+        return removed.find(elem) != removed.end(); //removed.contains(elem)
+    });
 }

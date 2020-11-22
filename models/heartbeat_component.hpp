@@ -11,50 +11,43 @@
 #include <vector>
 #include <thread>
 #include <functional>
+#include <algorithm>
 #include "lib/storage/two_p_set.hpp"
 #include "message.pb.h"
 #include "../utils/parser.hpp"
 #include "../utils/network.hpp"
 #include "message.hpp"
+#include "threshold_component.hpp"
 
-class heartbeat_component {
+class heartbeat_component : public threshold_component {
 public:
     explicit heartbeat_component(int waitThreshold);
-    void connectToServers(const parser::idToIP& idToIPs, int socketOffset, const WhoIsThis_Sender& whoIsThis,
+    void connectAndListen(const two_p_set& newMembers, int port, const WhoIsThis_Sender& whoIsThis,
                           const std::function<void(int, const std::string&)>& listener);
-    void connectToServers(const two_p_set& newMembers, int socketOffset, const WhoIsThis_Sender& whoIsThis,
-                          const std::function<void(int, const std::string&)>& listener);
-    void addConnection(int socket);
-    //TODO remove connection based on IP address (for remote). Store IP address of connections.
     template<typename Message> void send(const Message& payload) {
         std::shared_lock lock(componentMutex);
         if (!canSend) { //block if not enough connections
-            waitForThreshold();
+            waitForThreshold(lock);
         }
         int socket = nextComponentSocket();
         network::sendPayload(socket, payload);
     }
     void addHeartbeat(int socket);
 private:
-    const int waitThreshold;
-
     std::shared_mutex heartbeatMutex;
     std::unordered_map<int, time_t> heartbeats = {}; //key = socket
 
-    two_p_set members;
+    std::shared_mutex ipToSocketMutex;
     std::unordered_map<std::string, int> ipToSocket = {};
 
-    std::shared_mutex componentMutex;
-    std::condition_variable_any componentCV;
-    std::vector<int> fastComponents = {};
     std::vector<int> slowComponents = {};
     int next = 0;
-    bool canSend = false;
 
-    void waitForThreshold();
-    bool thresholdMet();
+    bool thresholdMet() override;
     int nextComponentSocket();
     [[noreturn]] void checkHeartbeats();
+
+    using threshold_component::connectAndMaybeListen;
 };
 
 

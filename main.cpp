@@ -3,13 +3,15 @@
 
 [[noreturn]]
 paxos::paxos() :
-    batchers(config::F+1), annaClient([&](two_p_set& twoPSet){connectToBatchers(twoPSet);}) {
+    batchers(config::F+1) {
     LOG("F: %d\n", config::F);
-#ifdef DEBUG
-    setbuf(stdout, nullptr);
-#endif
     const std::thread server([&] {startServer(); });
-    annaClient.periodicGet2PSet(config::KEY_BATCHERS);
+    anna annaClient({config::KEY_BATCHERS}, [&](const std::string& key, const two_p_set& twoPSet) {
+        batchers.connectAndListen(twoPSet, config::BATCHER_PORT_START, WhoIsThis_Sender_client,
+                                  [&](const int socket, const std::string& payload) {
+            batchers.addHeartbeat(socket);
+        });
+    });
     readInput();
 }
 
@@ -20,13 +22,6 @@ void paxos::startServer() {
             LOG("Main connected to unbatcher\n");
     }, [](const int socket, const WhoIsThis_Sender& whoIsThis, const std::string& payload) {
             LOG("--Acked: {%s}--\n", payload.c_str());
-    });
-}
-
-void paxos::connectToBatchers(two_p_set& twoPSet) {
-    batchers.connectToServers(twoPSet, config::BATCHER_PORT_START, WhoIsThis_Sender_client,
-    [&](const int socket, const std::string& payload) {
-        batchers.addHeartbeat(socket);
     });
 }
 

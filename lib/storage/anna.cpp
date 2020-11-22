@@ -8,32 +8,20 @@
 ZmqUtil zmq_util;
 ZmqUtilInterface *kZmqUtil = &zmq_util;
 
-anna::anna(const std::optional<std::function<void(two_p_set&)>>& listener) :
-    client({UserRoutingThread(config::ANNA_ROUTING_ADDRESS, 0)}, config::IP_ADDRESS) {
-    if (listener.has_value()) {
-        std::thread t([&]{
-            listenerThread(listener.value());
-        });
-        t.detach();
-    }
+anna::anna() : client({UserRoutingThread(config::ANNA_ROUTING_ADDRESS, 0)}, config::IP_ADDRESS) {}
+
+anna::anna(const std::unordered_set<std::string>& initialKeysToListenTo,
+           const std::function<void(const std::string&, const two_p_set&)>& listener) : anna() {
+    keysToListenTo = initialKeysToListenTo;
+    std::thread receive([&]{ listenerThread(listener);});
+    receive.detach();
+    std::thread get([&] { periodicGet2PSet(); });
+    get.detach();
 }
 
-anna::anna(const std::string& key, const std::string& value, const std::optional<std::function<void(two_p_set&)>>& listener) :
-    anna(listener) {
-    two_p_set valueSet;
-    valueSet.add(value);
-    put2Pset(config::KEY_OBSERVED_PREFIX + key, valueSet);
-}
-
-void anna::periodicGet2PSet(const std::string& key) {
-    std::thread t([&]{
-        while (true) {
-            client.get_async(config::KEY_OBSERVED_PREFIX + key);
-            client.get_async(config::KEY_REMOVED_PREFIX + key);
-            std::this_thread::sleep_for(std::chrono::seconds(config::ANNA_RECHECK_SEC));
-        }
-    });
-    t.detach();
+anna::anna(const std::string& key, const std::unordered_set<std::string>& keysToListenTo,
+           const std::function<void(const std::string&, const two_p_set&)>& listener) : anna(keysToListenTo, listener) {
+	putSingletonSet(key, config::IP_ADDRESS);
 }
 
 void anna::put2Pset(const std::string& key, const two_p_set& twoPSet) {
@@ -43,8 +31,24 @@ void anna::put2Pset(const std::string& key, const two_p_set& twoPSet) {
         putLattice(config::KEY_REMOVED_PREFIX + key, twoPSet.getRemoved());
 }
 
+void anna::putSingletonSet(const std::string& key, const std::string& value) {
+	two_p_set set;
+	set.add(value);
+	put2Pset(config::KEY_OBSERVED_PREFIX + key, set);
+}
+
+void anna::subscribeTo(const std::string& key) {
+    std::unique_lock lock(keysToListenToMutex);
+    keysToListenTo.emplace(key);
+}
+
+void anna::unsubscribeFrom(const std::string& key) {
+    std::unique_lock lock(keysToListenToMutex);
+    keysToListenTo.erase(key);
+}
+
 [[noreturn]]
-void anna::listenerThread(const std::function<void(two_p_set&)>& listener) {
+void anna::listenerThread(const std::function<void(const std::string&, const two_p_set&)>& listener) {
     while (true) {
         const std::vector<KeyResponse>& responses = client.receive_async();
         for (const KeyResponse& response : responses) {
@@ -55,11 +59,23 @@ void anna::listenerThread(const std::function<void(two_p_set&)>& listener) {
                     continue;
 
                 two_p_set twoPset;
-                twoPset.merge(keyTuple.key(), deserialize_set(keyTuple.payload()));
-                listener(twoPset);
+                const std::string& strippedKey = twoPset.mergeAndStripKey(keyTuple.key(), deserialize_set(keyTuple.payload()));
+                listener(strippedKey, twoPset);
             }
         }
         std::this_thread::sleep_for(std::chrono::seconds(config::ZMQ_RECEIVE_RETRY_SEC));
+    }
+}
+
+void anna::periodicGet2PSet() {
+    while (true) {
+        std::shared_lock lock(keysToListenToMutex);
+        for (const std::string& key : keysToListenTo) {
+            client.get_async(config::KEY_OBSERVED_PREFIX + key);
+            client.get_async(config::KEY_REMOVED_PREFIX + key);
+        }
+        lock.unlock();
+        std::this_thread::sleep_for(std::chrono::seconds(config::ANNA_RECHECK_SEC));
     }
 }
 

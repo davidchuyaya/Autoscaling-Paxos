@@ -13,13 +13,14 @@
 #include "utils/network.hpp"
 #include "models/message.hpp"
 #include "message.pb.h"
+#include "lib/storage/anna.hpp"
 
 class acceptor {
 public:
-    acceptor(int id, int acceptorGroupId);
+    acceptor(int id, std::string&& acceptorGroupId);
 private:
     const int id;
-    const int acceptorGroupId;
+    const std::string acceptorGroupId;
 
     std::shared_mutex ballotMutex;
     Ballot highestBallot = {};

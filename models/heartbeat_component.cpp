@@ -4,72 +4,57 @@
 
 #include "heartbeat_component.hpp"
 
-heartbeat_component::heartbeat_component(const int waitThreshold) : waitThreshold(waitThreshold) {
+heartbeat_component::heartbeat_component(const int waitThreshold) : threshold_component(waitThreshold) {
     std::thread thread([&]{checkHeartbeats();});
     thread.detach();
 }
 
-void heartbeat_component::connectToServers(const parser::idToIP& idToIPs, const int socketOffset,
-                                                    const WhoIsThis_Sender& whoIsThis,
-                                                    const std::function<void(int, const std::string&)>& listener) {
-    for (const auto& idToIP : idToIPs) {
-        const int id = idToIP.first;
-        const std::string& ip = idToIP.second;
-
-        std::thread thread([&, id, ip, whoIsThis, socketOffset, listener]{
-            int socket = network::connectToServerAtAddress(ip, socketOffset + id, whoIsThis);
-            addConnection(socket);
-            network::listenToSocketUntilClose(socket, listener);
-        });
-        thread.detach();
-    }
-}
-
-void heartbeat_component::connectToServers(const two_p_set& newMembers, const int socketOffset,
+void heartbeat_component::connectAndListen(const two_p_set& newMembers, const int port,
                                            const WhoIsThis_Sender& whoIsThis,
                                            const std::function<void(int, const std::string&)>& listener) {
-    const two_p_set& updates = members.updatesFrom(newMembers);
+	std::unique_lock membersLock(membersMutex);
+	const two_p_set& updates = members.updatesFrom(newMembers);
+	if (updates.empty())
+		return;
+	members.merge(newMembers);
+	membersLock.unlock();
 
     for (const std::string& ip : updates.getObserved()) {
         LOG("Connecting to new member: %s\n", ip.c_str());
-        std::thread thread([&, ip, whoIsThis, socketOffset, listener]{
-            int socket = network::connectToServerAtAddress(ip, socketOffset, whoIsThis);
+        std::thread thread([&, ip, whoIsThis, port, listener]{
+            const int socket = network::connectToServerAtAddress(ip, port, whoIsThis);
+            std::unique_lock lock(ipToSocketMutex);
+            ipToSocket[ip] = socket;
+            lock.unlock();
             addConnection(socket);
             network::listenToSocketUntilClose(socket, listener);
         });
         thread.detach();
     }
 
-    //TODO remove dead members
-
-    members.merge(newMembers);
-}
-
-void heartbeat_component::addConnection(const int socket) {
-    std::unique_lock lock(componentMutex);
-    fastComponents.emplace_back(socket);
-    //check threshold
-    if (!thresholdMet())
-        return;
-    lock.unlock();
-    componentCV.notify_one();
-}
-
-void heartbeat_component::waitForThreshold() {
-    std::shared_lock lock(componentMutex);
-    componentCV.wait(lock, [&]{return thresholdMet();});
-    canSend = true;
+    if (!updates.getRemoved().empty()) {
+        std::scoped_lock lock(ipToSocketMutex, componentMutex, heartbeatMutex);
+        for (const std::string& ip : updates.getRemoved()) {
+            LOG("Removing dead member: %s\n", ip.c_str());
+            const int socket = ipToSocket[ip];
+            shutdown(socket, 1);
+            components.erase(std::remove(components.begin(), components.end(), socket), components.end());
+            slowComponents.erase(std::remove(slowComponents.begin(), slowComponents.end(), socket), slowComponents.end());
+            heartbeats.erase(socket);
+            ipToSocket.erase(ip);
+        }
+    }
 }
 
 bool heartbeat_component::thresholdMet() {
-    return fastComponents.size() + slowComponents.size() >= waitThreshold;
+    return components.size() + slowComponents.size() >= waitThreshold;
 }
 
 int heartbeat_component::nextComponentSocket() {
     //prioritize sending to fast proxy leaders
-    if (!fastComponents.empty()) {
-        next = (next + 1) % fastComponents.size();
-        return fastComponents[next];
+    if (!components.empty()) {
+        next = (next + 1) % components.size();
+        return components[next];
     }
     else {
         next = (next + 1) % slowComponents.size();
@@ -88,13 +73,13 @@ void heartbeat_component::checkHeartbeats() {
 
         //if a node has no recent heartbeat, move it into the slow list
         std::vector<int> slowedComponents = {};
-        auto iterator = fastComponents.begin();
-        while (iterator != fastComponents.end()) {
+        auto iterator = components.begin();
+        while (iterator != components.end()) {
             const int socket = *iterator;
             if (difftime(now, heartbeats[socket]) > config::HEARTBEAT_TIMEOUT_SEC) {
                 LOG("Node failed to heartbeat\n");
                 slowComponents.emplace_back(socket);
-                iterator = fastComponents.erase(iterator);
+                iterator = components.erase(iterator);
                 slowedComponents.emplace_back(socket);
             }
             else
@@ -106,7 +91,7 @@ void heartbeat_component::checkHeartbeats() {
         while (iterator != slowComponents.end()) {
             const int socket = *iterator;
             if (difftime(now, heartbeats[socket]) > config::HEARTBEAT_TIMEOUT_SEC) {
-                fastComponents.emplace_back(socket);
+                components.emplace_back(socket);
                 iterator = slowComponents.erase(iterator);
             }
             else

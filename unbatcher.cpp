@@ -5,7 +5,12 @@
 #include "unbatcher.hpp"
 
 unbatcher::unbatcher(const int id) : id(id) {
-    const std::thread server([&] {startServer(); });
+    std::thread server([&] {startServer(); });
+    server.detach();
+
+	anna annaClient{};
+	annaClient.putSingletonSet(config::KEY_UNBATCHERS, config::IP_ADDRESS);
+
     heartbeater::heartbeat("i'm alive", proxyLeaderMutex, proxyLeaders);
     pthread_exit(nullptr);
 }
@@ -45,6 +50,6 @@ int main(const int argc, const char** argv) {
         printf("Usage: ./unbatcher <UNBATCHER ID>.\n");
         exit(0);
     }
-    const int id = atoi(argv[1]);
+    const int id = std::stoi(argv[1]);
     unbatcher {id};
 }

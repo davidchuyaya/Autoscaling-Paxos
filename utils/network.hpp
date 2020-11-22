@@ -74,8 +74,6 @@ namespace network {
      * @return Payload
      */
     std::optional<std::string> receivePayload(int socketId);
-
-    std::string getIp();
 }
 
 #endif //C__PAXOS_NETWORKNODE_HPP

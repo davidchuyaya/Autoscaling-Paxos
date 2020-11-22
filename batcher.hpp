@@ -20,10 +20,11 @@
 #include "message.pb.h"
 #include "lib/storage/anna.hpp"
 #include "lib/storage/two_p_set.hpp"
+#include "models/threshold_component.hpp"
 
 class batcher {
 public:
-    explicit batcher(int id, const parser::idToIP& proposerIDtoIPs);
+    batcher(int id);
 private:
     int id = 0;
     std::shared_mutex lastBatchTimeMutex;
@@ -32,8 +33,7 @@ private:
     std::shared_mutex payloadsMutex;
     std::unordered_map<std::string, std::vector<std::string>> clientToPayloads = {};
 
-    std::shared_mutex proposerMutex;
-    std::vector<int> proposerSockets = {};
+    threshold_component proposers;
 
     std::shared_mutex clientMutex;
     std::vector<int> clientSockets = {};
@@ -51,7 +51,6 @@ private:
      * @param client_address Address of the client
      */
     void listenToClient(const ClientToBatcher& payload);
-    void connectToProposers(const parser::idToIP& proposerIDtoIPs);
 };
 
 #endif //AUTOSCALING_PAXOS_BATCHER_HPP

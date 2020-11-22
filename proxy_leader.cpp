@@ -4,43 +4,80 @@
 
 #include "proxy_leader.hpp"
 
-proxy_leader::proxy_leader(const int id, const parser::idToIP& unbatchersIdToIps, const parser::idToIP& proposers,
-                           const std::unordered_map<int, parser::idToIP>& acceptors) : id(id), unbatchers(config::F+1) {
-    connectToUnbatchers(unbatchersIdToIps);
-    connectToProposers(proposers);
-    connectToAcceptors(acceptors);
-    heartbeater::heartbeat(message::createProxyLeaderHeartbeat(), proposerMutex, proposerSockets);
+proxy_leader::proxy_leader(const int id) : id(id), unbatchers(config::F+1), proposers(config::F+1),
+    annaClient(config::KEY_PROXY_LEADERS,
+               {config::KEY_PROPOSERS, config::KEY_UNBATCHERS, config::KEY_ACCEPTOR_GROUPS},
+               [&](const std::string& key, const two_p_set& twoPSet) {
+        listenToAnna(key, twoPSet);
+    }){
+    heartbeater::heartbeat(message::createProxyLeaderHeartbeat(), proposers);
     pthread_exit(nullptr);
 }
 
-void proxy_leader::connectToUnbatchers(const parser::idToIP& unbatchersIdToIps) {
-    unbatchers.connectToServers(unbatchersIdToIps, config::UNBATCHER_PORT_START, WhoIsThis_Sender_proxyLeader,
-        [&](const int socket, const std::string& payload) {
-        unbatchers.addHeartbeat(socket);
-    });
+void proxy_leader::listenToAnna(const std::string& key, const two_p_set& twoPSet) {
+    if (key == config::KEY_PROPOSERS) {
+        proposers.connectAndMaybeListen(twoPSet, config::PROPOSER_PORT_START, WhoIsThis_Sender_proxyLeader,
+                                        [&](const int socket, const std::string& payloadString) {
+            ProposerToAcceptor payload;
+            payload.ParseFromString(payloadString);
+            listenToProposer(payload);
+        });
+    }
+    else if (key == config::KEY_UNBATCHERS) {
+        unbatchers.connectAndListen(twoPSet, config::UNBATCHER_PORT_START, WhoIsThis_Sender_proxyLeader,
+                                    [&](const int socket, const std::string& payload) {
+            unbatchers.addHeartbeat(socket);
+        });
+    }
+    else if (key == config::KEY_ACCEPTOR_GROUPS) {
+        processAcceptorGroup(twoPSet);
+    }
+    else {
+        //must be individual acceptor groups
+        processAcceptors(key, twoPSet);
+    }
 }
 
-void proxy_leader::connectToProposers(const parser::idToIP& proposers) {
-    for (const auto& proposerIdToIps : proposers) {
-        const int proposerId = proposerIdToIps.first;
-        const std::string& proposerIp = proposerIdToIps.second;
-
-        std::thread thread([&, proposerId, proposerIp] {
-            const int socket = network::connectToServerAtAddress(proposerIp, config::PROPOSER_PORT_START + proposerId, WhoIsThis_Sender_proxyLeader);
-            LOG("Proxy leader %d connected to proposer\n", id);
-
-            std::unique_lock lock(proposerMutex);
-            proposerSockets[proposerId] = socket;
-            lock.unlock();
-
-            network::listenToSocketUntilClose(socket, [&](const int socket, const std::string& payloadString) {
-                ProposerToAcceptor payload;
-                payload.ParseFromString(payloadString);
-                listenToProposer(payload);
-            });
-        });
-        thread.detach();
+void proxy_leader::processAcceptorGroup(const two_p_set& twoPSet) {
+    const two_p_set& updates = acceptorGroupIdSet.updatesFrom(twoPSet);
+    for (const std::string& newAcceptorGroupId : updates.getObserved()) {
+        //find the IP addresses of acceptors in this group
+        annaClient.subscribeTo(newAcceptorGroupId);
     }
+    for (const std::string& removedAcceptorGroupId : updates.getRemoved()) {
+        annaClient.unsubscribeFrom(removedAcceptorGroupId);
+        //create 2p-set with all members removed, then merge it in to close all sockets. Then let it be GC'd
+	    std::unique_lock lock(acceptorMutex);
+        if (!knowOfAcceptorGroup(removedAcceptorGroupId))
+	        continue;
+        threshold_component* acceptors = acceptorGroupSockets.at(removedAcceptorGroupId);
+        two_p_set allMembersRemoved = {{}, acceptors->getMembers().getObserved()};
+        acceptors->connectAndMaybeListen(allMembersRemoved, config::ACCEPTOR_PORT_START,
+										WhoIsThis_Sender_proxyLeader, {});
+        acceptorGroupSockets.erase(removedAcceptorGroupId);
+	    free(acceptors);
+    }
+    acceptorGroupIdSet.merge(updates);
+}
+
+void proxy_leader::processAcceptors(const std::string& acceptorGroupId, const two_p_set& twoPSet) {
+	// if we've never heard from this acceptor group before, create the threshold_component
+	std::shared_lock readLock(acceptorMutex);
+	if (!knowOfAcceptorGroup(acceptorGroupId)) {
+		readLock.unlock(); //convoluted R/W lock scheme. Only 1 out of 2f+1 will need to write, so this should make it faster.
+		std::unique_lock writeLock(acceptorMutex);
+		acceptorGroupSockets[acceptorGroupId] = new threshold_component{2 * config::F + 1};
+		writeLock.unlock();
+		readLock.lock();
+	}
+
+	threshold_component* acceptors = acceptorGroupSockets.at(acceptorGroupId);
+	acceptors->connectAndMaybeListen(twoPSet, config::ACCEPTOR_PORT_START, WhoIsThis_Sender_proxyLeader,
+								 [&](const int socket, const std::string& payloadString) {
+		AcceptorToProxyLeader payload;
+		payload.ParseFromString(payloadString);
+		listenToAcceptor(payload);
+	});
 }
 
 void proxy_leader::listenToProposer(const ProposerToAcceptor& payload) {
@@ -51,48 +88,16 @@ void proxy_leader::listenToProposer(const ProposerToAcceptor& payload) {
     LOG("Proxy leader %d received from proposer: %s\n", id, payload.ShortDebugString().c_str());
 
     // Broadcast to Acceptors; wait if necessary
-    std::shared_lock acceptorsLock(acceptorMutex);
-    acceptorCV.wait(acceptorsLock, [&]{return acceptorSockets.find(payload.acceptorgroupid()) != acceptorSockets.end();});
-    // TODO check if connection to acceptors is valid for the ID; if not, fetch from Anna
-    for (const int acceptorSocket : acceptorSockets[payload.acceptorgroupid()])
-        network::sendPayload(acceptorSocket, payload);
-}
-
-void proxy_leader::connectToAcceptors(const std::unordered_map<int, parser::idToIP>& acceptors) {
-    for (const auto& acceptorGroupIdtoMemberIps : acceptors) {
-        const int acceptorGroupId = acceptorGroupIdtoMemberIps.first;
-        const parser::idToIP& memberIdtoIps = acceptorGroupIdtoMemberIps.second;
-        const int acceptorGroupPortOffset = config::ACCEPTOR_GROUP_PORT_OFFSET * acceptorGroupId;
-        std::unique_lock acceptorsLock1(acceptorMutex);
-        acceptorGroupIds.emplace_back(acceptorGroupId);
-        acceptorsLock1.unlock();
-
-        for (const auto& acceptor: memberIdtoIps) {
-            const int acceptorId = acceptor.first;
-            const std::string& acceptorIp = acceptor.second;
-            const int acceptorPort = config::ACCEPTOR_PORT_START + acceptorGroupPortOffset + acceptorId;
-
-            std::thread thread([&, acceptorIp, acceptorPort, acceptorGroupId]{
-                const int socket = network::connectToServerAtAddress(acceptorIp, acceptorPort, WhoIsThis_Sender_proxyLeader);
-                LOG("Proxy leader %d connected to acceptor\n", id);
-                std::unique_lock acceptorsLock2(acceptorMutex);
-                acceptorSockets[acceptorGroupId].emplace_back(socket);
-                if (acceptorSockets[acceptorGroupId].size() >= 2 * config::F + 1) {
-                    acceptorsLock2.unlock();
-                    acceptorCV.notify_one();
-                }
-                else
-                    acceptorsLock2.unlock();
-
-                network::listenToSocketUntilClose(socket, [&](const int socket, const std::string& payloadString) {
-                    AcceptorToProxyLeader payload;
-                    payload.ParseFromString(payloadString);
-                    listenToAcceptor(payload);
-                });
-            });
-            thread.detach();
-        }
+    std::shared_lock readLock(acceptorMutex);
+    if (!knowOfAcceptorGroup(payload.acceptorgroupid())) {
+	    readLock.unlock(); //convoluted R/W lock scheme. Only happens once per acceptor group, should be fast.
+	    std::unique_lock writeLock(acceptorMutex);
+	    acceptorGroupSockets[payload.acceptorgroupid()] = new threshold_component{2 * config::F + 1};
+	    writeLock.unlock();
+	    annaClient.subscribeTo(payload.acceptorgroupid()); //find the IP addresses of acceptors in this group
+	    readLock.lock();
     }
+    acceptorGroupSockets.at(payload.acceptorgroupid())->broadcast(payload);
 }
 
 void proxy_leader::listenToAcceptor(const AcceptorToProxyLeader& payload) {
@@ -118,14 +123,13 @@ void proxy_leader::handleP1B(const AcceptorToProxyLeader& payload) {
     }
     messagesLock.unlock();
 
-    std::shared_lock proposerLock(proposerMutex, std::defer_lock);
-    std::scoped_lock lock(sentMessagesMutex, unmergedLogsMutex, proposerLock);
+    std::scoped_lock lock(sentMessagesMutex, unmergedLogsMutex);
     if (Log::isBallotGreaterThan(payload.ballot(), sentValue.ballot())) {
         //yikes, the proposer got preempted
         const ProxyLeaderToProposer& messageToProposer = message::createProxyP1B(payload.messageid(),
                                                                                  payload.acceptorgroupid(),
                                                                                  payload.ballot(), {}, {});
-        network::sendPayload(proposerSockets[sentValue.ballot().id()], messageToProposer);
+        network::sendPayload(proposers.socketForIP(sentValue.ipaddress()), messageToProposer);
         sentMessages.erase(payload.messageid());
         unmergedLogs.erase(payload.messageid());
     }
@@ -138,7 +142,7 @@ void proxy_leader::handleP1B(const AcceptorToProxyLeader& payload) {
             const auto&[committedLog, uncommittedLog] = Log::mergeLogsOfAcceptorGroup(unmergedLogs[payload.messageid()]);
             const ProxyLeaderToProposer& messageToProposer = message::createProxyP1B(payload.messageid(), payload.acceptorgroupid(),
                                                                                      payload.ballot(), committedLog, uncommittedLog);
-            network::sendPayload(proposerSockets[sentValue.ballot().id()], messageToProposer);
+            network::sendPayload(proposers.socketForIP(sentValue.ipaddress()), messageToProposer);
             sentMessages.erase(payload.messageid());
             unmergedLogs.erase(payload.messageid());
         }
@@ -154,13 +158,12 @@ void proxy_leader::handleP2B(const AcceptorToProxyLeader& payload) {
     }
     messagesLock.unlock();
 
-    std::shared_lock proposerLock(proposerMutex, std::defer_lock);
-    std::scoped_lock lock(sentMessagesMutex, approvedCommandersMutex, proposerLock);
+    std::scoped_lock lock(sentMessagesMutex, approvedCommandersMutex);
     if (Log::isBallotGreaterThan(payload.ballot(), sentValue.ballot())) {
         //yikes, the proposer got preempted
         const ProxyLeaderToProposer& messageToProposer = message::createProxyP2B(payload.messageid(), payload.acceptorgroupid(),
                                                                                 payload.ballot(), payload.slot());
-        network::sendPayload(proposerSockets[sentValue.ballot().id()], messageToProposer);
+        network::sendPayload(proposers.socketForIP(sentValue.ipaddress()), messageToProposer);
         sentMessages.erase(payload.messageid());
         approvedCommanders.erase(payload.messageid());
     }
@@ -177,17 +180,15 @@ void proxy_leader::handleP2B(const AcceptorToProxyLeader& payload) {
     }
 }
 
+bool proxy_leader::knowOfAcceptorGroup(const std::string& acceptorGroupId) {
+	return acceptorGroupSockets.find(acceptorGroupId) != acceptorGroupSockets.end();
+}
+
 int main(int argc, char** argv) {
-    if (argc != 5) {
-        printf("Usage: ./proxy_leader <PROXY LEADER ID> <UNBATCHER FILE NAME> <PROPOSER FILE NAME> <ACCEPTOR FILE NAME>.\n");
+    if (argc != 2) {
+        printf("Usage: ./proxy_leader <PROXY LEADER ID>.\n");
         exit(0);
     }
-    const int id = atoi(argv[1]);
-    const std::string& unbatcherFileName = argv[2];
-    const parser::idToIP& unbatchers = parser::parseIDtoIPs(unbatcherFileName);
-    const std::string& proposerFileName = argv[3];
-    const parser::idToIP& proposers = parser::parseIDtoIPs(proposerFileName);
-    const std::string& acceptorFileName = argv[4];
-    const std::unordered_map<int, parser::idToIP>& acceptors = parser::parseAcceptors(acceptorFileName);
-    proxy_leader(id, unbatchers, proposers, acceptors);
+    const int id = std::stoi(argv[1]);
+    proxy_leader p(id);
 }

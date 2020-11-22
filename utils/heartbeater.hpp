@@ -8,12 +8,11 @@
 #include <shared_mutex>
 #include <thread>
 #include <vector>
+#include <models/threshold_component.hpp>
 #include "config.hpp"
 #include "network.hpp"
 
 namespace heartbeater {
-    template<typename Message>
-    void heartbeat(const Message& message, std::shared_mutex& mutex, std::vector<int>& sockets);
     template<typename Message>
     void heartbeat(const Message& message, std::shared_mutex& mutex, std::vector<int>& sockets) {
         std::thread thread([&, message]{
@@ -22,6 +21,15 @@ namespace heartbeater {
                 std::shared_lock lock(mutex);
                 for (const int socket : sockets)
                     network::sendPayload(socket, message);
+            }});
+        thread.detach();
+    }
+    template<typename Message>
+    void heartbeat(const Message& message, threshold_component& component) {
+        std::thread thread([&, message]{
+            while (true) {
+                std::this_thread::sleep_for(std::chrono::seconds(config::HEARTBEAT_SLEEP_SEC));
+                component.broadcast(message);
         }});
         thread.detach();
     }

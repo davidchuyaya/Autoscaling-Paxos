@@ -34,10 +34,10 @@ namespace Log {
      * the higher ballot is chosen. An uncommitted log only contains slots in which < F+1 acceptors agree upon the value.
      *
      * @param uncommittedLogs List of acceptor groups' uncommitted logs
-     * @return Merged uncommitted logs
+     * @return Merged uncommitted logs and a slot => acceptor group ID mapping
      */
-    std::tuple<pValueLog, std::unordered_map<int, int>>
-    mergeUncommittedLogs(const std::unordered_map<int, pValueLog>& uncommittedLogs);
+    std::tuple<pValueLog, std::unordered_map<int, std::string>>
+    mergeUncommittedLogs(const std::unordered_map<std::string, pValueLog>& uncommittedLogs);
     /**
      * Merge the logs of individual acceptors within the same acceptor group. The value at each slot is committed if all
      * acceptors hold that value; otherwise it is uncommitted and the value with the largest ballot is preserved.

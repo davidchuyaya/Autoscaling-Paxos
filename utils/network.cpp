@@ -135,12 +135,3 @@ std::optional<std::string> network::receivePayload(const int socketId) {
 
     return buffer;
 }
-
-std::string network::getIp() {
-#ifdef LOCAL
-    return config::LOCALHOST;
-#else
-    //TODO https://stackoverflow.com/questions/38679346/get-public-ip-address-on-current-ec2-instance
-    return "";
-#endif
-}
