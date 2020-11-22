@@ -29,6 +29,9 @@ jobs:
             cd protobuf-3.13.0
             sudo ./configure CXX=g++ CXXFLAGS='-std=c++17 -O3 -g'
             sudo make -j2
+        - name: Install protobuf
+          run: |
+            cd protobuf-3.13.0
             sudo make install
             sudo ldconfig
         - name: Building binaries w/ CMake
