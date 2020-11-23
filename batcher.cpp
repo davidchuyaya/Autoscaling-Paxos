@@ -5,11 +5,12 @@
 #include "batcher.hpp"
 
 batcher::batcher(const int id) : id(id), proposers(config::F+1) {
-    const std::thread server([&] {startServer(); });
+    std::thread server([&] {startServer(); });
+    server.detach();
     anna annaClient(config::KEY_BATCHERS, {config::KEY_PROPOSERS},
                     [&](const std::string& key, const two_p_set& twoPSet) {
-                        proposers.connectAndMaybeListen(twoPSet, config::PROPOSER_PORT_START, WhoIsThis_Sender_batcher, {});
-                    });
+    	proposers.connectAndMaybeListen(twoPSet, config::PROPOSER_PORT_START, WhoIsThis_Sender_batcher, {});
+    });
 
     heartbeater::heartbeat("i'm alive", clientMutex, clientSockets);
     pthread_exit(nullptr);
