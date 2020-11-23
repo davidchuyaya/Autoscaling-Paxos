@@ -7,7 +7,7 @@
 batcher::batcher(const int id) : id(id), proposers(config::F+1) {
     std::thread server([&] {startServer(); });
     server.detach();
-    anna annaClient(config::KEY_BATCHERS, {config::KEY_PROPOSERS},
+    annaClient = new anna(config::KEY_BATCHERS, {config::KEY_PROPOSERS},
                     [&](const std::string& key, const two_p_set& twoPSet) {
     	proposers.connectAndMaybeListen(twoPSet, config::PROPOSER_PORT_START, WhoIsThis_Sender_batcher, {});
     });

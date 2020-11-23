@@ -26,7 +26,9 @@ class batcher {
 public:
     batcher(int id);
 private:
-    int id = 0;
+    const int id = 0;
+    anna* annaClient;
+
     std::shared_mutex lastBatchTimeMutex;
     time_t lastBatchTime = 0;
 

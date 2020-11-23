@@ -19,6 +19,7 @@ class paxos {
 public:
     [[noreturn]] explicit paxos();
 private:
+	anna* annaClient;
     heartbeat_component batchers;
 
     [[noreturn]] void startServer();

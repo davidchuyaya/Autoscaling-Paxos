@@ -20,6 +20,8 @@ public:
     explicit unbatcher(int id);
 private:
     const int id;
+    anna* annaClient;
+
     std::shared_mutex ipToSocketMutex;
     std::unordered_map<std::string, int> ipToSocket = {};
 

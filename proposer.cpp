@@ -7,7 +7,7 @@ proposer::proposer(const int id, const int numAcceptorGroups) : id(id), proxyLea
     std::thread server([&] { startServer(); });
     server.detach();
     proposers.addSelfAsConnection();
-    anna annaClient(config::KEY_PROPOSERS,{config::KEY_PROPOSERS, config::KEY_ACCEPTOR_GROUPS},
+    annaClient = new anna(config::KEY_PROPOSERS,{config::KEY_PROPOSERS, config::KEY_ACCEPTOR_GROUPS},
                     [&](const std::string& key, const two_p_set& twoPSet) {
                         listenToAnna(key, twoPSet);
     });

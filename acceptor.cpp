@@ -8,9 +8,9 @@ acceptor::acceptor(const int id, std::string&& acceptorGroupId) : id(id), accept
     std::thread server([&]{startServer();});
     server.detach();
 
-    anna annaClient{};
-	annaClient.putSingletonSet(config::KEY_ACCEPTOR_GROUPS, acceptorGroupId);
-	annaClient.putSingletonSet(acceptorGroupId, config::IP_ADDRESS);
+    annaClient = new anna{};
+	annaClient->putSingletonSet(config::KEY_ACCEPTOR_GROUPS, acceptorGroupId);
+	annaClient->putSingletonSet(acceptorGroupId, config::IP_ADDRESS);
 
 	pthread_exit(nullptr);
 }

@@ -21,6 +21,7 @@ public:
 private:
     const int id;
     const std::string acceptorGroupId;
+    anna* annaClient;
 
     std::shared_mutex ballotMutex;
     Ballot highestBallot = {};
