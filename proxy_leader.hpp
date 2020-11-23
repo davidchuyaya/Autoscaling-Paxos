@@ -27,7 +27,7 @@ public:
     explicit proxy_leader(int id);
 private:
     const int id;
-    anna annaClient;
+    anna* annaClient;
 
     std::shared_mutex sentMessagesMutex;
     std::unordered_map<int, ProposerToAcceptor> sentMessages = {}; //key = message ID

@@ -4,12 +4,12 @@
 
 #include "proxy_leader.hpp"
 
-proxy_leader::proxy_leader(const int id) : id(id), unbatchers(config::F+1), proposers(config::F+1),
-    annaClient(config::KEY_PROXY_LEADERS,
-               {config::KEY_PROPOSERS, config::KEY_UNBATCHERS, config::KEY_ACCEPTOR_GROUPS},
-               [&](const std::string& key, const two_p_set& twoPSet) {
-        listenToAnna(key, twoPSet);
-    }){
+proxy_leader::proxy_leader(const int id) : id(id), unbatchers(config::F+1), proposers(config::F+1) {
+	annaClient = new anna{config::KEY_PROXY_LEADERS,
+					   {config::KEY_PROPOSERS, config::KEY_UNBATCHERS, config::KEY_ACCEPTOR_GROUPS},
+					   [&](const std::string& key, const two_p_set& twoPSet) {
+		listenToAnna(key, twoPSet);
+	}};
     heartbeater::heartbeat(message::createProxyLeaderHeartbeat(), proposers);
     pthread_exit(nullptr);
 }
@@ -42,10 +42,10 @@ void proxy_leader::processAcceptorGroup(const two_p_set& twoPSet) {
     const two_p_set& updates = acceptorGroupIdSet.updatesFrom(twoPSet);
     for (const std::string& newAcceptorGroupId : updates.getObserved()) {
         //find the IP addresses of acceptors in this group
-        annaClient.subscribeTo(newAcceptorGroupId);
+        annaClient->subscribeTo(newAcceptorGroupId);
     }
     for (const std::string& removedAcceptorGroupId : updates.getRemoved()) {
-        annaClient.unsubscribeFrom(removedAcceptorGroupId);
+        annaClient->unsubscribeFrom(removedAcceptorGroupId);
         //create 2p-set with all members removed, then merge it in to close all sockets. Then let it be GC'd
 	    std::unique_lock lock(acceptorMutex);
         if (!knowOfAcceptorGroup(removedAcceptorGroupId))
@@ -94,7 +94,7 @@ void proxy_leader::listenToProposer(const ProposerToAcceptor& payload) {
 	    std::unique_lock writeLock(acceptorMutex);
 	    acceptorGroupSockets[payload.acceptorgroupid()] = new threshold_component{2 * config::F + 1};
 	    writeLock.unlock();
-	    annaClient.subscribeTo(payload.acceptorgroupid()); //find the IP addresses of acceptors in this group
+	    annaClient->subscribeTo(payload.acceptorgroupid()); //find the IP addresses of acceptors in this group
 	    readLock.lock();
     }
     acceptorGroupSockets.at(payload.acceptorgroupid())->broadcast(payload);
