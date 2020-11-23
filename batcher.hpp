@@ -12,6 +12,7 @@
 #include <unordered_map>
 #include <unistd.h>
 #include <google/protobuf/message.h>
+
 #include "utils/config.hpp"
 #include "models/message.hpp"
 #include "utils/network.hpp"
@@ -31,6 +32,10 @@ private:
     std::shared_mutex payloadsMutex;
     std::unordered_map<std::string, std::string> clientToPayload = {};
     int numPayloads = 0;
+
+    std::shared_ptr<spdlog::logger> log = spdlog::basic_logger_mt("batcher_log", "log.txt", true);
+
+    LOGGER;
 
     threshold_component proposers;
 

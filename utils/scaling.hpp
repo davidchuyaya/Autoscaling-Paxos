@@ -18,10 +18,10 @@
 #include <aws/ec2/model/TagSpecification.h>
 
 namespace scaling {
-    void static startInstance(const std::string& command, const std::string& instanceName)
+    void static startInstance(const std::string& command, const std::string& instanceName, const std::string& instanceType)
     {
         std::stringstream ss;
-        ss << config::AWS_USER_DATA_SCRIPT << config::AWS_MAKE_EXEC << config::AWS_IP_ENV << config::AWS_ANNA_ROUTING_ENV << command;
+        ss << config::AWS_USER_DATA_SCRIPT << instanceType << "\n" << config::AWS_MAKE_EXEC << instanceType << "\n" << config::AWS_IP_ENV << config::AWS_ANNA_ROUTING_ENV << command;
         std::string userDataScript = ss.str();
         const auto userDataBase64 = Aws::Utils::Array((unsigned char*) userDataScript.c_str(), userDataScript.size());
 

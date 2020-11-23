@@ -4,7 +4,7 @@
 paxos::paxos(const int numCommands, const int numClients) : numCommands(numCommands), numClients(numClients),
 	isBenchmark(numCommands != 0), requestMutex(numClients), requestCV(numClients), request(numClients),
 	batchers(config::F+1) {
-    LOG("F: %d\n", config::F);
+    LOG("F: {}\n", config::F);
     std::thread server([&] {startServer(); });
     server.detach();
     annaClient = new anna({config::KEY_BATCHERS}, [&](const std::string& key, const two_p_set& twoPSet) {
@@ -24,12 +24,13 @@ paxos::paxos(const int numCommands, const int numClients) : numCommands(numComma
 	    benchmark();
 	    pthread_exit(nullptr);
     }
+}
 
-void paxos::startInstance(const std::string& command, const std::string& instanceName) {
+void paxos::startInstance(const std::string& command, const std::string& instanceName, const std::string& instanceType) {
     Aws::SDKOptions options;
     Aws::InitAPI(options);
     {
-        scaling::startInstance(command, instanceName);
+        scaling::startInstance(command, instanceName, instanceType);
     }
     Aws::ShutdownAPI(options);
 }

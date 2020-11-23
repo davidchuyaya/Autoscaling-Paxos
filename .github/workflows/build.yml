@@ -16,6 +16,12 @@ jobs:
           with:
             path: protobuf-3.13.0
             key: ${{ runner.os }}-protobuf
+        - name: Cache AWS Library
+          uses: actions/cache@v2
+          id: cache-aws
+          with:
+            path: aws-sdk-cpp-1.8.95
+            key: ${{ runner.os }}-aws-sdk-cpp-1.8.5
         - name: APT packages
           run: |
             sudo ./scripts/install_dependencies_for_building.sh
@@ -23,15 +29,22 @@ jobs:
           if: steps.cache-protobuf.outputs.cache-hit != 'true'
           run: |
             sudo ./scripts/download_protobuf.sh
+        - name: Build AWS Library
+          if: steps.cache-aws.outputs.cache-hit != 'true'
+          run: |
+            sudo ./scripts/download_aws.sh
         - name: Install protobuf
           run: |
             sudo ./scripts/install_protobuf.sh
-        - name: Building binaries w/ CMake
+        - name: Install AWS
+          run: |
+            sudo ./scripts/install_aws.sh
+        - name: Building w/ CMake
           run: |
             sudo ./scripts/build.sh
             sudo mkdir build
             find . -maxdepth 1 -type f  -executable | xargs -I {} sudo mv {} build
-        - name: Pushing binaries to S3
+        - name: Pushing Build Directory to S3
           uses: jakejarvis/s3-sync-action@master
           with:
             args: --acl public-read --delete

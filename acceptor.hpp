@@ -9,7 +9,10 @@
 #include <vector>
 #include <mutex>
 #include <thread>
+
+#include "utils/config.hpp"
 #include "models/log.hpp"
+#include "spdlog/spdlog.h"
 #include "utils/network.hpp"
 #include "models/message.hpp"
 #include "message.pb.h"
@@ -23,7 +26,9 @@ private:
     const std::string acceptorGroupId;
 	anna_write_only* annaWriteOnlyClient;
 
-    std::shared_mutex ballotMutex;
+    LOGGER;
+
+	std::shared_mutex ballotMutex;
     Ballot highestBallot = {};
 
     std::shared_mutex logMutex;
