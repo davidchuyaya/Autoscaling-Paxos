@@ -9,12 +9,15 @@
 #include <thread>
 #include <shared_mutex>
 #include <condition_variable>
+#include <mutex>
+#include <string>
 #include <numeric>
 #include <chrono>
 #include "utils/config.hpp"
 #include "acceptor.hpp"
 #include "batcher.hpp"
 #include "proposer.hpp"
+#include "utils/scaling.hpp"
 
 class paxos {
 public:
@@ -29,6 +32,8 @@ private:
     std::vector<std::shared_mutex> requestMutex;
     std::vector<std::condition_variable_any> requestCV;
     std::vector<std::optional<std::string>> request;
+
+    void startInstance(const std::string& command, const std::string& instanceName);
 
     [[noreturn]] void startServer();
     [[noreturn]] void readInput();

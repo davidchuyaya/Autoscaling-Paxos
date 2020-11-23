@@ -10,7 +10,7 @@
 #include <algorithm>
 #include <sstream>
 #include "lattices/core_lattices.hpp"
-#include "utils/config.hpp"
+#include "../utils/config.hpp"
 
 class two_p_set {
 public:

@@ -24,6 +24,14 @@ paxos::paxos(const int numCommands, const int numClients) : numCommands(numComma
 	    benchmark();
 	    pthread_exit(nullptr);
     }
+
+void paxos::startInstance(const std::string& command, const std::string& instanceName) {
+    Aws::SDKOptions options;
+    Aws::InitAPI(options);
+    {
+        scaling::startInstance(command, instanceName);
+    }
+    Aws::ShutdownAPI(options);
 }
 
 [[noreturn]]

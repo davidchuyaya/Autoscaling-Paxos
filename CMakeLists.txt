@@ -46,6 +46,8 @@ ADD_DEPENDENCIES(hydro-zmq zeromq zeromqcpp spdlog)
 LINK_DIRECTORIES(${ZEROMQ_LINK_DIRS} ${YAMLCPP_LINK_DIRS})
 
 # End Anna things -------------------------------------------------------------
+SET(BUILD_SHARED_LIBS on)
+find_package(AWSSDK REQUIRED COMPONENTS ec2)
 
 set(PROXY_LEADERS_SRC proxy_leader.cpp proxy_leader.hpp)
 set(BATCHERS_SRC batcher.cpp batcher.hpp)
@@ -65,7 +67,7 @@ add_executable(proposer ${PROPOSER_SRC} ${UTILS_SRC} ${STORAGE_SRC} ${MODELS_SRC
 add_executable(proxy_leader ${PROXY_LEADERS_SRC} ${UTILS_SRC} ${STORAGE_SRC} ${MODELS_SRC})
 add_executable(unbatcher ${UNBATCHER_SRC} ${UTILS_SRC} ${STORAGE_SRC} ${MODELS_SRC})
 
-target_link_libraries(Autoscaling_Paxos proto hydro-zmq zmq yaml-cpp pthread ${PROTOBUF_LIBRARY})
+target_link_libraries(Autoscaling_Paxos proto hydro-zmq zmq yaml-cpp pthread ${PROTOBUF_LIBRARY} ${AWSSDK_LINK_LIBRARIES})
 target_link_libraries(acceptor proto hydro-zmq zmq yaml-cpp pthread ${PROTOBUF_LIBRARY})
 target_link_libraries(batcher proto hydro-zmq zmq yaml-cpp pthread ${PROTOBUF_LIBRARY})
 target_link_libraries(proposer proto hydro-zmq zmq yaml-cpp pthread ${PROTOBUF_LIBRARY})

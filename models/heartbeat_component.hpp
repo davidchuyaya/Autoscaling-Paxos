@@ -12,7 +12,8 @@
 #include <thread>
 #include <functional>
 #include <algorithm>
-#include "lib/storage/two_p_set.hpp"
+
+#include "../lib/storage/two_p_set.hpp"
 #include "message.pb.h"
 #include "../utils/network.hpp"
 #include "message.hpp"
