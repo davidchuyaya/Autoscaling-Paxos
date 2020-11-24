@@ -23,7 +23,7 @@ void two_p_set::merge(const two_p_set& other) {
     removed.insert(other.removed.begin(), other.removed.end());
 }
 
-std::string two_p_set::mergeAndStripKey(std::string key, const SetLattice<std::string>& set) {
+std::string two_p_set::mergeAndUnprefixKey(std::string key, const SetLattice<std::string>& set) {
     const std::unordered_set<std::string>& revealed = set.reveal();
 
     auto observedPrefixPos = key.find(config::KEY_OBSERVED_PREFIX);
@@ -62,4 +62,16 @@ bool two_p_set::empty() const {
     return std::all_of(observed.begin(), observed.end(), [&](const std::string& elem){
         return removed.find(elem) != removed.end(); //removed.contains(elem)
     });
+}
+
+std::string two_p_set::printSet() const {
+	std::stringstream out;
+	out << "Observed: {";
+	for (const std::string& s : observed)
+		out << s << ", ";
+	out << "}. Removed: {";
+	for (const std::string& s : removed)
+		out << s << ", ";
+	out << "}";
+	return out.str();
 }

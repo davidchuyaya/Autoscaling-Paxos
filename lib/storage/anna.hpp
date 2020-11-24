@@ -32,11 +32,14 @@ private:
     std::shared_mutex keysToListenToMutex;
     std::unordered_set<std::string> keysToListenTo = {};
 
+    std::shared_mutex requestedKeysMutex;
+    std::unordered_set<std::string> requestedKeys = {};
+
     [[noreturn]]
     void listenerThread(const std::function<void(const std::string&, const two_p_set&)>& listener); //TODO don't just listen to 2p-sets?
     [[noreturn]]
     void periodicGet2PSet();
-    void putLattice(const std::string& key, const SetLattice<std::string>& lattice);
+    void putLattice(const std::string& prefixedKey, const SetLattice<std::string>& lattice);
 };
 
 #endif //AUTOSCALING_PAXOS_ANNA_HPP

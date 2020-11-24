@@ -58,12 +58,18 @@ void anna::listenerThread(const std::function<void(const std::string&, const two
             if (response.type() != GET)
                 continue;
             for (const KeyTuple& keyTuple : response.tuples()) {
+	            std::unique_lock requestedKeysLock(requestedKeysMutex);
+	            requestedKeys.erase(keyTuple.key());
+	            requestedKeysLock.unlock();
+
                 if (keyTuple.lattice_type() != SET)
                     continue;
 
                 two_p_set twoPset;
-                const std::string& strippedKey = twoPset.mergeAndStripKey(keyTuple.key(), deserialize_set(keyTuple.payload()));
-                listener(strippedKey, twoPset);
+	            const std::string& key = twoPset.mergeAndUnprefixKey(keyTuple.key(),
+																  deserialize_set(keyTuple.payload()));
+	            LOG("Received set with key %s: %s\n", key.c_str(), twoPset.printSet().c_str());
+	            listener(key, twoPset);
             }
         }
         std::this_thread::sleep_for(std::chrono::seconds(config::ZMQ_RECEIVE_RETRY_SEC));
@@ -75,15 +81,24 @@ void anna::periodicGet2PSet() {
 	    std::this_thread::sleep_for(std::chrono::seconds(config::ANNA_RECHECK_SEC));
 
 	    std::shared_lock keysLock(keysToListenToMutex, std::defer_lock);
-	    std::scoped_lock lock(keysLock, clientMutex);
+	    std::scoped_lock lock(keysLock, clientMutex, requestedKeysMutex);
         for (const std::string& key : keysToListenTo) {
-            client.get_async(config::KEY_OBSERVED_PREFIX + key);
-            client.get_async(config::KEY_REMOVED_PREFIX + key);
+        	//only request keys if we've heard a response for it
+	        const std::string& observedKey = config::KEY_OBSERVED_PREFIX + key;
+	        if (requestedKeys.find(observedKey) == requestedKeys.end()) {
+		        client.get_async(observedKey);
+		        requestedKeys.emplace(observedKey);
+	        }
+	        const std::string& removedKey = config::KEY_REMOVED_PREFIX + key;
+	        if (requestedKeys.find(removedKey) == requestedKeys.end()) {
+		        client.get_async(removedKey);
+		        requestedKeys.emplace(removedKey);
+	        }
         }
     }
 }
 
-void anna::putLattice(const std::string& key, const SetLattice<std::string>& lattice) {
+void anna::putLattice(const std::string& prefixedKey, const SetLattice<std::string>& lattice) {
 	std::unique_lock lock(clientMutex);
-    client.put_async(key, serialize(lattice), SET);
+    client.put_async(prefixedKey, serialize(lattice), SET);
 }
