@@ -18,26 +18,17 @@ jobs:
             key: ${{ runner.os }}-protobuf
         - name: APT packages
           run: |
-            sudo apt-get update
-            sudo apt-get install -y unzip ca-certificates apt-transport-https libpq-dev libzmq3-dev build-essential
-            sudo snap install cmake --classic
+            sudo ./scripts/install_dependencies_for_building.sh
         - name: Build protobuf library
           if: steps.cache-protobuf.outputs.cache-hit != 'true'
           run: |
-            sudo wget https://github.com/protocolbuffers/protobuf/releases/download/v3.13.0/protobuf-all-3.13.0.zip
-            sudo unzip protobuf-all-3.13.0.zip
-            cd protobuf-3.13.0
-            sudo ./configure CXX=g++ CXXFLAGS='-std=c++17 -O3 -g'
-            sudo make -j2
+            sudo ./scripts/download_protobuf.sh
         - name: Install protobuf
           run: |
-            cd protobuf-3.13.0
-            sudo make install
-            sudo ldconfig
+            sudo ./scripts/install_protobuf.sh
         - name: Building binaries w/ CMake
           run: |
-            sudo cmake -DCMAKE_CXX_COMPILER=/usr/bin/g++ .
-            sudo cmake --build . --target all -- -j 2
+            sudo ./scripts/build.sh
             sudo mkdir build
             find . -maxdepth 1 -type f  -executable | xargs -I {} sudo mv {} build
             sudo mv libhydro-zmq.a build
@@ -51,4 +42,4 @@ jobs:
             AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
             AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
             AWS_REGION: ${{ secrets.AWS_REGION }}
-            SOURCE_DIR: "build"
+            SOURCE_DIR: build
