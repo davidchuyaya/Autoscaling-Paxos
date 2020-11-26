@@ -19,8 +19,23 @@ void paxos::startServer() {
     network::startServerAtPort(config::CLIENT_PORT,
        [](const int socket, const WhoIsThis_Sender& whoIsThis) {
             LOG("Main connected to unbatcher\n");
-    }, [](const int socket, const WhoIsThis_Sender& whoIsThis, const std::string& payload) {
+    }, [&](const int socket, const WhoIsThis_Sender& whoIsThis, const std::string& payload) {
             LOG("--Acked: {%s}--\n", payload.c_str());
+
+            std::unique_lock lock(requestMutex);
+            if (request.has_value()) {
+            	if (request.value() == payload) {
+		            request.reset();
+		            lock.unlock();
+		            requestCV.notify_all();
+	            }
+            	else {
+		            LOG("Unexpected payload from unbatcher: {%s} when previous request was {%s}\n",
+		                payload.c_str(), request.value().c_str());
+	            }
+            }
+            else
+	            LOG("Unexpected payload from unbatcher: {%s} when previous request DNE\n", payload.c_str());
     });
 }
 
@@ -29,9 +44,12 @@ void paxos::readInput() {
     while (true) {
         std::string input;
         std::cin >> input;
-        //TODO do not resend until current value is acked
-        const ClientToBatcher& request = message::createClientRequest(config::IP_ADDRESS, input);
-        batchers.send(request);
+        batchers.send(message::createClientRequest(config::IP_ADDRESS, input));
+
+	    std::unique_lock lock(requestMutex);
+	    request.emplace(input);
+	    LOG("Waiting for ACK, do not input...\n");
+	    requestCV.wait(lock, [&]{return request->empty();});
     }
 }
 

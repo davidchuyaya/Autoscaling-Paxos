@@ -7,7 +7,8 @@
 
 #include <iostream>
 #include <thread>
-#include <mutex>
+#include <shared_mutex>
+#include <condition_variable>
 #include <numeric>
 
 #include "utils/config.hpp"
@@ -21,6 +22,10 @@ public:
 private:
 	anna* annaClient;
     heartbeat_component batchers;
+
+    std::shared_mutex requestMutex;
+    std::condition_variable_any requestCV;
+    std::optional<std::string> request;
 
     [[noreturn]] void startServer();
     [[noreturn]] void readInput();
