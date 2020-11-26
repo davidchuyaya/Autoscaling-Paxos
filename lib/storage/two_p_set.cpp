@@ -44,7 +44,7 @@ two_p_set two_p_set::updatesFrom(const two_p_set& other) const {
     std::set_difference(other.observed.begin(), other.observed.end(), observed.begin(), observed.end(),
                         std::inserter(outputObserved, outputObserved.end()));
     std::set_difference(other.removed.begin(), other.removed.end(), removed.begin(), removed.end(),
-                        std::inserter(outputObserved, outputObserved.end()));
+                        std::inserter(outputRemoved, outputRemoved.end()));
     return {outputObserved, outputRemoved};
 }
 

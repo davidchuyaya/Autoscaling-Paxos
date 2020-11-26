@@ -16,7 +16,7 @@ void heartbeat_component::connectAndListen(const two_p_set& newMembers, const in
 	const two_p_set& updates = members.updatesFrom(newMembers);
 	if (updates.empty())
 		return;
-	members.merge(newMembers);
+	members.merge(updates);
 	membersLock.unlock();
 
     for (const std::string& ip : updates.getObserved()) {

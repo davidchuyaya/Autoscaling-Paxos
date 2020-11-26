@@ -13,7 +13,7 @@ void threshold_component::connectAndMaybeListen(const two_p_set& newMembers, con
 	const two_p_set& updates = members.updatesFrom(newMembers);
 	if (updates.empty())
 		return;
-	members.merge(newMembers);
+	members.merge(updates);
 	membersLock.unlock();
 
 	for (const std::string& ip : updates.getObserved()) {
