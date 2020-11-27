@@ -5,14 +5,11 @@
 #include "acceptor.hpp"
 
 acceptor::acceptor(const int id, std::string&& acceptorGroupId) : id(id), acceptorGroupId(acceptorGroupId) {
-    std::thread server([&]{startServer();});
-    server.detach();
-
 	annaWriteOnlyClient = new anna_write_only{};
 	annaWriteOnlyClient->putSingletonSet(config::KEY_ACCEPTOR_GROUPS, acceptorGroupId);
 	annaWriteOnlyClient->putSingletonSet(acceptorGroupId, config::IP_ADDRESS);
 
-	pthread_exit(nullptr);
+	startServer();
 }
 
 [[noreturn]]

@@ -19,9 +19,7 @@ proposer::proposer(const int id, const int numAcceptorGroups) : id(id), numAccep
     lock.unlock();
     LOG("Acceptor group threshold met\n");
 
-    std::thread checkLeader([&] { leaderLoop(); });
-    checkLeader.detach();
-    pthread_exit(nullptr);
+    leaderLoop();
 }
 
 [[noreturn]]

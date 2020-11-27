@@ -10,8 +10,7 @@ proxy_leader::proxy_leader(const int id) : id(id), unbatchers(config::F+1), prop
 					   [&](const std::string& key, const two_p_set& twoPSet) {
 		listenToAnna(key, twoPSet);
 	}};
-    heartbeater::heartbeat(message::createProxyLeaderHeartbeat(), proposers);
-    pthread_exit(nullptr);
+    heartbeater::mainThreadHeartbeat(message::createProxyLeaderHeartbeat(), proposers);
 }
 
 void proxy_leader::listenToAnna(const std::string& key, const two_p_set& twoPSet) {

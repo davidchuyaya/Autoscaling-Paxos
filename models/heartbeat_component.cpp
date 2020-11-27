@@ -51,6 +51,7 @@ void heartbeat_component::addConnection(const int socket) {
 		std::scoped_lock lock(componentMutex, heartbeatMutex);
 		components.emplace_back(socket);
 		//add 1st heartbeat immediately after connection is made
+		LOG("Heartbeat added for socket: %d\n", socket);
 		time(&heartbeats[socket]);
 
 		//check threshold

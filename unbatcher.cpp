@@ -5,14 +5,11 @@
 #include "unbatcher.hpp"
 
 unbatcher::unbatcher(const int id) : id(id) {
-    std::thread server([&] {startServer(); });
-    server.detach();
-
 	annaWriteOnlyClient = new anna_write_only{};
 	annaWriteOnlyClient->putSingletonSet(config::KEY_UNBATCHERS, config::IP_ADDRESS);
 
     heartbeater::heartbeat("i'm alive", proxyLeaderMutex, proxyLeaders);
-    pthread_exit(nullptr);
+	startServer();
 }
 
 void unbatcher::startServer() {

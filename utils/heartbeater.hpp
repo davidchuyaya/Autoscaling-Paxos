@@ -26,26 +26,16 @@ namespace heartbeater {
     }
     template<typename Message>
     void heartbeat(const Message& message, threshold_component& component) {
-        std::thread thread([&, message]{
-            while (true) {
-                std::this_thread::sleep_for(std::chrono::seconds(config::HEARTBEAT_SLEEP_SEC));
-                component.broadcast(message);
-        }});
+        std::thread thread([&, message]{mainThreadHeartbeat(message, component);});
         thread.detach();
     }
-    template<typename Message>
-    void heartbeat(const Message& message, std::shared_mutex& mutex, std::unordered_map<int, int>& sockets);
-    template<typename Message>
-    void heartbeat(const Message& message, std::shared_mutex& mutex, std::unordered_map<int, int>& sockets) {
-        std::thread thread([&, message]{
-            while (true) {
-                std::this_thread::sleep_for(std::chrono::seconds(config::HEARTBEAT_SLEEP_SEC));
-                std::shared_lock lock(mutex);
-                for (const auto& [something, socket] : sockets)
-                    network::sendPayload(socket, message);
-        }});
-        thread.detach();
-    }
+	template<typename Message>
+	[[noreturn]] void mainThreadHeartbeat(const Message& message, threshold_component& component) {
+		while (true) {
+			std::this_thread::sleep_for(std::chrono::seconds(config::HEARTBEAT_SLEEP_SEC));
+			component.broadcast(message);
+		}
+	}
 };
 
 
