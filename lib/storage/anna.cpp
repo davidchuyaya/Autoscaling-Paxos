@@ -8,10 +8,9 @@
 ZmqUtil zmq_util;
 ZmqUtilInterface *kZmqUtil = &zmq_util;
 
-anna::anna() : client({UserRoutingThread(config::ANNA_ROUTING_ADDRESS, 0)}, config::IP_ADDRESS) {}
-
 anna::anna(const std::unordered_set<std::string>& initialKeysToListenTo,
-           const std::function<void(const std::string&, const two_p_set&)>& listener) : anna() {
+           const annaListener& listener) :
+           client({UserRoutingThread(config::ANNA_ROUTING_ADDRESS, 0)}, config::IP_ADDRESS) {
     keysToListenTo = initialKeysToListenTo;
     std::thread receive([&]{ listenerThread(listener);});
     receive.detach();
@@ -20,21 +19,17 @@ anna::anna(const std::unordered_set<std::string>& initialKeysToListenTo,
 }
 
 anna::anna(const std::string& key, const std::unordered_set<std::string>& keysToListenTo,
-           const std::function<void(const std::string&, const two_p_set&)>& listener) : anna(keysToListenTo, listener) {
+           const annaListener& listener) : anna(keysToListenTo, listener) {
 	putSingletonSet(key, config::IP_ADDRESS);
 }
 
-void anna::put2Pset(const std::string& key, const two_p_set& twoPSet) {
-    if (!twoPSet.getObserved().empty())
-        putLattice(config::KEY_OBSERVED_PREFIX + key, twoPSet.getObserved());
-    if (!twoPSet.getRemoved().empty())
-        putLattice(config::KEY_REMOVED_PREFIX + key, twoPSet.getRemoved());
+void anna::putSingletonSet(const std::string& key, const std::string& value) {
+	putLattice(config::KEY_OBSERVED_PREFIX + key, {value});
 }
 
-void anna::putSingletonSet(const std::string& key, const std::string& value) {
-	two_p_set set;
-	set.add(value);
-	put2Pset(key, set);
+void anna::putLattice(const std::string& prefixedKey, const std::unordered_set<std::string>& lattice) {
+	std::unique_lock lock(clientMutex);
+	client.put_async(prefixedKey, serialize(lattice), SET);
 }
 
 void anna::subscribeTo(const std::string& key) {
@@ -55,8 +50,10 @@ void anna::listenerThread(const std::function<void(const std::string&, const two
         lock.unlock();
 
         for (const KeyResponse& response : responses) {
-            if (response.type() != GET)
-                continue;
+            if (response.type() != GET) {
+	            LOG("PUT response received: %s\n", response.ShortDebugString().c_str());
+	            continue;
+            }
             for (const KeyTuple& keyTuple : response.tuples()) {
 	            std::unique_lock requestedKeysLock(requestedKeysMutex);
 	            requestedKeys.erase(keyTuple.key());
@@ -96,9 +93,4 @@ void anna::periodicGet2PSet() {
 	        }
         }
     }
-}
-
-void anna::putLattice(const std::string& prefixedKey, const SetLattice<std::string>& lattice) {
-	std::unique_lock lock(clientMutex);
-    client.put_async(prefixedKey, serialize(lattice), SET);
 }

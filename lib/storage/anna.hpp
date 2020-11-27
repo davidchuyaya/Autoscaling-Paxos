@@ -13,14 +13,12 @@
 #include "two_p_set.hpp"
 #include "utils/config.hpp"
 
+using annaListener = std::function<void(const std::string&, const two_p_set&)>;
+
 class anna {
 public:
-    explicit anna();
-    anna(const std::unordered_set<std::string>& keysToListenTo,
-         const std::function<void(const std::string&, const two_p_set&)>& listener);
-    anna(const std::string& key, const std::unordered_set<std::string>& keysToListenTo,
-         const std::function<void(const std::string&, const two_p_set&)>& listener);
-    void put2Pset(const std::string& key, const two_p_set& twoPSet);
+    anna(const std::unordered_set<std::string>& keysToListenTo, const annaListener& listener);
+    anna(const std::string& key, const std::unordered_set<std::string>& keysToListenTo, const annaListener& listener);
 	void putSingletonSet(const std::string& key, const std::string& value);
     void subscribeTo(const std::string& key);
     void unsubscribeFrom(const std::string& key);
@@ -36,10 +34,10 @@ private:
     std::unordered_set<std::string> requestedKeys = {};
 
     [[noreturn]]
-    void listenerThread(const std::function<void(const std::string&, const two_p_set&)>& listener); //TODO don't just listen to 2p-sets?
+    void listenerThread(const annaListener& listener);
     [[noreturn]]
     void periodicGet2PSet();
-    void putLattice(const std::string& prefixedKey, const SetLattice<std::string>& lattice);
+    void putLattice(const std::string& prefixedKey, const std::unordered_set<std::string>& lattice);
 };
 
 #endif //AUTOSCALING_PAXOS_ANNA_HPP
