@@ -41,10 +41,12 @@ std::string two_p_set::mergeAndUnprefixKey(std::string key, const SetLattice<std
 two_p_set two_p_set::updatesFrom(const two_p_set& other) const {
     std::unordered_set<std::string> outputObserved;
     std::unordered_set<std::string> outputRemoved;
-    std::set_difference(other.observed.begin(), other.observed.end(), observed.begin(), observed.end(),
-                        std::inserter(outputObserved, outputObserved.end()));
-    std::set_difference(other.removed.begin(), other.removed.end(), removed.begin(), removed.end(),
-                        std::inserter(outputRemoved, outputRemoved.end()));
+	for (const std::string& s : other.observed)
+		if (observed.find(s) == observed.end())
+			outputObserved.insert(s);
+	for (const std::string& s : other.removed)
+		if (removed.find(s) == removed.end())
+			outputRemoved.insert(s);
     return {outputObserved, outputRemoved};
 }
 

@@ -32,6 +32,7 @@ public:
     explicit proposer(int id, int numAcceptorGroups); //TODO once matchmakers are integrated, numAcceptorGroups is dynamic
 private:
     const int id; // 0 indexed, no gaps
+    const int numAcceptorGroups;
     anna* annaClient;
 
     std::shared_mutex ballotMutex;

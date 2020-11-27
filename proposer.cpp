@@ -3,7 +3,8 @@
 //
 #include "proposer.hpp"
 
-proposer::proposer(const int id, const int numAcceptorGroups) : id(id), proxyLeaders(config::F+1), proposers(config::F+1) {
+proposer::proposer(const int id, const int numAcceptorGroups) : id(id), numAcceptorGroups(numAcceptorGroups),
+	proxyLeaders(config::F+1), proposers(config::F+1) {
     std::thread server([&] { startServer(); });
     server.detach();
     proposers.addSelfAsConnection();
@@ -16,6 +17,7 @@ proposer::proposer(const int id, const int numAcceptorGroups) : id(id), proxyLea
     std::unique_lock lock(acceptorMutex);
     acceptorCV.wait(lock, [&]{ return acceptorGroupIds.size() >= numAcceptorGroups; });
     lock.unlock();
+    LOG("Acceptor group threshold met\n");
 
     std::thread checkLeader([&] { leaderLoop(); });
     checkLeader.detach();
@@ -58,6 +60,8 @@ void proposer::listenToAnna(const std::string& key, const two_p_set& twoPSet) {
     } else if (key == config::KEY_ACCEPTOR_GROUPS) {
         // merge new acceptor group IDs
         const two_p_set& updates = acceptorGroupIdSet.updatesFrom(twoPSet);
+        if (updates.empty())
+	        return;
 
         std::unique_lock lock(acceptorMutex);
         for (const std::string& acceptorGroupId : updates.getObserved()) {
@@ -68,6 +72,12 @@ void proposer::listenToAnna(const std::string& key, const two_p_set& twoPSet) {
             acceptorGroupIds.erase(std::remove(acceptorGroupIds.begin(), acceptorGroupIds.end(), acceptorGroupId), acceptorGroupIds.end());
         }
         acceptorGroupIdSet.merge(updates);
+
+        //awaken main thread if we're past the threshold
+        if (acceptorGroupIds.size() >= numAcceptorGroups) {
+        	lock.unlock();
+	        acceptorCV.notify_all();
+        }
     }
 }
 

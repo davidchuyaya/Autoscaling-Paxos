@@ -26,7 +26,7 @@ void heartbeat_component::connectAndListen(const two_p_set& newMembers, const in
             std::unique_lock lock(ipToSocketMutex);
             ipToSocket[ip] = socket;
             lock.unlock();
-            addConnection(socket);
+            heartbeat_component::addConnection(socket); //TODO figure out why virtual func isn't working normally
             network::listenToSocketUntilClose(socket, listener);
         });
         thread.detach();
@@ -46,14 +46,12 @@ void heartbeat_component::connectAndListen(const two_p_set& newMembers, const in
     }
 }
 
-void heartbeat_component::addConnection(int socket) {
+void heartbeat_component::addConnection(const int socket) {
 	{
 		std::scoped_lock lock(componentMutex, heartbeatMutex);
 		components.emplace_back(socket);
 		//add 1st heartbeat immediately after connection is made
-		time_t now;
-		time(&now);
-		heartbeats[socket] = now;
+		time(&heartbeats[socket]);
 
 		//check threshold
 		if (!thresholdMet())
@@ -88,7 +86,6 @@ void heartbeat_component::checkHeartbeats() {
         time(&now);
 
         //if a node has no recent heartbeat, move it into the slow list
-        std::vector<int> slowedComponents = {};
         auto iterator = components.begin();
         while (iterator != components.end()) {
             const int socket = *iterator;
@@ -96,7 +93,6 @@ void heartbeat_component::checkHeartbeats() {
                 LOG("Node failed to heartbeat\n");
                 slowComponents.emplace_back(socket);
                 iterator = components.erase(iterator);
-                slowedComponents.emplace_back(socket);
             }
             else
                 ++iterator;
@@ -106,7 +102,7 @@ void heartbeat_component::checkHeartbeats() {
         iterator = slowComponents.begin();
         while (iterator != slowComponents.end()) {
             const int socket = *iterator;
-            if (difftime(now, heartbeats[socket]) > config::HEARTBEAT_TIMEOUT_SEC) {
+            if (difftime(now, heartbeats[socket]) < config::HEARTBEAT_TIMEOUT_SEC) {
                 components.emplace_back(socket);
                 iterator = slowComponents.erase(iterator);
             }
