@@ -24,6 +24,7 @@ public:
     explicit heartbeat_component(int waitThreshold);
     void connectAndListen(const two_p_set& newMembers, int port, const WhoIsThis_Sender& whoIsThis,
                           const std::function<void(int, const std::string&)>& listener);
+	void addConnection(int socket) override;
     template<typename Message> void send(const Message& payload) {
         std::shared_lock lock(componentMutex);
         if (!canSend) { //block if not enough connections

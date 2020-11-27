@@ -16,7 +16,7 @@ unbatcher::unbatcher(const int id) : id(id) {
 }
 
 void unbatcher::startServer() {
-    network::startServerAtPort(config::UNBATCHER_PORT_START + id,
+    network::startServerAtPort(config::UNBATCHER_PORT,
        [&](const int socket, const WhoIsThis_Sender& whoIsThis) {
            LOG("Unbatcher %d connected to proxy leader\n", id);
            std::unique_lock lock(proxyLeaderMutex);

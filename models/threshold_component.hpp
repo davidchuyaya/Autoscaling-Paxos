@@ -24,7 +24,7 @@ public:
     explicit threshold_component(int waitThreshold);
     void connectAndMaybeListen(const two_p_set& newMembers, int port, const WhoIsThis_Sender& whoIsThis,
                                const std::optional<std::function<void(int, const std::string&)>>& listener);
-    void addConnection(int socket);
+    virtual void addConnection(int socket);
     void addSelfAsConnection();
     template<typename Message> void broadcast(const Message& payload) {
         std::shared_lock lock(componentMutex);

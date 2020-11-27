@@ -17,7 +17,7 @@ acceptor::acceptor(const int id, std::string&& acceptorGroupId) : id(id), accept
 
 [[noreturn]]
 void acceptor::startServer() {
-    network::startServerAtPort(config::ACCEPTOR_PORT_START,
+    network::startServerAtPort(config::ACCEPTOR_PORT,
        [&](const int socket, const WhoIsThis_Sender& whoIsThis) {
             LOG("Acceptor [%s, %d] connected to proxy leader\n", acceptorGroupId.c_str(), id);
         }, [&](const int socket, const WhoIsThis_Sender& whoIsThis, const std::string& payloadString) {

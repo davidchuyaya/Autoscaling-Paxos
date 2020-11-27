@@ -20,13 +20,12 @@
 
 namespace config {
     const static int F = 1;
-    const static int NUM_ACCEPTOR_GROUPS = 2;
     const static int THRESHOLD_BATCH_SIZE = 2;
     const static int CLIENT_PORT = 10000;
-    const static int PROPOSER_PORT_START = 11000;
-    const static int ACCEPTOR_PORT_START = 12000;
-    const static int BATCHER_PORT_START = 13000;
-    const static int UNBATCHER_PORT_START = 14000;
+    const static int PROPOSER_PORT = 11000;
+    const static int ACCEPTOR_PORT = 12000;
+    const static int BATCHER_PORT = 13000;
+    const static int UNBATCHER_PORT = 14000;
 
     //TODO Store result from "curl http://169.254.169.254/latest/meta-data/public-ipv4" into env
     const static inline std::string IP_ADDRESS = std::getenv("IP");

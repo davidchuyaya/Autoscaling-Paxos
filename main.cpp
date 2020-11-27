@@ -6,7 +6,7 @@ paxos::paxos() : batchers(config::F+1) {
     LOG("F: %d\n", config::F);
     const std::thread server([&] {startServer(); });
     annaClient = new anna({config::KEY_BATCHERS}, [&](const std::string& key, const two_p_set& twoPSet) {
-        batchers.connectAndListen(twoPSet, config::BATCHER_PORT_START, WhoIsThis_Sender_client,
+        batchers.connectAndListen(twoPSet, config::BATCHER_PORT, WhoIsThis_Sender_client,
                                   [&](const int socket, const std::string& payload) {
             batchers.addHeartbeat(socket);
         });

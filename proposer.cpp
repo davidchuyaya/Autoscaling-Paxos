@@ -51,7 +51,7 @@ void proposer::leaderLoop() {
 void proposer::listenToAnna(const std::string& key, const two_p_set& twoPSet) {
     if (key == config::KEY_PROPOSERS) {
         // connect to new proposer
-        proposers.connectAndMaybeListen(twoPSet, config::PROPOSER_PORT_START, WhoIsThis_Sender_proposer,
+        proposers.connectAndMaybeListen(twoPSet, config::PROPOSER_PORT, WhoIsThis_Sender_proposer,
                                         [&](const int socket, const std::string& payload){
                                             listenToProposer();
         });
@@ -73,7 +73,7 @@ void proposer::listenToAnna(const std::string& key, const two_p_set& twoPSet) {
 
 [[noreturn]]
 void proposer::startServer() {
-    network::startServerAtPort(config::PROPOSER_PORT_START,
+    network::startServerAtPort(config::PROPOSER_PORT,
            [&](const int socket, const WhoIsThis_Sender& whoIsThis) {
             switch (whoIsThis) {
                 case WhoIsThis_Sender_batcher:

@@ -9,7 +9,7 @@ batcher::batcher(const int id) : id(id), proposers(config::F+1) {
     server.detach();
     annaClient = new anna(config::KEY_BATCHERS, {config::KEY_PROPOSERS},
                     [&](const std::string& key, const two_p_set& twoPSet) {
-    	proposers.connectAndMaybeListen(twoPSet, config::PROPOSER_PORT_START, WhoIsThis_Sender_batcher, {});
+    	proposers.connectAndMaybeListen(twoPSet, config::PROPOSER_PORT, WhoIsThis_Sender_batcher, {});
     });
 
     heartbeater::heartbeat("i'm alive", clientMutex, clientSockets);
@@ -18,7 +18,7 @@ batcher::batcher(const int id) : id(id), proposers(config::F+1) {
 
 [[noreturn]]
 void batcher::startServer() {
-    network::startServerAtPort(config::BATCHER_PORT_START,
+    network::startServerAtPort(config::BATCHER_PORT,
        [&](const int socket, const WhoIsThis_Sender& whoIsThis) {
            LOG("Batcher %d connected to client\n", id);
            std::unique_lock lock(clientMutex);

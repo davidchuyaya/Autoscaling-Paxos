@@ -46,6 +46,22 @@ void heartbeat_component::connectAndListen(const two_p_set& newMembers, const in
     }
 }
 
+void heartbeat_component::addConnection(int socket) {
+	{
+		std::scoped_lock lock(componentMutex, heartbeatMutex);
+		components.emplace_back(socket);
+		//add 1st heartbeat immediately after connection is made
+		time_t now;
+		time(&now);
+		heartbeats[socket] = now;
+
+		//check threshold
+		if (!thresholdMet())
+			return;
+	}
+	componentCV.notify_all();
+}
+
 bool heartbeat_component::thresholdMet() {
     return components.size() + slowComponents.size() >= waitThreshold;
 }

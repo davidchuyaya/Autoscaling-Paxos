@@ -16,7 +16,7 @@ proxy_leader::proxy_leader(const int id) : id(id), unbatchers(config::F+1), prop
 
 void proxy_leader::listenToAnna(const std::string& key, const two_p_set& twoPSet) {
     if (key == config::KEY_PROPOSERS) {
-        proposers.connectAndMaybeListen(twoPSet, config::PROPOSER_PORT_START, WhoIsThis_Sender_proxyLeader,
+        proposers.connectAndMaybeListen(twoPSet, config::PROPOSER_PORT, WhoIsThis_Sender_proxyLeader,
                                         [&](const int socket, const std::string& payloadString) {
             ProposerToAcceptor payload;
             payload.ParseFromString(payloadString);
@@ -24,7 +24,7 @@ void proxy_leader::listenToAnna(const std::string& key, const two_p_set& twoPSet
         });
     }
     else if (key == config::KEY_UNBATCHERS) {
-        unbatchers.connectAndListen(twoPSet, config::UNBATCHER_PORT_START, WhoIsThis_Sender_proxyLeader,
+        unbatchers.connectAndListen(twoPSet, config::UNBATCHER_PORT, WhoIsThis_Sender_proxyLeader,
                                     [&](const int socket, const std::string& payload) {
             unbatchers.addHeartbeat(socket);
         });
@@ -52,7 +52,7 @@ void proxy_leader::processAcceptorGroup(const two_p_set& twoPSet) {
 	        continue;
         threshold_component* acceptors = acceptorGroupSockets.at(removedAcceptorGroupId);
         two_p_set allMembersRemoved = {{}, acceptors->getMembers().getObserved()};
-        acceptors->connectAndMaybeListen(allMembersRemoved, config::ACCEPTOR_PORT_START,
+        acceptors->connectAndMaybeListen(allMembersRemoved, config::ACCEPTOR_PORT,
 										WhoIsThis_Sender_proxyLeader, {});
         acceptorGroupSockets.erase(removedAcceptorGroupId);
 	    free(acceptors);
@@ -72,7 +72,7 @@ void proxy_leader::processAcceptors(const std::string& acceptorGroupId, const tw
 	}
 
 	threshold_component* acceptors = acceptorGroupSockets.at(acceptorGroupId);
-	acceptors->connectAndMaybeListen(twoPSet, config::ACCEPTOR_PORT_START, WhoIsThis_Sender_proxyLeader,
+	acceptors->connectAndMaybeListen(twoPSet, config::ACCEPTOR_PORT, WhoIsThis_Sender_proxyLeader,
 								 [&](const int socket, const std::string& payloadString) {
 		AcceptorToProxyLeader payload;
 		payload.ParseFromString(payloadString);
