@@ -10,7 +10,7 @@
 #include <shared_mutex>
 #include <condition_variable>
 #include <numeric>
-
+#include <chrono>
 #include "utils/config.hpp"
 #include "acceptor.hpp"
 #include "batcher.hpp"
@@ -18,8 +18,9 @@
 
 class paxos {
 public:
-    [[noreturn]] explicit paxos();
+    [[noreturn]] explicit paxos(int numCommands);
 private:
+	const int numCommands;
 	anna* annaClient;
     heartbeat_component batchers;
 
@@ -30,6 +31,7 @@ private:
     [[noreturn]] void startServer();
     [[noreturn]] void readInput();
     [[noreturn]] void resendInput();
+	void benchmark();
 };
 
 #endif //C__PAXOS_MAIN_HPP

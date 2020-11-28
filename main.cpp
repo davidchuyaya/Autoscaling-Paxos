@@ -2,7 +2,7 @@
 #include "main.hpp"
 
 [[noreturn]]
-paxos::paxos() : batchers(config::F+1) {
+paxos::paxos(const int numCommands) : numCommands(numCommands), batchers(config::F+1) {
     LOG("F: %d\n", config::F);
     std::thread server([&] {startServer(); });
     server.detach();
@@ -12,9 +12,14 @@ paxos::paxos() : batchers(config::F+1) {
             batchers.addHeartbeat(socket);
         });
     });
-    std::thread batchRetry([&] { resendInput(); });
-    batchRetry.detach();
-    readInput();
+
+    if (numCommands == 0) {
+	    std::thread batchRetry([&] { resendInput(); });
+	    batchRetry.detach();
+	    readInput();
+    }
+    else //assuming batchers will never timeout during benchmarking
+    	benchmark();
 }
 
 [[noreturn]]
@@ -73,10 +78,35 @@ void paxos::resendInput() {
 	}
 }
 
+void paxos::benchmark() {
+	printf("Enter any key to start benchmarking...\n");
+	std::string input;
+	std::cin >> input;
+
+	auto start = std::chrono::system_clock::now();
+
+	const std::string& payload = "hi";
+	const auto& protoMessage = message::createClientRequest(config::IP_ADDRESS, payload);
+	for (int i = 0; i < numCommands; i++) {
+		batchers.send(protoMessage);
+
+		std::unique_lock lock(requestMutex);
+		request.emplace(payload);
+		LOG("Waiting for ACK, do not input...\n");
+		requestCV.wait(lock, [&]{return !request.has_value();}); //TODO resend on timeout
+	}
+
+	auto end = std::chrono::system_clock::now();
+
+	printf("Elapsed time %lld for %d commands\n", std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count(),
+		numCommands);
+}
+
 int main(const int argc, const char** argv) {
-    if (argc != 1) {
-        printf("Usage: ./Autoscaling_Paxos\n");
+    if (argc != 2) {
+        printf("Usage: ./Autoscaling_Paxos <NUM COMMANDS TO BENCHMARK, 0 FOR DEBUG MODE>\n");
         exit(0);
     }
-    paxos p {};
+	const int numCommands = std::stoi(argv[1]);
+    paxos p {numCommands};
 }
