@@ -183,8 +183,8 @@ void proposer::sendScouts() {
 }
 
 void proposer::handleP1B(const ProxyLeaderToProposer& message) {
-    LOG("Proposer %d received p1b from acceptor group: %s, committed log length: %d, uncommitted log length: %d\n", id,
-           message.acceptorgroupid().c_str(), message.committedlog_size(), message.uncommittedlog_size());
+    LOG("Proposer %d received p1b from acceptor group: %s, committed log length: %d, uncommitted log length: %d, highest ballot: [%d, %d]\n", id, message.acceptorgroupid().c_str(), message.committedlog_size(),
+		message.uncommittedlog_size(), message.ballot().id(), message.ballot().ballotnum());
 
     if (message.ballot().id() != id) { // we lost the election
         // store the largest ballot we last saw so we can immediately catch up

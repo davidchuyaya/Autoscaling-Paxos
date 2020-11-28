@@ -11,6 +11,8 @@ batcher::batcher(const int id) : id(id), proposers(config::F+1) {
     });
 
     heartbeater::heartbeat("i'm alive", clientMutex, clientSockets);
+    std::thread t([&]{ sendBatchPeriodically(); });
+    t.detach();
 	startServer();
 }
 
@@ -32,24 +34,23 @@ void batcher::startServer() {
 void batcher::listenToClient(const ClientToBatcher& payload) {
     //first payload is IP address of client
     LOG("Batcher %d received payload: [%s]\n", id, payload.request().c_str());
-    std::unique_lock payloadsLock(payloadsMutex);
+    std::unique_lock lock(payloadsMutex);
     clientToPayloads[payload.ipaddress()].emplace_back(payload.request());
-    payloadsLock.unlock();
+}
 
-    //check if it's time to send another batch TODO separate timer in case client sends nothing else
-    std::shared_lock batchTimeLock(lastBatchTimeMutex);
-    time_t now;
-    time(&now);
-    if (difftime(now, lastBatchTime) < config::BATCH_TIME_SEC)
-        return;
-    batchTimeLock.unlock();
+[[noreturn]]
+void batcher::sendBatchPeriodically() {
+	while (true) {
+		std::this_thread::sleep_for(std::chrono::seconds(config::BATCH_TIME_SEC));
 
-    std::scoped_lock lock(lastBatchTimeMutex, payloadsMutex);
-    lastBatchTime = now;
-    LOG("Sending batch\n");
-    const Batch& batchMessage = message::createBatchMessage(clientToPayloads);
-    proposers.broadcast(batchMessage);
-    clientToPayloads.clear();
+		std::unique_lock lock(payloadsMutex);
+		if (!clientToPayloads.empty()) {
+			LOG("Sending batch\n");
+			const Batch& batchMessage = message::createBatchMessage(clientToPayloads);
+			proposers.broadcast(batchMessage);
+			clientToPayloads.clear();
+		}
+	}
 }
 
 int main(const int argc, const char** argv) {

@@ -29,6 +29,7 @@ private:
 
     [[noreturn]] void startServer();
     [[noreturn]] void readInput();
+    [[noreturn]] void resendInput();
 };
 
 #endif //C__PAXOS_MAIN_HPP

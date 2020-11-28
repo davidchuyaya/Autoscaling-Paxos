@@ -29,9 +29,6 @@ private:
     const int id = 0;
     anna* annaClient;
 
-    std::shared_mutex lastBatchTimeMutex;
-    time_t lastBatchTime = 0;
-
     std::shared_mutex payloadsMutex;
     std::unordered_map<std::string, std::vector<std::string>> clientToPayloads = {};
 
@@ -53,6 +50,7 @@ private:
      * @param client_address Address of the client
      */
     void listenToClient(const ClientToBatcher& payload);
+    [[noreturn]] void sendBatchPeriodically();
 };
 
 #endif //AUTOSCALING_PAXOS_BATCHER_HPP

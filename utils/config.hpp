@@ -27,7 +27,6 @@ namespace config {
     const static int BATCHER_PORT = 13000;
     const static int UNBATCHER_PORT = 14000;
 
-    //TODO Store result from "curl http://169.254.169.254/latest/meta-data/public-ipv4" into env
     const static inline std::string IP_ADDRESS = std::getenv("IP");
     const static inline std::string ANNA_ROUTING_ADDRESS = std::getenv("ANNA_ROUTING");
 
@@ -35,9 +34,10 @@ namespace config {
     const static int TCP_RETRY_TIMEOUT_SEC = 10;
     const static int HEARTBEAT_TIMEOUT_SEC = 20; // this - HEARTBEAT_SLEEP_SEC = time allowed between message send & receive
     const static int HEARTBEAT_SLEEP_SEC = 5;
+    const static int CLIENT_TIMEOUT_SEC = 10;
     const static int ID_SCOUT_DELAY_MULTIPLIER = 5; // this * proposer ID = number of seconds to delay before sending scouts
-    const static int ZMQ_RECEIVE_RETRY_SEC = 3; // how often we check ZMQ receive buffer for new Anna messages
-    const static int ANNA_RECHECK_SEC = 2; // how often we send a new get request to Anna for subscriptions
+    const static int ZMQ_RECEIVE_RETRY_SEC = 1; // how often we check ZMQ receive buffer for new Anna messages
+    const static int ANNA_RECHECK_SEC = 1; // how often we send a new get request to Anna for subscriptions
 
     const static inline std::string KEY_OBSERVED_PREFIX = "observed";
     const static inline std::string KEY_REMOVED_PREFIX = "removed";
