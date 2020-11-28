@@ -71,3 +71,10 @@ target_link_libraries(batcher proto hydro-zmq zmq yaml-cpp pthread ${PROTOBUF_LI
 target_link_libraries(proposer proto hydro-zmq zmq yaml-cpp pthread ${PROTOBUF_LIBRARY})
 target_link_libraries(proxy_leader proto hydro-zmq zmq yaml-cpp pthread ${PROTOBUF_LIBRARY})
 target_link_libraries(unbatcher proto hydro-zmq zmq yaml-cpp pthread ${PROTOBUF_LIBRARY})
+
+add_dependencies(Autoscaling_Paxos hydro-zmq zeromq zeromqcpp)
+add_dependencies(acceptor hydro-zmq zeromq zeromqcpp)
+add_dependencies(batcher hydro-zmq zeromq zeromqcpp)
+add_dependencies(proposer hydro-zmq zeromq zeromqcpp)
+add_dependencies(proxy_leader hydro-zmq zeromq zeromqcpp)
+add_dependencies(unbatcher hydro-zmq zeromq zeromqcpp)
