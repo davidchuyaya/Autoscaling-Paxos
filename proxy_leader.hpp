@@ -15,7 +15,6 @@
 #include <message.pb.h>
 #include "utils/config.hpp"
 #include "utils/network.hpp"
-#include "utils/parser.hpp"
 #include "models/message.hpp"
 #include "models/log.hpp"
 #include "models/heartbeat_component.hpp"

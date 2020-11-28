@@ -57,7 +57,7 @@ void paxos::readInput() {
 	    std::unique_lock lock(requestMutex);
 	    request.emplace(input);
 	    LOG("Waiting for ACK, do not input...\n");
-	    requestCV.wait(lock, [&]{return !request.has_value();}); //TODO resend on timeout
+	    requestCV.wait(lock, [&]{return !request.has_value();});
     }
 }
 
@@ -93,7 +93,7 @@ void paxos::benchmark() {
 		std::unique_lock lock(requestMutex);
 		request.emplace(payload);
 		LOG("Waiting for ACK, do not input...\n");
-		requestCV.wait(lock, [&]{return !request.has_value();}); //TODO resend on timeout
+		requestCV.wait(lock, [&]{return !request.has_value();});
 	}
 
 	auto end = std::chrono::system_clock::now();

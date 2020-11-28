@@ -20,7 +20,6 @@
 #include "utils/network.hpp"
 #include "utils/config.hpp"
 #include "models/message.hpp"
-#include "utils/parser.hpp"
 #include "message.pb.h"
 #include "models/log.hpp"
 #include "models/heartbeat_component.hpp"

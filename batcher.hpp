@@ -15,7 +15,6 @@
 #include "utils/config.hpp"
 #include "models/message.hpp"
 #include "utils/network.hpp"
-#include "utils/parser.hpp"
 #include "utils/heartbeater.hpp"
 #include "message.pb.h"
 #include "lib/storage/anna.hpp"
