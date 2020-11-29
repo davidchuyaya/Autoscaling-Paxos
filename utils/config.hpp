@@ -14,14 +14,14 @@
 
 #ifdef DEBUG
 #   define LOG(...) printf(__VA_ARGS__)
-#   define TIME() LOG("Millis: %ld\n", std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count())
+#   define TIME() LOG("Nano: %ld\n", std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now().time_since_epoch()).count())
 #else //noop
 #   define LOG(...) do{}while(0)
 #endif
 
 namespace config {
     const static int F = 1;
-    const static int THRESHOLD_BATCH_SIZE = 2;
+    const static int THRESHOLD_BATCH_SIZE = 1; //Note: If this is < than the # of clients, clients won't make progress
     const static int CLIENT_PORT = 10000;
     const static int PROPOSER_PORT = 11000;
     const static int ACCEPTOR_PORT = 12000;

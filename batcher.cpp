@@ -11,8 +11,6 @@ batcher::batcher(const int id) : id(id), proposers(config::F+1) {
     });
 
     heartbeater::heartbeat("i'm alive", clientMutex, clientSockets);
-    std::thread t([&]{ sendBatchPeriodically(); });
-    t.detach();
 	startServer();
 }
 
@@ -35,24 +33,21 @@ void batcher::listenToClient(const ClientToBatcher& payload) {
     //first payload is IP address of client
     LOG("Batcher %d received payload: [%s]\n", id, payload.request().c_str());
 	TIME();
+
 	std::unique_lock lock(payloadsMutex);
     clientToPayloads[payload.ipaddress()].emplace_back(payload.request());
-}
+    numPayloads += 1;
 
-[[noreturn]]
-void batcher::sendBatchPeriodically() {
-	while (true) {
-		std::this_thread::sleep_for(std::chrono::seconds(config::BATCH_TIME_SEC));
+	if (numPayloads < config::THRESHOLD_BATCH_SIZE)
+		return;
 
-		std::unique_lock lock(payloadsMutex);
-		if (!clientToPayloads.empty()) {
-			LOG("Sending batch\n");
-			const Batch& batchMessage = message::createBatchMessage(clientToPayloads);
-			proposers.broadcast(batchMessage);
-			TIME();
-			clientToPayloads.clear();
-		}
-	}
+	LOG("Sending batch\n");
+	const Batch& batchMessage = message::createBatchMessage(clientToPayloads);
+	proposers.broadcast(batchMessage);
+	TIME();
+
+	clientToPayloads.clear();
+	numPayloads = 0;
 }
 
 int main(const int argc, const char** argv) {

@@ -30,6 +30,7 @@ private:
 
     std::shared_mutex payloadsMutex;
     std::unordered_map<std::string, std::vector<std::string>> clientToPayloads = {};
+    int numPayloads = 0;
 
     threshold_component proposers;
 
@@ -49,7 +50,6 @@ private:
      * @param client_address Address of the client
      */
     void listenToClient(const ClientToBatcher& payload);
-    [[noreturn]] void sendBatchPeriodically();
 };
 
 #endif //AUTOSCALING_PAXOS_BATCHER_HPP
