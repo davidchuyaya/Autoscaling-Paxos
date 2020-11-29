@@ -38,6 +38,7 @@ void acceptor::listenToProxyLeaders(const int socket, const ProposerToAcceptor& 
         }
         case ProposerToAcceptor_Type_p2a:
             LOG("Acceptor [%s, %d] received p2a: [%s]\n", acceptorGroupId.c_str(), id, payload.ShortDebugString().c_str());
+		    TIME();
             if (!Log::isBallotGreaterThan(highestBallot, payload.ballot())) {
                 PValue pValue;
                 pValue.set_payload(payload.payload());
@@ -47,6 +48,7 @@ void acceptor::listenToProxyLeaders(const int socket, const ProposerToAcceptor& 
                 LOG("[%s, %d] New log: %s\n", acceptorGroupId.c_str(), id, Log::printLog(log).c_str());
             }
             network::sendPayload(socket, message::createP2B(payload.messageid(), acceptorGroupId, highestBallot, payload.slot()));
+		    TIME();
             break;
         default: {}
     }

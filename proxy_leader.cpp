@@ -80,13 +80,15 @@ void proxy_leader::processAcceptors(const std::string& acceptorGroupId, const tw
 }
 
 void proxy_leader::listenToProposer(const ProposerToAcceptor& payload) {
+	LOG("Proxy leader %d received from proposer: %s\n", id, payload.ShortDebugString().c_str());
+	TIME();
+
     // keep track
     std::unique_lock messagesLock(sentMessagesMutex);
     sentMessages[payload.messageid()] = payload;
     messagesLock.unlock();
-    LOG("Proxy leader %d received from proposer: %s\n", id, payload.ShortDebugString().c_str());
 
-    // Broadcast to Acceptors; wait if necessary
+	// Broadcast to Acceptors; wait if necessary
     std::shared_lock readLock(acceptorMutex);
     if (!knowOfAcceptorGroup(payload.acceptorgroupid())) {
 	    readLock.unlock(); //convoluted R/W lock scheme. Only happens once per acceptor group, should be fast.
@@ -97,6 +99,7 @@ void proxy_leader::listenToProposer(const ProposerToAcceptor& payload) {
 	    readLock.lock();
     }
     acceptorGroupSockets.at(payload.acceptorgroupid())->broadcast(payload);
+	TIME();
 }
 
 void proxy_leader::listenToAcceptor(const AcceptorToProxyLeader& payload) {
@@ -125,6 +128,7 @@ void proxy_leader::handleP1B(const AcceptorToProxyLeader& payload) {
     std::scoped_lock lock(sentMessagesMutex, unmergedLogsMutex);
     if (Log::isBallotGreaterThan(payload.ballot(), sentValue.ballot())) {
         //yikes, the proposer got preempted
+	    LOG("P1B preempted for proposer %d\n", payload.ballot().id());
         const ProxyLeaderToProposer& messageToProposer = message::createProxyP1B(payload.messageid(),
                                                                                  payload.acceptorgroupid(),
                                                                                  payload.ballot(), {}, {});
@@ -138,9 +142,12 @@ void proxy_leader::handleP1B(const AcceptorToProxyLeader& payload) {
 
         if (unmergedLogs[payload.messageid()].size() >= config::F + 1) {
             //we have f+1 good logs, merge them & tell the proposer
+	        LOG("P1B approved for proposer %d\n", payload.ballot().id());
             const auto&[committedLog, uncommittedLog] = Log::mergeLogsOfAcceptorGroup(unmergedLogs[payload.messageid()]);
-            const ProxyLeaderToProposer& messageToProposer = message::createProxyP1B(payload.messageid(), payload.acceptorgroupid(),
-                                                                                     payload.ballot(), committedLog, uncommittedLog);
+            const ProxyLeaderToProposer& messageToProposer = message::createProxyP1B(payload.messageid(),
+																					 payload.acceptorgroupid(),
+                                                                                     payload.ballot(),
+                                                                                     committedLog, uncommittedLog);
             network::sendPayload(proposers.socketForIP(sentValue.ipaddress()), messageToProposer);
             sentMessages.erase(payload.messageid());
             unmergedLogs.erase(payload.messageid());
@@ -160,6 +167,7 @@ void proxy_leader::handleP2B(const AcceptorToProxyLeader& payload) {
     std::scoped_lock lock(sentMessagesMutex, approvedCommandersMutex);
     if (Log::isBallotGreaterThan(payload.ballot(), sentValue.ballot())) {
         //yikes, the proposer got preempted
+	    LOG("P2B preempted for proposer: %d, slot: %d\n", payload.ballot().id(), payload.slot());
         const ProxyLeaderToProposer& messageToProposer = message::createProxyP2B(payload.messageid(), payload.acceptorgroupid(),
                                                                                 payload.ballot(), payload.slot());
         network::sendPayload(proposers.socketForIP(sentValue.ipaddress()), messageToProposer);
@@ -172,9 +180,11 @@ void proxy_leader::handleP2B(const AcceptorToProxyLeader& payload) {
 
         if (approvedCommanders[payload.messageid()] >= config::F + 1) {
             //we have f+1 approved commanders, tell the unbatcher. No need to tell proposer
-            unbatchers.send(sentMessages[payload.messageid()].payload());
+	        LOG("P2B approved for proposer: %d, slot: %d\n", payload.ballot().id(), payload.slot());
+	        unbatchers.send(sentMessages[payload.messageid()].payload());
             sentMessages.erase(payload.messageid());
             approvedCommanders.erase(payload.messageid());
+	        TIME();
         }
     }
 }

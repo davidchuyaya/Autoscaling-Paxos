@@ -60,10 +60,12 @@ void paxos::readInput() {
 	    std::unique_lock lock(requestMutex);
 	    request.emplace(input);
 	    LOG("Waiting for ACK, do not input...\n");
+	    TIME();
 	    requestCV.wait(lock, [&]{return !request.has_value();});
 	    auto end = std::chrono::system_clock::now();
 
-	    printf("Elapsed time %lld\n", std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count());
+	    printf("Elapsed time %ld\n", std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count());
+	    TIME();
     }
 }
 
@@ -104,7 +106,7 @@ void paxos::benchmark() {
 
 	auto end = std::chrono::system_clock::now();
 
-	printf("Elapsed time %lld for %d commands\n", std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count(),
+	printf("Elapsed time %ld for %d commands\n", std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count(),
 		numCommands);
 }
 

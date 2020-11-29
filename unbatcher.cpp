@@ -21,6 +21,7 @@ void unbatcher::startServer() {
         },
        [&](const int socket, const WhoIsThis_Sender& whoIsThis, const std::string& payload) {
            LOG("Unbatcher received payload: %s\n", payload.c_str());
+	       TIME();
            Batch batch;
            batch.ParseFromString(payload);
            for (const auto&[clientIp, requests] : batch.clienttorequests()) {
@@ -28,6 +29,7 @@ void unbatcher::startServer() {
                for (const std::string& request : requests.requests())
                    network::sendPayload(clientSocket, request);
            }
+	       TIME();
     });
 }
 

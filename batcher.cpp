@@ -34,7 +34,8 @@ void batcher::startServer() {
 void batcher::listenToClient(const ClientToBatcher& payload) {
     //first payload is IP address of client
     LOG("Batcher %d received payload: [%s]\n", id, payload.request().c_str());
-    std::unique_lock lock(payloadsMutex);
+	TIME();
+	std::unique_lock lock(payloadsMutex);
     clientToPayloads[payload.ipaddress()].emplace_back(payload.request());
 }
 
@@ -48,6 +49,7 @@ void batcher::sendBatchPeriodically() {
 			LOG("Sending batch\n");
 			const Batch& batchMessage = message::createBatchMessage(clientToPayloads);
 			proposers.broadcast(batchMessage);
+			TIME();
 			clientToPayloads.clear();
 		}
 	}

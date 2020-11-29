@@ -14,6 +14,7 @@
 
 #ifdef DEBUG
 #   define LOG(...) printf(__VA_ARGS__)
+#   define TIME() LOG("Millis: %ld\n", std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count())
 #else //noop
 #   define LOG(...) do{}while(0)
 #endif

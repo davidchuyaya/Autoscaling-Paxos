@@ -122,6 +122,7 @@ void proposer::listenToBatcher(const std::string& payload) {
     if (!isLeader)
         return;
 
+	TIME();
     std::shared_lock acceptorsLock(acceptorMutex, std::defer_lock);
     std::shared_lock ballotLock(ballotMutex, std::defer_lock);
     std::scoped_lock lock(logMutex, acceptorsLock, ballotLock);
@@ -135,6 +136,7 @@ void proposer::listenToBatcher(const std::string& payload) {
         logHoles.pop();
     }
     proxyLeaders.send(message::createP2A(id, ballotNum, slot, payload, fetchNextAcceptorGroupId(), config::IP_ADDRESS));
+	TIME();
 }
 
 void proposer::listenToProxyLeader(const int socket, const ProxyLeaderToProposer& payload) {
