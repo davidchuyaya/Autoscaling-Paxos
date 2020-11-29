@@ -1,7 +1,6 @@
 
 #include "main.hpp"
 
-[[noreturn]]
 paxos::paxos(const int numCommands) : numCommands(numCommands), batchers(config::F+1) {
     LOG("F: %d\n", config::F);
     std::thread server([&] {startServer(); });
@@ -18,8 +17,11 @@ paxos::paxos(const int numCommands) : numCommands(numCommands), batchers(config:
 	    batchRetry.detach();
 	    readInput();
     }
-    else //assuming batchers will never timeout during benchmarking
-    	benchmark();
+    else {
+    	//assuming batchers will never timeout during benchmarking
+	    benchmark();
+	    pthread_exit(nullptr);
+    }
 }
 
 [[noreturn]]
@@ -28,7 +30,7 @@ void paxos::startServer() {
        [](const int socket, const WhoIsThis_Sender& whoIsThis) {
             LOG("Main connected to unbatcher\n");
     }, [&](const int socket, const WhoIsThis_Sender& whoIsThis, const std::string& payload) {
-            LOG("--Acked: {%s}--\n", payload.c_str());
+            printf("--Acked: {%s}--\n", payload.c_str());
 
             std::unique_lock lock(requestMutex);
             if (request.has_value()) {
@@ -53,11 +55,15 @@ void paxos::readInput() {
         std::string input;
         std::cin >> input;
         batchers.send(message::createClientRequest(config::IP_ADDRESS, input));
+	    auto start = std::chrono::system_clock::now();
 
 	    std::unique_lock lock(requestMutex);
 	    request.emplace(input);
 	    LOG("Waiting for ACK, do not input...\n");
 	    requestCV.wait(lock, [&]{return !request.has_value();});
+	    auto end = std::chrono::system_clock::now();
+
+	    printf("Elapsed time %lld\n", std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count());
     }
 }
 

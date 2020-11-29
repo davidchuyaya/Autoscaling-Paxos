@@ -59,5 +59,5 @@ int main(const int argc, const char** argv) {
         exit(0);
     }
     const int batcherId = std::stoi(argv[1]);
-    batcher b = {batcherId};
+    batcher b {batcherId};
 }

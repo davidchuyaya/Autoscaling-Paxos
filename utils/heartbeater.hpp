@@ -15,18 +15,19 @@
 namespace heartbeater {
     template<typename Message>
     void heartbeat(const Message& message, std::shared_mutex& mutex, std::vector<int>& sockets) {
-        std::thread thread([&, message]{
+        std::thread thread([message](std::shared_mutex& mutex, std::vector<int>& sockets){
             while (true) {
                 std::this_thread::sleep_for(std::chrono::seconds(config::HEARTBEAT_SLEEP_SEC));
                 std::shared_lock lock(mutex);
                 for (const int socket : sockets)
                     network::sendPayload(socket, message);
-            }});
+            }}, std::ref(mutex), std::ref(sockets));
         thread.detach();
     }
     template<typename Message>
     void heartbeat(const Message& message, threshold_component& component) {
-        std::thread thread([&, message]{mainThreadHeartbeat(message, component);});
+        std::thread thread([message](threshold_component& component){mainThreadHeartbeat(message, component);},
+						   std::ref(component));
         thread.detach();
     }
 	template<typename Message>

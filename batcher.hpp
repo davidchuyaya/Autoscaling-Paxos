@@ -23,7 +23,7 @@
 
 class batcher {
 public:
-    batcher(int id);
+    explicit batcher(int id);
 private:
     const int id = 0;
     anna* annaClient;

@@ -18,7 +18,7 @@
 
 class paxos {
 public:
-    [[noreturn]] explicit paxos(int numCommands);
+    explicit paxos(int numCommands);
 private:
 	const int numCommands;
 	anna* annaClient;

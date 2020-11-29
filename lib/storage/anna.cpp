@@ -43,7 +43,7 @@ void anna::unsubscribeFrom(const std::string& key) {
 }
 
 [[noreturn]]
-void anna::listenerThread(const std::function<void(const std::string&, const two_p_set&)>& listener) {
+void anna::listenerThread(const annaListener& listener) {
     while (true) {
 	    std::unique_lock lock(clientMutex);
         const std::vector<KeyResponse>& responses = client.receive_async();
@@ -62,9 +62,8 @@ void anna::listenerThread(const std::function<void(const std::string&, const two
                 if (keyTuple.lattice_type() != SET)
                     continue;
 
-                two_p_set twoPset;
-	            const std::string& key = twoPset.mergeAndUnprefixKey(keyTuple.key(),
-																  deserialize_set(keyTuple.payload()));
+                two_p_set twoPset = {};
+	            std::string key = twoPset.mergeAndUnprefixKey(keyTuple.key(), deserialize_set(keyTuple.payload()));
 	            LOG("Received set with key %s: %s\n", key.c_str(), twoPset.printSet().c_str());
 	            listener(key, twoPset);
             }
