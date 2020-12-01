@@ -6,8 +6,8 @@ paxos::paxos(const int numCommands) : numCommands(numCommands), batchers(config:
     std::thread server([&] {startServer(); });
     server.detach();
     annaClient = new anna({config::KEY_BATCHERS}, [&](const std::string& key, const two_p_set& twoPSet) {
-        batchers.connectAndListen(twoPSet, config::BATCHER_PORT, WhoIsThis_Sender_client,
-                                  [&](const int socket, const std::string& payload) {
+        batchers.connectAndListen<Heartbeat>(twoPSet, config::BATCHER_PORT, WhoIsThis_Sender_client,
+											 [&](const int socket, const Heartbeat& payload) {
             batchers.addHeartbeat(socket);
         });
     });
@@ -26,26 +26,26 @@ paxos::paxos(const int numCommands) : numCommands(numCommands), batchers(config:
 
 [[noreturn]]
 void paxos::startServer() {
-    network::startServerAtPort(config::CLIENT_PORT,
-       [](const int socket, const WhoIsThis_Sender& whoIsThis) {
+    network::startServerAtPort<UnbatcherToClient>(config::CLIENT_PORT,
+       [](const int socket) {
             LOG("Main connected to unbatcher\n");
-    }, [&](const int socket, const WhoIsThis_Sender& whoIsThis, const std::string& payload) {
-            printf("--Acked: {%s}--\n", payload.c_str());
+    }, [&](const int socket, const UnbatcherToClient& payload) {
+            LOG("--Acked: {%s}--\n", payload.request().c_str());
 
             std::unique_lock lock(requestMutex);
             if (request.has_value()) {
-            	if (request.value() == payload) {
+            	if (request.value() == payload.request()) {
 		            request.reset();
 		            lock.unlock();
 		            requestCV.notify_all();
 	            }
             	else {
 		            LOG("Unexpected payload from unbatcher: {%s} when previous request was {%s}\n",
-		                payload.c_str(), request.value().c_str());
+		                payload.request().c_str(), request.value().c_str());
 	            }
             }
             else
-	            LOG("Unexpected payload from unbatcher: {%s} when previous request DNE\n", payload.c_str());
+	            LOG("Unexpected payload from unbatcher: {%s} when previous request DNE\n", payload.request().c_str());
     });
 }
 
@@ -64,7 +64,7 @@ void paxos::readInput() {
 	    requestCV.wait(lock, [&]{return !request.has_value();});
 	    auto end = std::chrono::system_clock::now();
 
-	    printf("Elapsed time %ld\n", std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count());
+	    printf("Elapsed micro %ld\n", std::chrono::duration_cast<std::chrono::microseconds>(end - start).count());
 	    TIME();
     }
 }
@@ -94,7 +94,7 @@ void paxos::benchmark() {
 	auto start = std::chrono::system_clock::now();
 
 	const std::string& payload = "hi";
-	const auto& protoMessage = message::createClientRequest(config::IP_ADDRESS, payload);
+	const ClientToBatcher& protoMessage = message::createClientRequest(config::IP_ADDRESS, payload);
 	for (int i = 0; i < numCommands; i++) {
 		batchers.send(protoMessage);
 
@@ -106,7 +106,7 @@ void paxos::benchmark() {
 
 	auto end = std::chrono::system_clock::now();
 
-	printf("Elapsed time %ld for %d commands\n", std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count(),
+	printf("Elapsed millis %ld for %d commands\n", std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count(),
 		numCommands);
 }
 

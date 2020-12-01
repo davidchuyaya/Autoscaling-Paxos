@@ -7,26 +7,23 @@
 batcher::batcher(const int id) : id(id), proposers(config::F+1) {
     annaClient = new anna(config::KEY_BATCHERS, {config::KEY_PROPOSERS},
                     [&](const std::string& key, const two_p_set& twoPSet) {
-    	proposers.connectAndMaybeListen(twoPSet, config::PROPOSER_PORT, WhoIsThis_Sender_batcher, {});
+    	//template type doesn't matter, since we don't receive any messages from the proposer anyway
+    	proposers.connectAndMaybeListen<Heartbeat>(twoPSet, config::PROPOSER_PORT, WhoIsThis_Sender_batcher, {});
     });
-
-    heartbeater::heartbeat("i'm alive", clientMutex, clientSockets);
+    heartbeater::heartbeat(clientMutex, clientSockets);
 	startServer();
 }
 
 [[noreturn]]
 void batcher::startServer() {
-    network::startServerAtPort(config::BATCHER_PORT,
-       [&](const int socket, const WhoIsThis_Sender& whoIsThis) {
+    network::startServerAtPort<ClientToBatcher>(config::BATCHER_PORT,
+       [&](const int socket) {
            LOG("Batcher %d connected to client\n", id);
            std::unique_lock lock(clientMutex);
            clientSockets.emplace_back(socket);
-        },
-       [&](const int socket, const WhoIsThis_Sender& whoIsThis, const std::string& payloadString) {
-            ClientToBatcher payload;
-            payload.ParseFromString(payloadString);
-            listenToClient(payload);
-    });
+        }, [&](const int socket, const ClientToBatcher& payload) {
+        	listenToClient(payload);
+        });
 }
 
 void batcher::listenToClient(const ClientToBatcher& payload) {
@@ -35,18 +32,18 @@ void batcher::listenToClient(const ClientToBatcher& payload) {
 	TIME();
 
 	std::unique_lock lock(payloadsMutex);
-    clientToPayloads[payload.ipaddress()].emplace_back(payload.request());
+    clientToPayload[payload.ipaddress()] = payload.request();
     numPayloads += 1;
 
 	if (numPayloads < config::THRESHOLD_BATCH_SIZE)
 		return;
 
 	LOG("Sending batch\n");
-	const Batch& batchMessage = message::createBatchMessage(clientToPayloads);
+	const Batch& batchMessage = message::createBatchMessage(clientToPayload);
 	proposers.broadcast(batchMessage);
 	TIME();
 
-	clientToPayloads.clear();
+	clientToPayload.clear();
 	numPayloads = 0;
 }
 

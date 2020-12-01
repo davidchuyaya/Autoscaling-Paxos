@@ -29,7 +29,7 @@ private:
     anna* annaClient;
 
     std::shared_mutex payloadsMutex;
-    std::unordered_map<std::string, std::vector<std::string>> clientToPayloads = {};
+    std::unordered_map<std::string, std::string> clientToPayload = {};
     int numPayloads = 0;
 
     threshold_component proposers;

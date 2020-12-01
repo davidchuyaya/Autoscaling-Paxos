@@ -15,16 +15,14 @@ proxy_leader::proxy_leader(const int id) : id(id), unbatchers(config::F+1), prop
 
 void proxy_leader::listenToAnna(const std::string& key, const two_p_set& twoPSet) {
     if (key == config::KEY_PROPOSERS) {
-        proposers.connectAndMaybeListen(twoPSet, config::PROPOSER_PORT, WhoIsThis_Sender_proxyLeader,
-                                        [&](const int socket, const std::string& payloadString) {
-            ProposerToAcceptor payload;
-            payload.ParseFromString(payloadString);
+        proposers.connectAndMaybeListen<ProposerToAcceptor>(twoPSet, config::PROPOSER_PORT,WhoIsThis_Sender_proxyLeader,
+                                        [&](const int socket, const ProposerToAcceptor& payload) {
             listenToProposer(payload);
         });
     }
     else if (key == config::KEY_UNBATCHERS) {
-        unbatchers.connectAndListen(twoPSet, config::UNBATCHER_PORT, WhoIsThis_Sender_proxyLeader,
-                                    [&](const int socket, const std::string& payload) {
+        unbatchers.connectAndListen<Heartbeat>(twoPSet, config::UNBATCHER_PORT, WhoIsThis_Sender_proxyLeader,
+                                    [&](const int socket, const Heartbeat& payload) {
             unbatchers.addHeartbeat(socket);
         });
     }
@@ -51,7 +49,7 @@ void proxy_leader::processAcceptorGroup(const two_p_set& twoPSet) {
 	        continue;
         threshold_component* acceptors = acceptorGroupSockets.at(removedAcceptorGroupId);
         two_p_set allMembersRemoved = {{}, acceptors->getMembers().getObserved()};
-        acceptors->connectAndMaybeListen(allMembersRemoved, config::ACCEPTOR_PORT,
+        acceptors->connectAndMaybeListen<AcceptorToProxyLeader>(allMembersRemoved, config::ACCEPTOR_PORT,
 										WhoIsThis_Sender_proxyLeader, {});
         acceptorGroupSockets.erase(removedAcceptorGroupId);
 	    free(acceptors);
@@ -71,10 +69,8 @@ void proxy_leader::processAcceptors(const std::string& acceptorGroupId, const tw
 	}
 
 	threshold_component* acceptors = acceptorGroupSockets.at(acceptorGroupId);
-	acceptors->connectAndMaybeListen(twoPSet, config::ACCEPTOR_PORT, WhoIsThis_Sender_proxyLeader,
-								 [&](const int socket, const std::string& payloadString) {
-		AcceptorToProxyLeader payload;
-		payload.ParseFromString(payloadString);
+	acceptors->connectAndMaybeListen<AcceptorToProxyLeader>(twoPSet, config::ACCEPTOR_PORT,WhoIsThis_Sender_proxyLeader,
+								 [&](const int socket, const AcceptorToProxyLeader& payload) {
 		listenToAcceptor(payload);
 	});
 }
@@ -104,6 +100,7 @@ void proxy_leader::listenToProposer(const ProposerToAcceptor& payload) {
 
 void proxy_leader::listenToAcceptor(const AcceptorToProxyLeader& payload) {
     LOG("Proxy leader %d received from acceptors: %s\n", id, payload.ShortDebugString().c_str());
+//	google::protobuf::util::ParseDelimitedFromCodedStream();
 
     switch (payload.type()) {
         case AcceptorToProxyLeader_Type_p1b:
@@ -117,15 +114,13 @@ void proxy_leader::listenToAcceptor(const AcceptorToProxyLeader& payload) {
 }
 
 void proxy_leader::handleP1B(const AcceptorToProxyLeader& payload) {
-    std::shared_lock messagesLock(sentMessagesMutex);
+	std::scoped_lock lock(sentMessagesMutex, unmergedLogsMutex);
     const ProposerToAcceptor& sentValue = sentMessages[payload.messageid()];
     if (sentValue.ballot().ballotnum() == 0) {
         //p1b is arriving for a nonexistent sentValue
         return;
     }
-    messagesLock.unlock();
 
-    std::scoped_lock lock(sentMessagesMutex, unmergedLogsMutex);
     if (Log::isBallotGreaterThan(payload.ballot(), sentValue.ballot())) {
         //yikes, the proposer got preempted
 	    LOG("P1B preempted for proposer %d\n", payload.ballot().id());
@@ -156,15 +151,13 @@ void proxy_leader::handleP1B(const AcceptorToProxyLeader& payload) {
 }
 
 void proxy_leader::handleP2B(const AcceptorToProxyLeader& payload) {
-    std::shared_lock messagesLock(sentMessagesMutex);
+	std::scoped_lock lock(sentMessagesMutex, approvedCommandersMutex);
     const ProposerToAcceptor& sentValue = sentMessages[payload.messageid()];
     if (sentValue.slot() == 0) {
         //p2b is arriving for a nonexistent sentValue
         return;
     }
-    messagesLock.unlock();
 
-    std::scoped_lock lock(sentMessagesMutex, approvedCommandersMutex);
     if (Log::isBallotGreaterThan(payload.ballot(), sentValue.ballot())) {
         //yikes, the proposer got preempted
 	    LOG("P2B preempted for proposer: %d, slot: %d\n", payload.ballot().id(), payload.slot());
@@ -181,7 +174,9 @@ void proxy_leader::handleP2B(const AcceptorToProxyLeader& payload) {
         if (approvedCommanders[payload.messageid()] >= config::F + 1) {
             //we have f+1 approved commanders, tell the unbatcher. No need to tell proposer
 	        LOG("P2B approved for proposer: %d, slot: %d\n", payload.ballot().id(), payload.slot());
-	        unbatchers.send(sentMessages[payload.messageid()].payload());
+	        Batch batch;
+	        batch.ParseFromString(sentMessages[payload.messageid()].payload());
+	        unbatchers.send(batch);
             sentMessages.erase(payload.messageid());
             approvedCommanders.erase(payload.messageid());
 	        TIME();

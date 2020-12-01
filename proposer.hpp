@@ -70,7 +70,7 @@ private:
 
     void listenToAnna(const std::string& key, const two_p_set& twoPSet);
     [[noreturn]] void startServer();
-    void listenToBatcher(const std::string& payload);
+    void listenToBatcher(const Batch& payload);
     void listenToProxyLeader(int socket, const ProxyLeaderToProposer& payload);
     void listenToProposer();
 

@@ -91,6 +91,12 @@ ProxyLeaderToProposer message::createProxyLeaderHeartbeat() {
     return heartbeat;
 }
 
+Heartbeat message::createGenericHeartbeat() {
+	Heartbeat heartbeat;
+	heartbeat.set_dummy(true); //must have at least 1 value for message to send
+	return heartbeat;
+}
+
 ProposerToProposer message::createIamLeader() {
     ProposerToProposer iAmLeader;
     iAmLeader.set_iamleader(true);
@@ -104,12 +110,14 @@ ClientToBatcher message::createClientRequest(const std::string& ipAddress, const
     return clientToBatcher;
 }
 
-Batch message::createBatchMessage(const std::unordered_map<std::string, std::vector<std::string>>& requests) {
-    std::unordered_map<std::string, Batch_Requests> protobufRequests = {};
-    for (const auto& [ip, requestsForIp] : requests)
-        *protobufRequests[ip].mutable_requests() = {requestsForIp.begin(), requestsForIp.end()};
-
+Batch message::createBatchMessage(const std::unordered_map<std::string, std::string>& requests) {
     Batch batch;
-    *batch.mutable_clienttorequests() = {protobufRequests.begin(), protobufRequests.end()};
+    *batch.mutable_clienttorequest() = {requests.begin(), requests.end()};
     return batch;
+}
+
+UnbatcherToClient message::createUnbatcherToClientAck(const std::string& request) {
+	UnbatcherToClient unbatcherToClient;
+	unbatcherToClient.set_request(request);
+	return unbatcherToClient;
 }

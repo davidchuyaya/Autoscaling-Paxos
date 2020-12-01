@@ -26,7 +26,7 @@ public:
     [[nodiscard]] const std::unordered_set<std::string>& getObserved() const;
     [[nodiscard]] const std::unordered_set<std::string>& getRemoved() const;
     [[nodiscard]] bool empty() const;
-	std::string printSet() const;
+	[[nodiscard]] std::string printSet() const;
 private:
     std::unordered_set<std::string> observed;
     std::unordered_set<std::string> removed;

@@ -14,12 +14,10 @@ acceptor::acceptor(const int id, std::string&& acceptorGroupId) : id(id), accept
 
 [[noreturn]]
 void acceptor::startServer() {
-    network::startServerAtPort(config::ACCEPTOR_PORT,
-       [&](const int socket, const WhoIsThis_Sender& whoIsThis) {
+    network::startServerAtPort<ProposerToAcceptor>(config::ACCEPTOR_PORT,
+       [&](const int socket) {
             LOG("Acceptor [%s, %d] connected to proxy leader\n", acceptorGroupId.c_str(), id);
-        }, [&](const int socket, const WhoIsThis_Sender& whoIsThis, const std::string& payloadString) {
-            ProposerToAcceptor payload;
-            payload.ParseFromString(payloadString);
+        }, [&](const int socket, const ProposerToAcceptor& payload) {
             listenToProxyLeaders(socket, payload);
     });
 }

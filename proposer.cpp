@@ -10,7 +10,7 @@ proposer::proposer(const int id, const int numAcceptorGroups) : id(id), numAccep
     proposers.addSelfAsConnection();
     annaClient = new anna(config::KEY_PROPOSERS,{config::KEY_PROPOSERS, config::KEY_ACCEPTOR_GROUPS},
                     [&](const std::string& key, const two_p_set& twoPSet) {
-                        listenToAnna(key, twoPSet);
+    	listenToAnna(key, twoPSet);
     });
 
     //wait for acceptor group IDs before starting phase 1 or phase 2. All batches will be dropped until then.
@@ -51,9 +51,9 @@ void proposer::leaderLoop() {
 void proposer::listenToAnna(const std::string& key, const two_p_set& twoPSet) {
     if (key == config::KEY_PROPOSERS) {
         // connect to new proposer
-        proposers.connectAndMaybeListen(twoPSet, config::PROPOSER_PORT, WhoIsThis_Sender_proposer,
-                                        [&](const int socket, const std::string& payload){
-                                            listenToProposer();
+        proposers.connectAndMaybeListen<ProposerToProposer>(twoPSet, config::PROPOSER_PORT, WhoIsThis_Sender_proposer,
+                                        [&](const int socket, const ProposerToProposer& payload){
+        	listenToProposer();
         });
     } else if (key == config::KEY_ACCEPTOR_GROUPS) {
         // merge new acceptor group IDs
@@ -81,43 +81,38 @@ void proposer::listenToAnna(const std::string& key, const two_p_set& twoPSet) {
 
 [[noreturn]]
 void proposer::startServer() {
-    network::startServerAtPort(config::PROPOSER_PORT,
-           [&](const int socket, const WhoIsThis_Sender& whoIsThis) {
+    network::startServerAtPortMultitype(config::PROPOSER_PORT,
+           [&](const int socket, const WhoIsThis_Sender& whoIsThis, google::protobuf::io::ZeroCopyInputStream* inputStream) {
             switch (whoIsThis) {
                 case WhoIsThis_Sender_batcher:
-                    LOG("Server %d connected to batcher\n", id);
-                    break;
+	                LOG("Server %d connected to batcher\n", id);
+	                network::listenToStream<Batch>(socket, inputStream, [&](const int socket, const Batch& batch) {
+		                listenToBatcher(batch);
+	                });
+	                break;
                 case WhoIsThis_Sender_proxyLeader:
                     LOG("Server %d connected to proxy leader\n", id);
                     proxyLeaders.addConnection(socket);
+		            network::listenToStream<ProxyLeaderToProposer>(socket, inputStream,
+															 [&](const int socket, const ProxyLeaderToProposer& payload) {
+		            	listenToProxyLeader(socket, payload);
+		            });
                     break;
                 case WhoIsThis_Sender_proposer: {
                     LOG("Server %d connected to proposer\n", id);
                     proposers.addConnection(socket);
+	                network::listenToStream<ProposerToProposer>(socket, inputStream,
+	                                                               [&](const int socket, const ProposerToProposer& payload) {
+	                	listenToProposer();
+	                });
                     break;
                 }
                 default: {}
             }
-        }, [&](const int socket, const WhoIsThis_Sender& whoIsThis, const std::string& payloadString) {
-            switch (whoIsThis) {
-                case WhoIsThis_Sender_batcher:
-                    listenToBatcher(payloadString);
-                    break;
-                case WhoIsThis_Sender_proxyLeader: {
-                    ProxyLeaderToProposer payload;
-                    payload.ParseFromString(payloadString);
-                    listenToProxyLeader(socket, payload);
-                    break;
-                }
-                case WhoIsThis_Sender_proposer:
-                    listenToProposer();
-                    break;
-                default: {}
-            }
-    });
+        });
 }
 
-void proposer::listenToBatcher(const std::string& payload) {
+void proposer::listenToBatcher(const Batch& payload) {
     LOG("Proposer %d received a batch request\n", id);
     if (!isLeader)
         return;
@@ -135,7 +130,8 @@ void proposer::listenToBatcher(const std::string& payload) {
         slot = logHoles.front();
         logHoles.pop();
     }
-    proxyLeaders.send(message::createP2A(id, ballotNum, slot, payload, fetchNextAcceptorGroupId(), config::IP_ADDRESS));
+    proxyLeaders.send(message::createP2A(id, ballotNum, slot, payload.SerializeAsString(),
+										 fetchNextAcceptorGroupId(), config::IP_ADDRESS));
 	TIME();
 }
 

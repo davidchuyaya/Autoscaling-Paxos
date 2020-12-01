@@ -26,10 +26,10 @@ message PValue {
     string payload = 2;
 }
 message Batch {
-    message Requests {
-        repeated string requests = 1;
-    }
-    map<string, Requests> clientToRequests = 1;
+    map<string, string> clientToRequest = 1;
+}
+message Heartbeat {
+    bool dummy = 1; //must have at least 1 value for message to send
 }
 
 /**
@@ -87,4 +87,8 @@ message ProposerToProposer {
 message ClientToBatcher {
     string ipAddress = 1;
     string request = 2;
+}
+
+message UnbatcherToClient {
+    string request = 1;
 }

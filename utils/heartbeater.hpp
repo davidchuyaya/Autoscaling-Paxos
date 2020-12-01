@@ -13,9 +13,9 @@
 #include "network.hpp"
 
 namespace heartbeater {
-    template<typename Message>
-    void heartbeat(const Message& message, std::shared_mutex& mutex, std::vector<int>& sockets) {
-        std::thread thread([message](std::shared_mutex& mutex, std::vector<int>& sockets){
+    void heartbeat(std::shared_mutex& mutex, std::vector<int>& sockets) {
+        std::thread thread([](std::shared_mutex& mutex, std::vector<int>& sockets){
+	        const Heartbeat& message = message::createGenericHeartbeat();
             while (true) {
                 std::this_thread::sleep_for(std::chrono::seconds(config::HEARTBEAT_SLEEP_SEC));
                 std::shared_lock lock(mutex);

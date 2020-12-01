@@ -14,9 +14,10 @@
 
 #ifdef DEBUG
 #   define LOG(...) printf(__VA_ARGS__)
-#   define TIME() LOG("Nano: %ld\n", std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now().time_since_epoch()).count())
+#   define TIME() LOG("Micro: %ld\n", std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now().time_since_epoch()).count())
 #else //noop
 #   define LOG(...) do{}while(0)
+#   define TIME() do{}while(0)
 #endif
 
 namespace config {
@@ -27,11 +28,11 @@ namespace config {
     const static int ACCEPTOR_PORT = 12000;
     const static int BATCHER_PORT = 13000;
     const static int UNBATCHER_PORT = 14000;
+    const static int SERVER_MAX_CONNECTIONS = 100;
 
     const static inline std::string IP_ADDRESS = std::getenv("IP");
     const static inline std::string ANNA_ROUTING_ADDRESS = std::getenv("ANNA_ROUTING");
 
-    const static int BATCH_TIME_SEC = 5;
     const static int TCP_RETRY_TIMEOUT_SEC = 10;
     const static int HEARTBEAT_TIMEOUT_SEC = 20; // this - HEARTBEAT_SLEEP_SEC = time allowed between message send & receive
     const static int HEARTBEAT_SLEEP_SEC = 5;
