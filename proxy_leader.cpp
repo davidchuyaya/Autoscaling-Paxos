@@ -4,7 +4,7 @@
 
 #include "proxy_leader.hpp"
 
-proxy_leader::proxy_leader(const int id) : id(id), unbatchers(config::F+1), proposers(config::F+1) {
+proxy_leader::proxy_leader() : unbatchers(config::F+1), proposers(config::F+1) {
 	annaClient = new anna{config::KEY_PROXY_LEADERS,
 					   {config::KEY_PROPOSERS, config::KEY_UNBATCHERS, config::KEY_ACCEPTOR_GROUPS},
 					   [&](const std::string& key, const two_p_set& twoPSet) {
@@ -76,7 +76,7 @@ void proxy_leader::processAcceptors(const std::string& acceptorGroupId, const tw
 }
 
 void proxy_leader::listenToProposer(const ProposerToAcceptor& payload) {
-	LOG("Proxy leader %d received from proposer: %s\n", id, payload.ShortDebugString().c_str());
+	LOG("Received from proposer: {}\n", payload.ShortDebugString());
 	TIME();
 
     // keep track
@@ -99,7 +99,7 @@ void proxy_leader::listenToProposer(const ProposerToAcceptor& payload) {
 }
 
 void proxy_leader::listenToAcceptor(const AcceptorToProxyLeader& payload) {
-    LOG("Proxy leader %d received from acceptors: %s\n", id, payload.ShortDebugString().c_str());
+    LOG("Received from acceptors: {}\n", payload.ShortDebugString());
 //	google::protobuf::util::ParseDelimitedFromCodedStream();
 
     switch (payload.type()) {
@@ -123,7 +123,7 @@ void proxy_leader::handleP1B(const AcceptorToProxyLeader& payload) {
 
     if (Log::isBallotGreaterThan(payload.ballot(), sentValue.ballot())) {
         //yikes, the proposer got preempted
-	    LOG("P1B preempted for proposer %d\n", payload.ballot().id());
+	    LOG("P1B preempted for proposer {}\n", payload.ballot().id());
         const ProxyLeaderToProposer& messageToProposer = message::createProxyP1B(payload.messageid(),
                                                                                  payload.acceptorgroupid(),
                                                                                  payload.ballot(), {}, {});
@@ -137,7 +137,7 @@ void proxy_leader::handleP1B(const AcceptorToProxyLeader& payload) {
 
         if (unmergedLogs[payload.messageid()].size() >= config::F + 1) {
             //we have f+1 good logs, merge them & tell the proposer
-	        LOG("P1B approved for proposer %d\n", payload.ballot().id());
+	        LOG("P1B approved for proposer {}\n", payload.ballot().id());
             const auto&[committedLog, uncommittedLog] = Log::mergeLogsOfAcceptorGroup(unmergedLogs[payload.messageid()]);
             const ProxyLeaderToProposer& messageToProposer = message::createProxyP1B(payload.messageid(),
 																					 payload.acceptorgroupid(),
@@ -160,7 +160,7 @@ void proxy_leader::handleP2B(const AcceptorToProxyLeader& payload) {
 
     if (Log::isBallotGreaterThan(payload.ballot(), sentValue.ballot())) {
         //yikes, the proposer got preempted
-	    LOG("P2B preempted for proposer: %d, slot: %d\n", payload.ballot().id(), payload.slot());
+	    LOG("P2B preempted for proposer: {}, slot: {}\n", payload.ballot().id(), payload.slot());
         const ProxyLeaderToProposer& messageToProposer = message::createProxyP2B(payload.messageid(), payload.acceptorgroupid(),
                                                                                 payload.ballot(), payload.slot());
         network::sendPayload(proposers.socketForIP(sentValue.ipaddress()), messageToProposer);
@@ -173,7 +173,7 @@ void proxy_leader::handleP2B(const AcceptorToProxyLeader& payload) {
 
         if (approvedCommanders[payload.messageid()] >= config::F + 1) {
             //we have f+1 approved commanders, tell the unbatcher. No need to tell proposer
-	        LOG("P2B approved for proposer: %d, slot: %d\n", payload.ballot().id(), payload.slot());
+	        LOG("P2B approved for proposer: {}, slot: {}\n", payload.ballot().id(), payload.slot());
 	        Batch batch;
 	        batch.ParseFromString(sentMessages[payload.messageid()].payload());
 	        unbatchers.send(batch);
@@ -189,10 +189,9 @@ bool proxy_leader::knowOfAcceptorGroup(const std::string& acceptorGroupId) {
 }
 
 int main(int argc, char** argv) {
-    if (argc != 2) {
-        printf("Usage: ./proxy_leader <PROXY LEADER ID>.\n");
+    if (argc != 1) {
+        printf("Usage: ./proxy_leader\n");
         exit(0);
     }
-    const int id = std::stoi(argv[1]);
-    proxy_leader p(id);
+    proxy_leader pr {};
 }

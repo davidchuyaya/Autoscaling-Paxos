@@ -4,7 +4,7 @@
 
 #include "unbatcher.hpp"
 
-unbatcher::unbatcher(const int id) : id(id) {
+unbatcher::unbatcher() {
 	annaWriteOnlyClient = new anna_write_only{};
 	annaWriteOnlyClient->putSingletonSet(config::KEY_UNBATCHERS, config::IP_ADDRESS);
 
@@ -15,11 +15,11 @@ unbatcher::unbatcher(const int id) : id(id) {
 void unbatcher::startServer() {
     network::startServerAtPort<Batch>(config::UNBATCHER_PORT,
        [&](const int socket) {
-           LOG("Unbatcher %d connected to proxy leader\n", id);
+           LOG("Unbatcher connected to proxy leader\n");
            std::unique_lock lock(proxyLeaderMutex);
            proxyLeaders.emplace_back(socket);
         }, [&](const int socket, const Batch& batch) {
-        	LOG("Unbatcher received payload: %s\n", batch.ShortDebugString().c_str());
+        	LOG("Unbatcher received payload: {}\n", batch.ShortDebugString());
         	TIME();
         	for (const auto&[clientIp, request] : batch.clienttorequest()) {
         		const int clientSocket = connectToClient(clientIp);
@@ -41,10 +41,9 @@ int unbatcher::connectToClient(const std::string& ipAddress) {
 }
 
 int main(const int argc, const char** argv) {
-    if (argc != 2) {
-        printf("Usage: ./unbatcher <UNBATCHER ID>.\n");
+    if (argc != 1) {
+        printf("Usage: ./unbatcher\n");
         exit(0);
     }
-    const int id = std::stoi(argv[1]);
-    unbatcher {id};
+    unbatcher u {};
 }

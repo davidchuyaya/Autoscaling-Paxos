@@ -19,7 +19,7 @@
 #include <optional>
 #include <message.pb.h>
 #include "config.hpp"
-#include "models/message.hpp"
+#include "../models/message.hpp"
 #include "google/protobuf/util/delimited_message_util.h"
 
 namespace network {

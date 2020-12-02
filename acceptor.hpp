@@ -7,7 +7,6 @@
 
 #include <shared_mutex>
 #include <vector>
-#include <mutex>
 #include <thread>
 
 #include "utils/config.hpp"
@@ -20,9 +19,8 @@
 
 class acceptor {
 public:
-    acceptor(int id, std::string&& acceptorGroupId);
+    explicit acceptor(std::string&& acceptorGroupId);
 private:
-    const int id;
     const std::string acceptorGroupId;
 	anna_write_only* annaWriteOnlyClient;
 

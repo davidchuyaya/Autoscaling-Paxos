@@ -18,9 +18,8 @@
 
 class unbatcher {
 public:
-    explicit unbatcher(int id);
+    explicit unbatcher();
 private:
-    const int id;
 	anna_write_only* annaWriteOnlyClient;
 
     LOGGER;

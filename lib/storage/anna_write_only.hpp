@@ -9,7 +9,7 @@
 #include <unordered_set>
 #include <string>
 #include "client/kvs_client.hpp"
-#include "../utils/config.hpp"
+#include "../../utils/config.hpp"
 
 class anna_write_only {
 public:

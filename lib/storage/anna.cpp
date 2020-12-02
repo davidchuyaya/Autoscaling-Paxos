@@ -51,7 +51,7 @@ void anna::listenerThread(const annaListener& listener) {
 
         for (const KeyResponse& response : responses) {
             if (response.type() != GET) {
-	            LOG("PUT response received: %s\n", response.ShortDebugString().c_str());
+	            LOG("PUT response received: {}\n", response.ShortDebugString());
 	            continue;
             }
             for (const KeyTuple& keyTuple : response.tuples()) {
@@ -64,7 +64,7 @@ void anna::listenerThread(const annaListener& listener) {
 
                 two_p_set twoPset = {};
 	            std::string key = twoPset.mergeAndUnprefixKey(keyTuple.key(), deserialize_set(keyTuple.payload()));
-	            LOG("Received set with key %s: %s\n", key.c_str(), twoPset.printSet().c_str());
+	            LOG("Received set with key {}: {}\n", key, twoPset.printSet());
 	            listener(key, twoPset);
             }
         }

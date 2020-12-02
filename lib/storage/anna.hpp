@@ -12,7 +12,7 @@
 
 #include "client/kvs_client.hpp"
 #include "two_p_set.hpp"
-#include "../utils/config.hpp"
+#include "../../utils/config.hpp"
 
 using annaListener = std::function<void(const std::string&, const two_p_set&)>;
 

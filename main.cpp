@@ -26,12 +26,11 @@ paxos::paxos(const int numCommands, const int numClients) : numCommands(numComma
     }
 }
 
-void paxos::startInstance(const std::string& command, const std::string& instanceName, const std::string& instanceType) {
+void paxos::startInstance(const std::string& command, const std::string& instanceName,
+						  const std::string& instanceType) {
     Aws::SDKOptions options;
     Aws::InitAPI(options);
-    {
-        scaling::startInstance(command, instanceName, instanceType);
-    }
+    scaling::startInstance(command, instanceName, instanceType);
     Aws::ShutdownAPI(options);
 }
 
@@ -41,7 +40,7 @@ void paxos::startServer() {
        [](const int socket) {
             LOG("Main connected to unbatcher\n");
     }, [&](const int socket, const UnbatcherToClient& payload) {
-            LOG("--Acked: {%s}--\n", payload.request().c_str());
+            LOG("--Acked: {}--\n", payload.request());
 
             //payload = client ID
             const int requestIndex = isBenchmark ? std::stoi(payload.request()) : 0;
@@ -54,12 +53,12 @@ void paxos::startServer() {
 		            requestCV[requestIndex].notify_all();
 	            }
             	else {
-		            LOG("Unexpected payload from unbatcher: {%s} when previous request was {%s}\n",
-		                payload.request().c_str(), request[requestIndex].value().c_str());
+		            LOG("Unexpected payload from unbatcher: {} when previous request was {}\n",
+		                payload.request(), request[requestIndex].value());
 	            }
             }
             else
-	            LOG("Unexpected payload from unbatcher: {%s} when previous request DNE\n", payload.request().c_str());
+	            LOG("Unexpected payload from unbatcher: {} when previous request DNE\n", payload.request());
     });
 }
 
@@ -79,7 +78,7 @@ void paxos::readInput() {
 	    requestCV[0].wait(lock, [&]{return !request[0].has_value();});
 	    auto end = std::chrono::system_clock::now();
 
-	    printf("Elapsed micro %ld\n", std::chrono::duration_cast<std::chrono::microseconds>(end - start).count());
+	    LOG("Elapsed micro {}\n", std::chrono::duration_cast<std::chrono::microseconds>(end - start).count());
 	    TIME();
     }
 }
@@ -98,13 +97,13 @@ void paxos::resendInput() {
 			lastInput = request[0].value();
 		else if (lastInput == request[0].value()) {//no response within timeout, resend
 			batchers.send(message::createClientRequest(config::IP_ADDRESS, lastInput));
-			LOG("Batcher timed out, resent request: %s\n", lastInput.c_str());
+			LOG("Batcher timed out, resent request: {}\n", lastInput);
 		}
 	}
 }
 
 void paxos::benchmark() {
-	printf("Enter any key to start benchmarking...\n");
+	BENCHMARK_LOG("Enter any key to start benchmarking...\n");
 	std::string input;
 	std::cin >> input;
 
@@ -134,7 +133,7 @@ void paxos::benchmark() {
 
 	auto end = std::chrono::system_clock::now();
 
-	printf("Elapsed millis %ld for %d clients and %d commands\n",
+	BENCHMARK_LOG("Elapsed millis {} for {} clients and {} commands\n",
 		std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count(), numClients, numCommands);
 }
 

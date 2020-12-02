@@ -9,7 +9,6 @@
 #include <thread>
 #include <shared_mutex>
 #include <condition_variable>
-#include <mutex>
 #include <string>
 #include <numeric>
 #include <chrono>
@@ -36,7 +35,7 @@ private:
     std::vector<std::condition_variable_any> requestCV;
     std::vector<std::optional<std::string>> request;
 
-    void startInstance(const std::string& command, const std::string& instanceName);
+    void startInstance(const std::string& command, const std::string& instanceName, const std::string& instanceType);
 
     [[noreturn]] void startServer();
     [[noreturn]] void readInput();

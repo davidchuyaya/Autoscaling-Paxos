@@ -4,7 +4,7 @@
 
 #include "batcher.hpp"
 
-batcher::batcher(const int id) : id(id), proposers(config::F+1) {
+batcher::batcher() : proposers(config::F+1) {
     annaClient = new anna(config::KEY_BATCHERS, {config::KEY_PROPOSERS},
                     [&](const std::string& key, const two_p_set& twoPSet) {
     	//template type doesn't matter, since we don't receive any messages from the proposer anyway
@@ -18,7 +18,7 @@ batcher::batcher(const int id) : id(id), proposers(config::F+1) {
 void batcher::startServer() {
     network::startServerAtPort<ClientToBatcher>(config::BATCHER_PORT,
        [&](const int socket) {
-           LOG("Batcher %d connected to client\n", id);
+           LOG("Connected to client\n");
            std::unique_lock lock(clientMutex);
            clientSockets.emplace_back(socket);
         }, [&](const int socket, const ClientToBatcher& payload) {
@@ -28,7 +28,7 @@ void batcher::startServer() {
 
 void batcher::listenToClient(const ClientToBatcher& payload) {
     //first payload is IP address of client
-    LOG("Batcher %d received payload: [%s]\n", id, payload.request().c_str());
+    LOG("Received payload: {}\n", payload.request());
 	TIME();
 
 	std::unique_lock lock(payloadsMutex);
@@ -48,10 +48,9 @@ void batcher::listenToClient(const ClientToBatcher& payload) {
 }
 
 int main(const int argc, const char** argv) {
-    if (argc != 2) {
-        printf("Usage: ./batcher <BATCHER ID>.\n");
+    if (argc != 1) {
+        printf("Usage: ./batcher\n");
         exit(0);
     }
-    const int batcherId = std::stoi(argv[1]);
-    batcher b {batcherId};
+    batcher b {};
 }

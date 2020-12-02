@@ -34,7 +34,7 @@ public:
 		membersLock.unlock();
 
 		for (const std::string& ip : updates.getObserved()) {
-			LOG("Connecting to new member: %s\n", ip.c_str());
+			LOG("Connecting to new member: {}\n", ip);
 			std::thread thread([&, ip, whoIsThis, port, listener]{
 				const int socket = network::connectToServerAtAddress(ip, port, whoIsThis);
 				std::unique_lock lock(ipToSocketMutex);
@@ -49,7 +49,7 @@ public:
 		if (!updates.getRemoved().empty()) {
 			std::scoped_lock lock(ipToSocketMutex, componentMutex, heartbeatMutex);
 			for (const std::string& ip : updates.getRemoved()) {
-				LOG("Removing dead member: %s\n", ip.c_str());
+				LOG("Removing dead member: {}\n", ip);
 				const int socket = ipToSocket[ip];
 				shutdown(socket, 1);
 				components.erase(std::remove(components.begin(), components.end(), socket), components.end());

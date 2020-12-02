@@ -10,7 +10,6 @@
 #include <shared_mutex>
 #include <condition_variable>
 #include <vector>
-#include <mutex>
 #include <thread>
 #include <message.pb.h>
 #include "utils/config.hpp"
@@ -23,9 +22,8 @@
 
 class proxy_leader {
 public:
-    explicit proxy_leader(int id);
+    explicit proxy_leader();
 private:
-    const int id;
     anna* annaClient;
 
     std::shared_mutex sentMessagesMutex;

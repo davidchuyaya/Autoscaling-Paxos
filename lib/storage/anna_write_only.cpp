@@ -37,7 +37,7 @@ void anna_write_only::listenerThread() {
 			if (response.type() != PUT)
 				continue;
 			for (const KeyTuple& keyTuple : response.tuples()) {
-				LOG("PUT response received for key: %s\n", keyTuple.key().c_str());
+				LOG("PUT response received for key: {}\n", keyTuple.key());
 				//TODO catch TIMEOUT errors & maybe resend?
 				std::unique_lock keysWrittenLock(keysWrittenMutex);
 				keysWritten.erase(keyTuple.key());

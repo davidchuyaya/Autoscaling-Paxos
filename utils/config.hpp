@@ -12,13 +12,14 @@
 #include <numeric>
 #include "spdlog/spdlog.h"
 
+#define LOGGER std::shared_ptr<spdlog::logger> logger = spdlog::basic_logger_mt("paxos_log", "log.txt")
+#define BENCHMARK_LOG(...) spdlog::get("paxos_log")->info(__VA_ARGS__) //some logging is always on for benchmarks
+
 #define DEBUG
 #ifdef DEBUG
-#   define LOGGER std::shared_ptr<spdlog::logger> logger = spdlog::basic_logger_mt("paxos_log", "log.txt")
-#   define LOG(...) spdlog::get("paxos_log")->info(__VA_ARGS__)
-#   define TIME() LOG("Micro: %ld\n", std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now().time_since_epoch()).count())
+#   define LOG(...) BENCHMARK_LOG(__VA_ARGS__)
+#   define TIME() LOG("Micro: {}\n", std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now().time_since_epoch()).count())
 #else //noop
-#   define LOGGER void(0)
 #   define LOG(...) void(0)
 #   define TIME() do{}while(0)
 #endif
@@ -36,8 +37,6 @@ namespace config {
     const static inline std::string ENV_ANNA_ROUTING_NAME = "ANNA_ROUTING";
     const static inline std::string ENV_IP_NAME = "IP";
 
-    //TODO Store result from "curl http://169.254.169.254/latest/meta-data/public-ipv4" into env
-    //TODO change IP address
     const static inline std::string IP_ADDRESS = std::getenv(ENV_IP_NAME.c_str());
     const static inline std::string ANNA_ROUTING_ADDRESS = std::getenv(ENV_ANNA_ROUTING_NAME.c_str());
 
