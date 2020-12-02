@@ -52,6 +52,7 @@ void paxos::startServer() {
 [[noreturn]]
 void paxos::readInput() {
     while (true) {
+	    printf("You may input...\n");
         std::string input;
         std::cin >> input;
         batchers.send(message::createClientRequest(config::IP_ADDRESS, input));
