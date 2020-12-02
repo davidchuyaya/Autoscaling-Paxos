@@ -18,15 +18,17 @@
 
 class paxos {
 public:
-    explicit paxos(int numCommands);
+    paxos(int numCommands, int numClients);
 private:
 	const int numCommands;
+	const int numClients;
+	const bool isBenchmark;
 	anna* annaClient;
     heartbeat_component batchers;
 
-    std::shared_mutex requestMutex;
-    std::condition_variable_any requestCV;
-    std::optional<std::string> request;
+    std::vector<std::shared_mutex> requestMutex;
+    std::vector<std::condition_variable_any> requestCV;
+    std::vector<std::optional<std::string>> request;
 
     [[noreturn]] void startServer();
     [[noreturn]] void readInput();
