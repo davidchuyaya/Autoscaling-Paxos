@@ -4,20 +4,20 @@
 
 #include "acceptor.hpp"
 
-acceptor::acceptor(const int id, const int acceptorGroupId) : id(id), acceptorGroupId(acceptorGroupId) {
-    startServer();
+acceptor::acceptor(const int id, std::string&& acceptorGroupId) : id(id), acceptorGroupId(acceptorGroupId) {
+	annaWriteOnlyClient = new anna_write_only{};
+	annaWriteOnlyClient->putSingletonSet(config::KEY_ACCEPTOR_GROUPS, acceptorGroupId);
+	annaWriteOnlyClient->putSingletonSet(acceptorGroupId, config::IP_ADDRESS);
+
+	startServer();
 }
 
 [[noreturn]]
 void acceptor::startServer() {
-    const int acceptorGroupPortOffset = config::ACCEPTOR_GROUP_PORT_OFFSET * acceptorGroupId;
-    LOG("Acceptor Port: %d\n", config::ACCEPTOR_PORT_START + acceptorGroupPortOffset + id);
-    network::startServerAtPort(config::ACCEPTOR_PORT_START + acceptorGroupPortOffset + id,
-       [&](const int socket, const WhoIsThis_Sender& whoIsThis) {
-            LOG("Acceptor [%d, %d] connected to proxy leader\n", acceptorGroupId, id);
-        }, [&](const int socket, const WhoIsThis_Sender& whoIsThis, const std::string& payloadString) {
-            ProposerToAcceptor payload;
-            payload.ParseFromString(payloadString);
+    network::startServerAtPort<ProposerToAcceptor>(config::ACCEPTOR_PORT,
+       [&](const int socket) {
+            LOG("Acceptor [%s, %d] connected to proxy leader\n", acceptorGroupId.c_str(), id);
+        }, [&](const int socket, const ProposerToAcceptor& payload) {
             listenToProxyLeaders(socket, payload);
     });
 }
@@ -26,8 +26,8 @@ void acceptor::listenToProxyLeaders(const int socket, const ProposerToAcceptor& 
     std::scoped_lock lock(ballotMutex, logMutex);
     switch (payload.type()) {
         case ProposerToAcceptor_Type_p1a: {
-            LOG("Acceptor [%d, %d] received p1a: [%d, %d], highestBallot: [%d, %d]\n",
-                   acceptorGroupId, id, payload.ballot().id(),
+            LOG("Acceptor [%s, %d] received p1a: [%d, %d], highestBallot: [%d, %d]\n",
+                   acceptorGroupId.c_str(), id, payload.ballot().id(),
                    payload.ballot().ballotnum(), highestBallot.id(), highestBallot.ballotnum());
             if (Log::isBallotGreaterThan(payload.ballot(), highestBallot))
                 highestBallot = payload.ballot();
@@ -35,16 +35,18 @@ void acceptor::listenToProxyLeaders(const int socket, const ProposerToAcceptor& 
             break;
         }
         case ProposerToAcceptor_Type_p2a:
-            LOG("Acceptor [%d, %d] received p2a: [%s]\n", acceptorGroupId, id, payload.ShortDebugString().c_str());
+            LOG("Acceptor [%s, %d] received p2a: [%s]\n", acceptorGroupId.c_str(), id, payload.ShortDebugString().c_str());
+		    TIME();
             if (!Log::isBallotGreaterThan(highestBallot, payload.ballot())) {
                 PValue pValue;
                 pValue.set_payload(payload.payload());
                 *pValue.mutable_ballot() = payload.ballot();
                 log[payload.slot()] = pValue;
                 highestBallot = payload.ballot();
-                LOG("[%d, %d] New log: %s\n", acceptorGroupId, id, Log::printLog(log).c_str());
+                LOG("[%s, %d] New log: %s\n", acceptorGroupId.c_str(), id, Log::printLog(log).c_str());
             }
             network::sendPayload(socket, message::createP2B(payload.messageid(), acceptorGroupId, highestBallot, payload.slot()));
+		    TIME();
             break;
         default: {}
     }
@@ -55,7 +57,6 @@ int main(const int argc, const char** argv) {
         printf("Usage: ./acceptor <ACCEPTOR GROUP ID> <ACCEPTOR ID>.\n");
         exit(0);
     }
-    const int acceptorGroupId = atoi(argv[1]);
-    const int id = atoi(argv[2]);
-    acceptor(id, acceptorGroupId);
+    const int id = std::stoi(argv[2]);
+    acceptor(id, argv[1]);
 }

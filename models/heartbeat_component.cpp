@@ -4,52 +4,35 @@
 
 #include "heartbeat_component.hpp"
 
-heartbeat_component::heartbeat_component(const int waitThreshold) : waitThreshold(waitThreshold) {
+heartbeat_component::heartbeat_component(const int waitThreshold) : threshold_component(waitThreshold) {
     std::thread thread([&]{checkHeartbeats();});
     thread.detach();
 }
 
-void heartbeat_component::connectToServers(const parser::idToIP& idToIPs, const int socketOffset,
-                                                    const WhoIsThis_Sender& whoIsThis,
-                                                    const std::function<void(int, const std::string&)>& listener) {
-    for (const auto& idToIP : idToIPs) {
-        const int id = idToIP.first;
-        const std::string& ip = idToIP.second;
-
-        std::thread thread([&, id, ip, whoIsThis, socketOffset, listener]{
-            int socket = network::connectToServerAtAddress(ip, socketOffset + id, whoIsThis);
-            addConnection(socket);
-            network::listenToSocketUntilClose(socket, listener);
-        });
-        thread.detach();
-    }
-}
-
 void heartbeat_component::addConnection(const int socket) {
-    std::unique_lock lock(componentMutex);
-    fastComponents.emplace_back(socket);
-    //check threshold
-    if (!thresholdMet())
-        return;
-    lock.unlock();
-    componentCV.notify_one();
-}
+	{
+		std::scoped_lock lock(componentMutex, heartbeatMutex);
+		components.emplace_back(socket);
+		//add 1st heartbeat immediately after connection is made
+		LOG("Heartbeat added for socket: %d\n", socket);
+		time(&heartbeats[socket]);
 
-void heartbeat_component::waitForThreshold() {
-    std::shared_lock lock(componentMutex);
-    componentCV.wait(lock, [&]{return thresholdMet();});
-    canSend = true;
+		//check threshold
+		if (!thresholdMet())
+			return;
+	}
+	componentCV.notify_all();
 }
 
 bool heartbeat_component::thresholdMet() {
-    return fastComponents.size() + slowComponents.size() >= waitThreshold;
+    return components.size() + slowComponents.size() >= waitThreshold;
 }
 
 int heartbeat_component::nextComponentSocket() {
     //prioritize sending to fast proxy leaders
-    if (!fastComponents.empty()) {
-        next = (next + 1) % fastComponents.size();
-        return fastComponents[next];
+    if (!components.empty()) {
+        next = (next + 1) % components.size();
+        return components[next];
     }
     else {
         next = (next + 1) % slowComponents.size();
@@ -67,15 +50,13 @@ void heartbeat_component::checkHeartbeats() {
         time(&now);
 
         //if a node has no recent heartbeat, move it into the slow list
-        std::vector<int> slowedComponents = {};
-        auto iterator = fastComponents.begin();
-        while (iterator != fastComponents.end()) {
+        auto iterator = components.begin();
+        while (iterator != components.end()) {
             const int socket = *iterator;
             if (difftime(now, heartbeats[socket]) > config::HEARTBEAT_TIMEOUT_SEC) {
                 LOG("Node failed to heartbeat\n");
                 slowComponents.emplace_back(socket);
-                iterator = fastComponents.erase(iterator);
-                slowedComponents.emplace_back(socket);
+                iterator = components.erase(iterator);
             }
             else
                 ++iterator;
@@ -85,8 +66,8 @@ void heartbeat_component::checkHeartbeats() {
         iterator = slowComponents.begin();
         while (iterator != slowComponents.end()) {
             const int socket = *iterator;
-            if (difftime(now, heartbeats[socket]) > config::HEARTBEAT_TIMEOUT_SEC) {
-                fastComponents.emplace_back(socket);
+            if (difftime(now, heartbeats[socket]) < config::HEARTBEAT_TIMEOUT_SEC) {
+                components.emplace_back(socket);
                 iterator = slowComponents.erase(iterator);
             }
             else

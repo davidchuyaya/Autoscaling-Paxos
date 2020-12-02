@@ -7,9 +7,10 @@
 
 #include <iostream>
 #include <thread>
-#include <mutex>
+#include <shared_mutex>
+#include <condition_variable>
 #include <numeric>
-
+#include <chrono>
 #include "utils/config.hpp"
 #include "acceptor.hpp"
 #include "batcher.hpp"
@@ -17,13 +18,20 @@
 
 class paxos {
 public:
-    [[noreturn]] explicit paxos(const parser::idToIP& batchers);
+    explicit paxos(int numCommands);
 private:
+	const int numCommands;
+	anna* annaClient;
     heartbeat_component batchers;
 
+    std::shared_mutex requestMutex;
+    std::condition_variable_any requestCV;
+    std::optional<std::string> request;
+
     [[noreturn]] void startServer();
-    void connectToBatchers(const parser::idToIP& batcherIdToIPs);
     [[noreturn]] void readInput();
+    [[noreturn]] void resendInput();
+	void benchmark();
 };
 
 #endif //C__PAXOS_MAIN_HPP

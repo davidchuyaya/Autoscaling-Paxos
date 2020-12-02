@@ -1,10 +1,18 @@
-cmake_minimum_required(VERSION 3.17)
+cmake_minimum_required(VERSION 3.17 FATAL_ERROR)
 project(Autoscaling_Paxos)
 set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED on)
 
-SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -pthread")
+IF(${CMAKE_CXX_COMPILER} STREQUAL "/usr/bin/clang++")
+    SET(CMAKE_CXX_FLAGS_COMMON
+            "-std=c++17 \
+      -stdlib=libc++ -pthread")
+ENDIF()
 
-INCLUDE(ExternalProject)
+IF(${CMAKE_CXX_COMPILER} STREQUAL "/usr/bin/g++")
+    SET(CMAKE_CXX_FLAGS_COMMON
+            "-std=c++17 -pthread")
+ENDIF()
 
 # Begin Anna things -----------------------------------------------------------
 SET(VENDOR_DIR common/vendor)
@@ -39,35 +47,27 @@ LINK_DIRECTORIES(${ZEROMQ_LINK_DIRS} ${YAMLCPP_LINK_DIRS})
 
 # End Anna things -------------------------------------------------------------
 
-
-file(GLOB UTILS_SRC
-        "utils/*.hpp"
-        "utils/*.cpp"
-        )
-
-file(GLOB MODELS_SRC
-        "models/*.hpp"
-        "models/*.cpp"
-        )
 set(PROXY_LEADERS_SRC proxy_leader.cpp proxy_leader.hpp)
 set(BATCHERS_SRC batcher.cpp batcher.hpp)
 set(PROPOSER_SRC proposer.cpp proposer.hpp)
 set(ACCEPTOR_SRC acceptor.cpp acceptor.hpp)
 set(UNBATCHER_SRC unbatcher.cpp unbatcher.hpp)
 set(MAIN_SRC main.cpp main.hpp)
+file(GLOB UTILS_SRC "utils/*.hpp" "utils/*.cpp")
+file(GLOB MODELS_SRC "models/*.hpp" "models/*.cpp")
 file(GLOB STORAGE_SRC "lib/storage/*.hpp" "lib/storage/*.cpp")
 
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
-add_executable(Autoscaling_Paxos ${MAIN_SRC} ${UTILS_SRC} ${STORAGE_SRC} ${MODELS_SRC} ${PROTO_SRC} ${PROTO_HDRS})
-add_executable(acceptor ${ACCEPTOR_SRC} ${UTILS_SRC} ${STORAGE_SRC} ${MODELS_SRC} ${PROTO_SRC} ${PROTO_HDRS})
-add_executable(batcher ${BATCHERS_SRC} ${UTILS_SRC} ${STORAGE_SRC} ${MODELS_SRC} ${PROTO_SRC} ${PROTO_HDRS})
-add_executable(proposer ${PROPOSER_SRC} ${UTILS_SRC} ${STORAGE_SRC} ${MODELS_SRC} ${PROTO_SRC} ${PROTO_HDRS})
-add_executable(proxy_leader ${PROXY_LEADERS_SRC} ${UTILS_SRC} ${STORAGE_SRC} ${MODELS_SRC} ${PROTO_SRC} ${PROTO_HDRS})
-add_executable(unbatcher ${UNBATCHER_SRC} ${UTILS_SRC} ${STORAGE_SRC} ${MODELS_SRC} ${PROTO_SRC} ${PROTO_HDRS})
+add_executable(Autoscaling_Paxos ${MAIN_SRC} ${UTILS_SRC} ${STORAGE_SRC} ${MODELS_SRC})
+add_executable(acceptor ${ACCEPTOR_SRC} ${UTILS_SRC} ${STORAGE_SRC} ${MODELS_SRC})
+add_executable(batcher ${BATCHERS_SRC} ${UTILS_SRC} ${STORAGE_SRC} ${MODELS_SRC})
+add_executable(proposer ${PROPOSER_SRC} ${UTILS_SRC} ${STORAGE_SRC} ${MODELS_SRC})
+add_executable(proxy_leader ${PROXY_LEADERS_SRC} ${UTILS_SRC} ${STORAGE_SRC} ${MODELS_SRC})
+add_executable(unbatcher ${UNBATCHER_SRC} ${UTILS_SRC} ${STORAGE_SRC} ${MODELS_SRC})
 
-target_link_libraries(Autoscaling_Paxos proto ${PROTOBUF_LIBRARY})
-target_link_libraries(acceptor proto ${PROTOBUF_LIBRARY})
-target_link_libraries(batcher proto ${PROTOBUF_LIBRARY})
-target_link_libraries(proposer proto ${PROTOBUF_LIBRARY})
-target_link_libraries(proxy_leader proto ${PROTOBUF_LIBRARY})
-target_link_libraries(unbatcher proto ${PROTOBUF_LIBRARY})
+target_link_libraries(Autoscaling_Paxos proto hydro-zmq zmq yaml-cpp pthread ${PROTOBUF_LIBRARY})
+target_link_libraries(acceptor proto hydro-zmq zmq yaml-cpp pthread ${PROTOBUF_LIBRARY})
+target_link_libraries(batcher proto hydro-zmq zmq yaml-cpp pthread ${PROTOBUF_LIBRARY})
+target_link_libraries(proposer proto hydro-zmq zmq yaml-cpp pthread ${PROTOBUF_LIBRARY})
+target_link_libraries(proxy_leader proto hydro-zmq zmq yaml-cpp pthread ${PROTOBUF_LIBRARY})
+target_link_libraries(unbatcher proto hydro-zmq zmq yaml-cpp pthread ${PROTOBUF_LIBRARY})

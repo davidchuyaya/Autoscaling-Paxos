@@ -5,13 +5,13 @@
 #ifndef C__PAXOS_NETWORKNODE_HPP
 #define C__PAXOS_NETWORKNODE_HPP
 
-#define MAX_CONNECTIONS 5
-
 #include <netinet/in.h>
 #include <google/protobuf/message.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <unistd.h>
+#include <fcntl.h>
+#include <poll.h>
 #include <thread>
 #include <functional>
 #include <vector>
@@ -19,9 +19,40 @@
 #include <optional>
 #include <message.pb.h>
 #include "config.hpp"
+#include "models/message.hpp"
+#include "google/protobuf/util/delimited_message_util.h"
 
 namespace network {
-    /**
+	/**
+ * Creates a local server at the given port and listens.
+ *
+ * @param port Port of server
+ * @return {Socket ID, socket address struct}
+ */
+	std::tuple<int, sockaddr_in> listenToPort(int port);
+
+	/**
+	 * Waits for a payload from the socket.
+	 * @note Blocks until a payload arrives.
+	 *
+	 * @param socketId Socket ID of sender
+	 * @return Payload
+	 */
+	bool receivePayload(google::protobuf::Message* message, google::protobuf::io::ZeroCopyInputStream* stream);
+
+	template<typename Message>
+	void listenToStream(const int socket, google::protobuf::io::ZeroCopyInputStream* inputStream,
+	                    const std::function<void(int, const Message&)>& onPayloadReceived) {
+		Message message;
+		bool socketOpen = receivePayload(&message, inputStream);
+		while (socketOpen) {
+			onPayloadReceived(socket, message);
+			message.Clear();
+			socketOpen = receivePayload(&message, inputStream);
+		}
+	}
+
+	/**
      * Creates a local server at the given port, waiting for clients to connect.
      * Triggers the callback function with a socket ID for each client connection.
      * @note Runs forever.
@@ -30,20 +61,55 @@ namespace network {
      * @param onClientConnected Callback that accepts the socket ID of a client connection. Started in new thread, so
      * this is allowed to block
      */
-    [[noreturn]] void startServerAtPort(int port,
-                                        const std::function<void(int, const WhoIsThis_Sender&)>& onConnect,
-                                        const std::function<void(int, const WhoIsThis_Sender&, const std::string&)>&
-                                                onPayloadReceived);
-    /**
-     * Creates a local server at the given port and listens.
+	[[noreturn]]
+	void startServerAtPortMultitype(int port, const std::function<void(int, const WhoIsThis_Sender&,
+			google::protobuf::io::ZeroCopyInputStream*)>& onConnect);
+
+	/**
+     * Creates a local server at the given port, waiting for clients to connect.
+     * Triggers the callback function with a socket ID for each client connection.
+     * @note Runs forever.
      *
      * @param port Port of server
-     * @return {Socket ID, socket address struct}
+     * @param onClientConnected Callback that accepts the socket ID of a client connection. Started in new thread, so
+     * this is allowed to block
      */
-    std::tuple<int, sockaddr_in> listenToPort(int port);
+    template <typename Message>
+    [[noreturn]]
+    void startServerAtPort(const int port, const std::function<void(int)>& onConnect,
+						   const std::function<void(int, const Message&)>& onPayloadReceived) {
+		const auto& [socketId, serverAddress] = listenToPort(port);
+		while (true) {
+			socklen_t serverAddressSize = sizeof(serverAddress);
+			const int socket = accept(socketId, (sockaddr *) &serverAddress, &serverAddressSize);
+			std::thread thread([&, socket] {
+				google::protobuf::io::ZeroCopyInputStream* inputStream = new google::protobuf::io::FileInputStream(socket);
 
-    bool listenToSocket(int socket, const std::function<void(int, const std::string&)>& onPayloadReceived);
-    void listenToSocketUntilClose(int socket, const std::function<void(int, const std::string&)>& onPayloadReceived);
+				//parse whoIsThis
+				WhoIsThis whoIsThis;
+				bool socketOpen = receivePayload(&whoIsThis, inputStream);
+				if (socketOpen) {
+					onConnect(socket);
+
+					//start receiving regular messages
+					listenToStream(socket, inputStream, onPayloadReceived);
+				}
+				delete inputStream;
+				close(socket);
+			});
+			thread.detach();
+		}
+	}
+
+	//similar to startServerAtPort, but creates streams & closes the socket
+	template <typename Message>
+    void listenToSocketUntilClose(const int socket, const std::function<void(int, const Message&)>& onPayloadReceived) {
+		google::protobuf::io::ZeroCopyInputStream* inputStream = new google::protobuf::io::FileInputStream(socket);
+		listenToStream(socket, inputStream, onPayloadReceived);
+		delete inputStream;
+		close(socket);
+	}
+
     /**
      * Creates a connection to the server at the given IP address and port.
      * @note Blocks until connection is made.
@@ -65,15 +131,6 @@ namespace network {
      * @param payload Payload to send
      */
     void sendPayload(int socketId, const google::protobuf::Message& payload);
-    void sendPayload(int socketId, const std::string& payload);
-    /**
-     * Waits for a payload from the socket.
-     * @note Blocks until a payload arrives.
-     *
-     * @param socketId Socket ID of sender
-     * @return Payload
-     */
-    std::optional<std::string> receivePayload(int socketId);
 }
 
 #endif //C__PAXOS_NETWORKNODE_HPP

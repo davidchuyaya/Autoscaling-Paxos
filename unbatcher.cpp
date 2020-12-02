@@ -5,28 +5,28 @@
 #include "unbatcher.hpp"
 
 unbatcher::unbatcher(const int id) : id(id) {
-    const std::thread server([&] {startServer(); });
-    heartbeater::heartbeat("i'm alive", proxyLeaderMutex, proxyLeaders);
-    pthread_exit(nullptr);
+	annaWriteOnlyClient = new anna_write_only{};
+	annaWriteOnlyClient->putSingletonSet(config::KEY_UNBATCHERS, config::IP_ADDRESS);
+
+    heartbeater::heartbeat(proxyLeaderMutex, proxyLeaders);
+	startServer();
 }
 
 void unbatcher::startServer() {
-    network::startServerAtPort(config::UNBATCHER_PORT_START + id,
-       [&](const int socket, const WhoIsThis_Sender& whoIsThis) {
+    network::startServerAtPort<Batch>(config::UNBATCHER_PORT,
+       [&](const int socket) {
            LOG("Unbatcher %d connected to proxy leader\n", id);
            std::unique_lock lock(proxyLeaderMutex);
            proxyLeaders.emplace_back(socket);
-        },
-       [&](const int socket, const WhoIsThis_Sender& whoIsThis, const std::string& payload) {
-           LOG("Unbatcher received payload: %s\n", payload.c_str());
-           Batch batch;
-           batch.ParseFromString(payload);
-           for (const auto&[clientIp, requests] : batch.clienttorequests()) {
-               const int clientSocket = connectToClient(clientIp);
-               for (const std::string& request : requests.requests())
-                   network::sendPayload(clientSocket, request);
-           }
-    });
+        }, [&](const int socket, const Batch& batch) {
+        	LOG("Unbatcher received payload: %s\n", batch.ShortDebugString().c_str());
+        	TIME();
+        	for (const auto&[clientIp, request] : batch.clienttorequest()) {
+        		const int clientSocket = connectToClient(clientIp);
+        		network::sendPayload(clientSocket, message::createUnbatcherToClientAck(request));
+        	}
+        	TIME();
+        });
 }
 
 int unbatcher::connectToClient(const std::string& ipAddress) {
@@ -45,6 +45,6 @@ int main(const int argc, const char** argv) {
         printf("Usage: ./unbatcher <UNBATCHER ID>.\n");
         exit(0);
     }
-    const int id = atoi(argv[1]);
+    const int id = std::stoi(argv[1]);
     unbatcher {id};
 }

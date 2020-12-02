@@ -15,18 +15,19 @@
 #include <message.pb.h>
 #include "utils/config.hpp"
 #include "utils/network.hpp"
-#include "utils/parser.hpp"
 #include "models/message.hpp"
 #include "models/log.hpp"
 #include "models/heartbeat_component.hpp"
 #include "utils/heartbeater.hpp"
+#include "lib/storage/anna.hpp"
 
 class proxy_leader {
 public:
-    explicit proxy_leader(int id, const parser::idToIP& unbatchers, const parser::idToIP& proposers,
-                          const std::unordered_map<int, parser::idToIP>& acceptors);
+    explicit proxy_leader(int id);
 private:
     const int id;
+    anna* annaClient;
+
     std::shared_mutex sentMessagesMutex;
     std::unordered_map<int, ProposerToAcceptor> sentMessages = {}; //key = message ID
 
@@ -36,20 +37,19 @@ private:
     std::shared_mutex approvedCommandersMutex;
     std::unordered_map<int, int> approvedCommanders = {}; //key = message ID
 
-    std::shared_mutex proposerMutex;
-    std::unordered_map<int, int> proposerSockets = {}; //key = proposer ID
+    threshold_component proposers;
+
+    two_p_set acceptorGroupIdSet;
 
     std::shared_mutex acceptorMutex;
-    std::condition_variable_any acceptorCV;
-    std::unordered_map<int, std::vector<int>> acceptorSockets = {}; //key = acceptor group ID
-    std::vector<int> acceptorGroupIds = {};
+    std::unordered_map<std::string, threshold_component*> acceptorGroupSockets = {}; //key = acceptor group ID
 
     heartbeat_component unbatchers;
 
-    void connectToUnbatchers(const parser::idToIP& unbatchers);
-    void connectToProposers(const parser::idToIP& proposers);
+    void listenToAnna(const std::string& key, const two_p_set& twoPSet);
+    void processAcceptorGroup(const two_p_set& twoPSet);
+    void processAcceptors(const std::string& acceptorGroupId, const two_p_set& twoPSet);
     void listenToProposer(const ProposerToAcceptor& payload);
-    void connectToAcceptors(const std::unordered_map<int, parser::idToIP>& acceptors);
     void listenToAcceptor(const AcceptorToProxyLeader& payload);
 
     /**
@@ -68,6 +68,7 @@ private:
      * @param payload
      */
     void handleP2B(const AcceptorToProxyLeader& payload);
+	bool knowOfAcceptorGroup(const std::string& acceptorGroupId);
 };
 
 

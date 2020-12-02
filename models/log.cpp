@@ -26,9 +26,9 @@ Log::stringLog Log::mergeCommittedLogs(const std::vector<stringLog>& committedLo
     return committedLog;
 }
 
-std::tuple<Log::pValueLog, std::unordered_map<int, int>>
-Log::mergeUncommittedLogs(const std::unordered_map<int, pValueLog>& uncommittedLogs) {
-    std::unordered_map<int, int> acceptorGroupForSlot = {};
+std::tuple<Log::pValueLog, std::unordered_map<int, std::string>>
+Log::mergeUncommittedLogs(const std::unordered_map<std::string, pValueLog>& uncommittedLogs) {
+    std::unordered_map<int, std::string> acceptorGroupForSlot = {};
     pValueLog bestUncommittedValueForSlot = {};
 
     for (const auto& [acceptorGroupId, logs] : uncommittedLogs) {

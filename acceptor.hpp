@@ -13,13 +13,15 @@
 #include "utils/network.hpp"
 #include "models/message.hpp"
 #include "message.pb.h"
+#include "lib/storage/anna_write_only.hpp"
 
 class acceptor {
 public:
-    acceptor(int id, int acceptorGroupId);
+    acceptor(int id, std::string&& acceptorGroupId);
 private:
     const int id;
-    const int acceptorGroupId;
+    const std::string acceptorGroupId;
+	anna_write_only* annaWriteOnlyClient;
 
     std::shared_mutex ballotMutex;
     Ballot highestBallot = {};

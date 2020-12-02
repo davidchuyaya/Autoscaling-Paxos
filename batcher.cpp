@@ -4,76 +4,54 @@
 
 #include "batcher.hpp"
 
-batcher::batcher(const int id, const parser::idToIP& proposerIDtoIPs) : id(id) {
-    connectToProposers(proposerIDtoIPs);
-    const std::thread server([&] {startServer(); });
-    heartbeater::heartbeat("i'm alive", clientMutex, clientSockets);
-    pthread_exit(nullptr);
+batcher::batcher(const int id) : id(id), proposers(config::F+1) {
+    annaClient = new anna(config::KEY_BATCHERS, {config::KEY_PROPOSERS},
+                    [&](const std::string& key, const two_p_set& twoPSet) {
+    	//template type doesn't matter, since we don't receive any messages from the proposer anyway
+    	proposers.connectAndMaybeListen<Heartbeat>(twoPSet, config::PROPOSER_PORT, WhoIsThis_Sender_batcher, {});
+    });
+    heartbeater::heartbeat(clientMutex, clientSockets);
+	startServer();
 }
 
 [[noreturn]]
 void batcher::startServer() {
-    network::startServerAtPort(config::BATCHER_PORT_START + id,
-       [&](const int socket, const WhoIsThis_Sender& whoIsThis) {
+    network::startServerAtPort<ClientToBatcher>(config::BATCHER_PORT,
+       [&](const int socket) {
            LOG("Batcher %d connected to client\n", id);
            std::unique_lock lock(clientMutex);
            clientSockets.emplace_back(socket);
-        },
-       [&](const int socket, const WhoIsThis_Sender& whoIsThis, const std::string& payloadString) {
-            ClientToBatcher payload;
-            payload.ParseFromString(payloadString);
-            listenToClient(payload);
-    });
+        }, [&](const int socket, const ClientToBatcher& payload) {
+        	listenToClient(payload);
+        });
 }
 
 void batcher::listenToClient(const ClientToBatcher& payload) {
     //first payload is IP address of client
     LOG("Batcher %d received payload: [%s]\n", id, payload.request().c_str());
-    std::unique_lock payloadsLock(payloadsMutex);
-    clientToPayloads[payload.ipaddress()].emplace_back(payload.request());
-    payloadsLock.unlock();
+	TIME();
 
-    //check if it's time to send another batch TODO separate timer in case client sends nothing else
-    std::shared_lock batchTimeLock(lastBatchTimeMutex);
-    time_t now;
-    time(&now);
-    if (difftime(now, lastBatchTime) < config::BATCH_TIME_SEC)
-        return;
-    batchTimeLock.unlock();
+	std::unique_lock lock(payloadsMutex);
+    clientToPayload[payload.ipaddress()] = payload.request();
+    numPayloads += 1;
 
-    std::shared_lock proposersLock(proposerMutex, std::defer_lock);
-    std::scoped_lock lock(lastBatchTimeMutex, payloadsMutex, proposersLock);
-    lastBatchTime = now;
-    LOG("Sending batch\n");
-    const Batch& batchMessage = message::createBatchMessage(clientToPayloads);
-    for (const int socket : proposerSockets)
-        network::sendPayload(socket, batchMessage);
-    clientToPayloads.clear();
-}
+	if (numPayloads < config::THRESHOLD_BATCH_SIZE)
+		return;
 
-void batcher::connectToProposers(const parser::idToIP& proposerIDToIPs) {
-    for (const auto& idToIP : proposerIDToIPs) {
-        int proposerID = idToIP.first;
-        std::string proposerIP = idToIP.second;
-        const int proposerPort = config::PROPOSER_PORT_START + proposerID;
+	LOG("Sending batch\n");
+	const Batch& batchMessage = message::createBatchMessage(clientToPayload);
+	proposers.broadcast(batchMessage);
+	TIME();
 
-        std::thread thread([&, proposerIP, proposerPort] {
-            const int proposerSocketId = network::connectToServerAtAddress(proposerIP, proposerPort, WhoIsThis_Sender_batcher);
-            std::unique_lock lock(proposerMutex);
-            proposerSockets.emplace_back(proposerSocketId);
-            LOG("Batcher %d connected to proposer\n", id);
-        });
-        thread.detach();
-    }
+	clientToPayload.clear();
+	numPayloads = 0;
 }
 
 int main(const int argc, const char** argv) {
-    if (argc != 3) {
-        printf("Usage: ./batcher <BATCHER ID> <PROPOSER FILE NAME>.\n");
+    if (argc != 2) {
+        printf("Usage: ./batcher <BATCHER ID>.\n");
         exit(0);
     }
-    const int batcherId = atoi(argv[1]);
-    const std::string& proposerFile = argv[2];
-    const parser::idToIP& proposers = parser::parseIDtoIPs(proposerFile);
-    batcher(batcherId, proposers);
+    const int batcherId = std::stoi(argv[1]);
+    batcher b {batcherId};
 }

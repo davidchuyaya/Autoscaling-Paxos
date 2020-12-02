@@ -26,10 +26,10 @@ message PValue {
     string payload = 2;
 }
 message Batch {
-    message Requests {
-        repeated string requests = 1;
-    }
-    map<string, Requests> clientToRequests = 1;
+    map<string, string> clientToRequest = 1;
+}
+message Heartbeat {
+    bool dummy = 1; //must have at least 1 value for message to send
 }
 
 /**
@@ -43,10 +43,11 @@ message ProposerToAcceptor {
 
     int32 messageId = 1;
     Type type = 2;
-    int32 acceptorGroupId = 3; //Acceptor group ID of recipient
+    string acceptorGroupId = 3; //Acceptor group ID of recipient
     Ballot ballot = 4;
     int32 slot = 5;
     string payload = 6;
+    string ipAddress = 7;
 }
 
 message AcceptorToProxyLeader {
@@ -57,7 +58,7 @@ message AcceptorToProxyLeader {
 
     int32 messageId = 1;
     Type type = 2;
-    int32 acceptorGroupId = 3;
+    string acceptorGroupId = 3;
     Ballot ballot = 4;
     int32 slot = 5;
     map<int32, PValue> log = 6;
@@ -72,7 +73,7 @@ message ProxyLeaderToProposer {
 
     int32 messageId = 1;
     Type type = 2;
-    int32 acceptorGroupId = 3;
+    string acceptorGroupId = 3;
     Ballot ballot = 4;
     int32 slot = 5;
     map<int32, string> committedLog = 6;
@@ -86,4 +87,8 @@ message ProposerToProposer {
 message ClientToBatcher {
     string ipAddress = 1;
     string request = 2;
+}
+
+message UnbatcherToClient {
+    string request = 1;
 }

@@ -13,12 +13,15 @@
 #include <message.pb.h>
 #include "utils/network.hpp"
 #include "utils/heartbeater.hpp"
+#include "lib/storage/anna_write_only.hpp"
 
 class unbatcher {
 public:
     explicit unbatcher(int id);
 private:
     const int id;
+	anna_write_only* annaWriteOnlyClient;
+
     std::shared_mutex ipToSocketMutex;
     std::unordered_map<std::string, int> ipToSocket = {};
 

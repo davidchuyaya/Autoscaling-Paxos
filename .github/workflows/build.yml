@@ -10,12 +10,27 @@ jobs:
         - uses: actions/checkout@v2
         - name: Checkout submodules
           uses: textbook/git-checkout-submodule-action@master
+        - name: Cache protobuf
+          uses: actions/cache@v2
+          id: cache-protobuf
+          with:
+            path: protobuf-3.13.0
+            key: ${{ runner.os }}-protobuf
+        - name: APT packages
+          run: |
+            sudo ./scripts/install_dependencies_for_building.sh
+        - name: Build protobuf library
+          if: steps.cache-protobuf.outputs.cache-hit != 'true'
+          run: |
+            sudo ./scripts/download_protobuf.sh
+        - name: Install protobuf
+          run: |
+            sudo ./scripts/install_protobuf.sh
         - name: Building binaries w/ CMake
           run: |
-            sudo apt-get update
-            mv scripts/compile_aspaxos.sh .
-            sudo chmod +x ./compile_aspaxos.sh
-            sudo ./compile_aspaxos.sh
+            sudo ./scripts/build.sh
+            sudo mkdir build
+            find . -maxdepth 1 -type f  -executable | xargs -I {} sudo mv {} build
         - name: Pushing binaries to S3
           uses: jakejarvis/s3-sync-action@master
           with:
@@ -25,4 +40,4 @@ jobs:
             AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
             AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
             AWS_REGION: ${{ secrets.AWS_REGION }}
-            SOURCE_DIR: "build"
+            SOURCE_DIR: build

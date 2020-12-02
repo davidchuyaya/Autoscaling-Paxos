@@ -20,16 +20,19 @@
 #include "utils/network.hpp"
 #include "utils/config.hpp"
 #include "models/message.hpp"
-#include "utils/parser.hpp"
 #include "message.pb.h"
 #include "models/log.hpp"
 #include "models/heartbeat_component.hpp"
+#include "models/threshold_component.hpp"
+#include "lib/storage/anna.hpp"
 
 class proposer {
 public:
-    explicit proposer(int id, const parser::idToIP& proposers, const std::unordered_map<int, parser::idToIP>& acceptors);
+    explicit proposer(int id, int numAcceptorGroups); //TODO once matchmakers are integrated, numAcceptorGroups is dynamic
 private:
     const int id; // 0 indexed, no gaps
+    const int numAcceptorGroups;
+    anna* annaClient;
 
     std::shared_mutex ballotMutex;
     int ballotNum = 0; // must be at least 1 the first time it is sent
@@ -39,7 +42,7 @@ private:
     time_t lastLeaderHeartbeat = 0;
 
     std::shared_mutex remainingAcceptorGroupsForScoutsMutex;
-    std::unordered_set<int> remainingAcceptorGroupsForScouts = {};
+    std::unordered_set<std::string> remainingAcceptorGroupsForScouts = {};
 
     std::shared_mutex logMutex;
     std::queue<int> logHoles = {};
@@ -47,31 +50,28 @@ private:
 
     std::shared_mutex acceptorGroupLogsMutex;
     std::vector<Log::stringLog> acceptorGroupCommittedLogs = {};
-    std::unordered_map<int, Log::pValueLog> acceptorGroupUncommittedLogs = {}; //key = acceptor group ID
+    std::unordered_map<std::string, Log::pValueLog> acceptorGroupUncommittedLogs = {}; //key = acceptor group ID
 
-    std::shared_mutex proposerMutex;
-    std::vector<int> proposerSockets = {};
+    threshold_component proposers;
+
+    two_p_set acceptorGroupIdSet;
 
     std::shared_mutex acceptorMutex;
-    std::vector<int> acceptorGroupIds = {};
+    std::condition_variable_any acceptorCV;
+    std::vector<std::string> acceptorGroupIds = {};
     int nextAcceptorGroup = 0;
 
     heartbeat_component proxyLeaders;
-
-    /**
-     * Set acceptorGroupIds.
-     */
-    void findAcceptorGroupIds(const std::unordered_map<int, parser::idToIP>& acceptors);
 
     /**
      * If isLeader = true, periodically tell other proposers.
      */
     [[noreturn]] void leaderLoop();
 
+    void listenToAnna(const std::string& key, const two_p_set& twoPSet);
     [[noreturn]] void startServer();
-    void listenToBatcher(const std::string& payload);
+    void listenToBatcher(const Batch& payload);
     void listenToProxyLeader(int socket, const ProxyLeaderToProposer& payload);
-    void connectToProposers(const parser::idToIP& proposers);
     void listenToProposer();
 
     /**
@@ -109,7 +109,7 @@ private:
      * @warning Does NOT lock acceptorMutex. The caller MUST lock it.
      * @return The ID of the acceptor group to propose to.
      */
-    int fetchNextAcceptorGroupId();
+    const std::string& fetchNextAcceptorGroupId();
 };
 
 

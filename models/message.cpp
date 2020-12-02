@@ -10,11 +10,13 @@ WhoIsThis message::createWhoIsThis(const WhoIsThis_Sender& sender) {
     return whoIsThis;
 }
 
-ProposerToAcceptor message::createP1A(const int id, const int ballotNum, const int acceptorGroupId) {
+ProposerToAcceptor message::createP1A(const int id, const int ballotNum, const std::string& acceptorGroupId,
+									  const std::string& ipAddress) {
     ProposerToAcceptor p1a;
     p1a.set_messageid(uuid::generate());
     p1a.set_type(ProposerToAcceptor_Type_p1a);
     p1a.set_acceptorgroupid(acceptorGroupId);
+	p1a.set_ipaddress(ipAddress);
     Ballot* ballot = p1a.mutable_ballot();
     ballot->set_id(id);
     ballot->set_ballotnum(ballotNum);
@@ -22,7 +24,8 @@ ProposerToAcceptor message::createP1A(const int id, const int ballotNum, const i
 }
 
 AcceptorToProxyLeader
-message::createP1B(const int messageId, const int acceptorGroupId, const Ballot& highestBallot, const Log::pValueLog& log) {
+message::createP1B(const int messageId, const std::string& acceptorGroupId, const Ballot& highestBallot,
+                   const Log::pValueLog& log) {
     AcceptorToProxyLeader p1b;
     p1b.set_messageid(messageId);
     p1b.set_type(AcceptorToProxyLeader_Type_p1b);
@@ -33,7 +36,7 @@ message::createP1B(const int messageId, const int acceptorGroupId, const Ballot&
 }
 
 ProposerToAcceptor message::createP2A(const int id, const int ballotNum, const int slot, const std::string& payload,
-                                      const int acceptorGroupId) {
+                                      const std::string& acceptorGroupId, const std::string& ipAddress) {
     ProposerToAcceptor p2a;
     p2a.set_messageid(uuid::generate());
     p2a.set_type(ProposerToAcceptor_Type_p2a);
@@ -43,10 +46,12 @@ ProposerToAcceptor message::createP2A(const int id, const int ballotNum, const i
     p2a.set_slot(slot);
     p2a.set_payload(payload);
     p2a.set_acceptorgroupid(acceptorGroupId);
+	p2a.set_ipaddress(ipAddress);
     return p2a;
 }
 
-AcceptorToProxyLeader message::createP2B(const int messageId, const int acceptorGroupId, const Ballot& highestBallot, const int slot) {
+AcceptorToProxyLeader message::createP2B(const int messageId, const std::string& acceptorGroupId,
+                                         const Ballot& highestBallot, const int slot) {
     AcceptorToProxyLeader p2b;
     p2b.set_messageid(messageId);
     p2b.set_type(AcceptorToProxyLeader_Type_p2b);
@@ -56,8 +61,9 @@ AcceptorToProxyLeader message::createP2B(const int messageId, const int acceptor
     return p2b;
 }
 
-ProxyLeaderToProposer message::createProxyP1B(const int messageId, const int acceptorGroupId, const Ballot& highestBallot,
-                                              const Log::stringLog& committedLog, const Log::pValueLog& uncommittedLog) {
+ProxyLeaderToProposer message::createProxyP1B(const int messageId, const std::string& acceptorGroupId,
+                                              const Ballot& highestBallot, const Log::stringLog& committedLog,
+                                              const Log::pValueLog& uncommittedLog) {
     ProxyLeaderToProposer p1b;
     p1b.set_messageid(messageId);
     p1b.set_type(ProxyLeaderToProposer_Type_p1b);
@@ -68,8 +74,8 @@ ProxyLeaderToProposer message::createProxyP1B(const int messageId, const int acc
     return p1b;
 }
 
-ProxyLeaderToProposer message::createProxyP2B(const int messageId, const int acceptorGroupId, const Ballot& highestBallot,
-                                              const int slot) {
+ProxyLeaderToProposer message::createProxyP2B(const int messageId, const std::string& acceptorGroupId,
+                                              const Ballot& highestBallot, const int slot) {
     ProxyLeaderToProposer p2b;
     p2b.set_messageid(messageId);
     p2b.set_type(ProxyLeaderToProposer_Type_p2b);
@@ -85,6 +91,12 @@ ProxyLeaderToProposer message::createProxyLeaderHeartbeat() {
     return heartbeat;
 }
 
+Heartbeat message::createGenericHeartbeat() {
+	Heartbeat heartbeat;
+	heartbeat.set_dummy(true); //must have at least 1 value for message to send
+	return heartbeat;
+}
+
 ProposerToProposer message::createIamLeader() {
     ProposerToProposer iAmLeader;
     iAmLeader.set_iamleader(true);
@@ -98,12 +110,14 @@ ClientToBatcher message::createClientRequest(const std::string& ipAddress, const
     return clientToBatcher;
 }
 
-Batch message::createBatchMessage(const std::unordered_map<std::string, std::vector<std::string>>& requests) {
-    std::unordered_map<std::string, Batch_Requests> protobufRequests = {};
-    for (const auto& [ip, requestsForIp] : requests)
-        *protobufRequests[ip].mutable_requests() = {requestsForIp.begin(), requestsForIp.end()};
-
+Batch message::createBatchMessage(const std::unordered_map<std::string, std::string>& requests) {
     Batch batch;
-    *batch.mutable_clienttorequests() = {protobufRequests.begin(), protobufRequests.end()};
+    *batch.mutable_clienttorequest() = {requests.begin(), requests.end()};
     return batch;
+}
+
+UnbatcherToClient message::createUnbatcherToClientAck(const std::string& request) {
+	UnbatcherToClient unbatcherToClient;
+	unbatcherToClient.set_request(request);
+	return unbatcherToClient;
 }
