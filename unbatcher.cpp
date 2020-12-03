@@ -45,5 +45,7 @@ int main(const int argc, const char** argv) {
         printf("Usage: ./unbatcher\n");
         exit(0);
     }
+
+    INIT_LOGGER();
     unbatcher u {};
 }

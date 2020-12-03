@@ -22,8 +22,6 @@ public:
 private:
 	anna_write_only* annaWriteOnlyClient;
 
-    LOGGER;
-
     std::shared_mutex ipToSocketMutex;
     std::unordered_map<std::string, int> ipToSocket = {};
 

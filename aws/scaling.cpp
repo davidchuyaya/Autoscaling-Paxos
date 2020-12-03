@@ -54,3 +54,7 @@ void scaling::startInstance(const std::string& executable, const std::string& ar
 
 	system(ec2Script.str().c_str());
 }
+
+void scaling::shutdown() {
+	system("shutdown -h now");
+}

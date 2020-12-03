@@ -21,7 +21,7 @@
 
 class paxos {
 public:
-    paxos(int numCommands = 0, int numClients = 0, int numBatchers = 0, int numProxyLeaders = 0, int numAcceptorGroups = 0,
+    paxos(int numCommands = 0, int numClients = 1, int numBatchers = 0, int numProxyLeaders = 0, int numAcceptorGroups = 0,
 		  int numUnbatchers = 0);
 private:
 	const bool isBenchmark;
@@ -34,8 +34,6 @@ private:
 
 	anna* annaClient;
     heartbeat_component batchers;
-
-	LOGGER;
 
 	std::vector<std::shared_mutex> requestMutex;
     std::vector<std::condition_variable_any> requestCV;

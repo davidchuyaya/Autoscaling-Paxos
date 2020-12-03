@@ -29,8 +29,6 @@ private:
     std::shared_mutex sentMessagesMutex;
     std::unordered_map<int, ProposerToAcceptor> sentMessages = {}; //key = message ID
 
-    LOGGER;
-
     std::shared_mutex unmergedLogsMutex;
     std::unordered_map<int, Log::acceptorGroupLog> unmergedLogs = {}; //key = message ID
 

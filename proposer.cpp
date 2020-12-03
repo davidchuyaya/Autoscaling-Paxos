@@ -257,7 +257,10 @@ int main(const int argc, const char** argv) {
         printf("Usage: ./proposer <PROPOSER ID> <NUM ACCEPTOR GROUPS>.\n");
         exit(0);
     }
-    const int id = std::stoi( argv[1] );
+
+    INIT_LOGGER();
+
+    const int id = std::stoi(argv[1]);
 	const int numAcceptorGroups = std::stoi(argv[2]);
     proposer p(id, numAcceptorGroups);
 }

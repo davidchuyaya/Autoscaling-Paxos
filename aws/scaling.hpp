@@ -21,6 +21,7 @@ namespace scaling {
 	void startAcceptorGroup(const std::string& acceptorGroupId);
 	void startUnbatchers(int numUnbatchers);
     void startInstance(const std::string& executable, const std::string& arguments, const std::string& name, int num);
+    void shutdown();
 };
 
 #endif //AUTOSCALING_PAXOS_SCALING_HPP

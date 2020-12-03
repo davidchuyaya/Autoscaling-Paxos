@@ -12,7 +12,7 @@
 #include <numeric>
 #include "spdlog/spdlog.h"
 
-#define LOGGER std::shared_ptr<spdlog::logger> logger = spdlog::basic_logger_mt("paxos_log", "log.txt")
+#define INIT_LOGGER() std::shared_ptr<spdlog::logger> logger = spdlog::basic_logger_mt("paxos_log", "log.txt");spdlog::get("paxos_log")->flush_on(spdlog::level::info)
 #define BENCHMARK_LOG(...) spdlog::get("paxos_log")->info(__VA_ARGS__) //some logging is always on for benchmarks
 
 #define DEBUG

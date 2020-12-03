@@ -55,5 +55,7 @@ int main(const int argc, const char** argv) {
         printf("Usage: ./acceptor <ACCEPTOR GROUP ID>.\n");
         exit(0);
     }
+
+    INIT_LOGGER();
     acceptor a {argv[1]};
 }

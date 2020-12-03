@@ -24,8 +24,6 @@ private:
     const std::string acceptorGroupId;
 	anna_write_only* annaWriteOnlyClient;
 
-    LOGGER;
-
 	std::shared_mutex ballotMutex;
     Ballot highestBallot = {};
 

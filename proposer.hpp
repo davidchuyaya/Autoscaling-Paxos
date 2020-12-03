@@ -38,8 +38,6 @@ private:
     std::shared_mutex ballotMutex;
     int ballotNum = 0; // must be at least 1 the first time it is sent
 
-    LOGGER;
-
     std::atomic<bool> isLeader = false;
     std::shared_mutex heartbeatMutex;
     time_t lastLeaderHeartbeat = 0;

@@ -32,8 +32,6 @@ private:
     std::unordered_map<std::string, std::string> clientToPayload = {};
     int numPayloads = 0;
 
-    LOGGER;
-
     threshold_component proposers;
 
     std::shared_mutex clientMutex;

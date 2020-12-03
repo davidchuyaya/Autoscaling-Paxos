@@ -52,5 +52,7 @@ int main(const int argc, const char** argv) {
         printf("Usage: ./batcher\n");
         exit(0);
     }
+
+    INIT_LOGGER();
     batcher b {};
 }

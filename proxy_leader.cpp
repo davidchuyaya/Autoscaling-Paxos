@@ -193,5 +193,7 @@ int main(int argc, char** argv) {
         printf("Usage: ./proxy_leader\n");
         exit(0);
     }
+
+    INIT_LOGGER();
     proxy_leader pr {};
 }

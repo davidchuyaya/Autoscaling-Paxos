@@ -29,8 +29,6 @@ jobs:
         - name: Building w/ CMake
           run: |
             sudo ./scripts/build.sh
-            sudo mkdir build
-            find . -maxdepth 1 -type f  -executable | xargs -I {} sudo mv {} build
         - name: Pushing Build Directory to S3
           uses: jakejarvis/s3-sync-action@master
           with:
