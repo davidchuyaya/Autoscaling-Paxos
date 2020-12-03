@@ -1,9 +1,11 @@
 
 #include "main.hpp"
 
-paxos::paxos(const int numCommands, const int numClients) : numCommands(numCommands), numClients(numClients),
-	isBenchmark(numCommands != 0), requestMutex(numClients), requestCV(numClients), request(numClients),
-	batchers(config::F+1) {
+paxos::paxos(const int numCommands, const int numClients, const int numBatchers,
+			 const int numProxyLeaders, const int numAcceptorGroups, const int numUnbatchers) :
+			 isBenchmark(numCommands != 0),  numCommands(numCommands), numClients(numClients), numBatchers(numBatchers),
+			 numProxyLeaders(numProxyLeaders), numAcceptorGroups(numAcceptorGroups), numUnbatchers(numUnbatchers),
+			 requestMutex(numClients), requestCV(numClients), request(numClients), batchers(config::F+1) {
     LOG("F: {}\n", config::F);
     std::thread server([&] {startServer(); });
     server.detach();
@@ -24,14 +26,6 @@ paxos::paxos(const int numCommands, const int numClients) : numCommands(numComma
 	    benchmark();
 	    pthread_exit(nullptr);
     }
-}
-
-void paxos::startInstance(const std::string& command, const std::string& instanceName,
-						  const std::string& instanceType) {
-    Aws::SDKOptions options;
-    Aws::InitAPI(options);
-    scaling::startInstance(command, instanceName, instanceType);
-    Aws::ShutdownAPI(options);
 }
 
 [[noreturn]]
@@ -103,6 +97,9 @@ void paxos::resendInput() {
 }
 
 void paxos::benchmark() {
+	BENCHMARK_LOG("Starting cluster, you should wait until a leader has been elected before starting...\n");
+	startCluster();
+
 	BENCHMARK_LOG("Enter any key to start benchmarking...\n");
 	std::string input;
 	std::cin >> input;
@@ -135,6 +132,18 @@ void paxos::benchmark() {
 
 	BENCHMARK_LOG("Elapsed millis {} for {} clients and {} commands\n",
 		std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count(), numClients, numCommands);
+}
+
+void paxos::startCluster() {
+	scaling::startAWS();
+	scaling::startBatchers(numBatchers);
+	scaling::startProposers(numAcceptorGroups);
+	scaling::startProxyLeaders(numProxyLeaders);
+	for (int i = 0; i < numAcceptorGroups; i++) {
+		const std::string& acceptorGroupId = std::to_string(uuid::generate());
+		scaling::startAcceptorGroup(acceptorGroupId);
+	}
+	scaling::startUnbatchers(numUnbatchers);
 }
 
 int main(const int argc, const char** argv) {

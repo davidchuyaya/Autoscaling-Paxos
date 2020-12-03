@@ -16,10 +16,15 @@
 #include <aws/ec2/model/RunInstancesRequest.h>
 #include <aws/ec2/model/RunInstancesResponse.h>
 #include <aws/ec2/model/TagSpecification.h>
-#include "config.hpp"
+#include "../utils/config.hpp"
 
 namespace scaling {
+	void startAWS();
 	void startBatchers(int numBatchers);
+	/**
+	 * @warning Only call this method once per execution, or else proposers will spawn with the same ID.
+	 * @param numAcceptorGroups
+	 */
 	void startProposers(int numAcceptorGroups);
 	void startProxyLeaders(int numProxyLeaders);
 	void startAcceptorGroup(const std::string& acceptorGroupId);

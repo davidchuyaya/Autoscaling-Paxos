@@ -36,17 +36,22 @@ namespace config {
 
     const static inline std::string ENV_ANNA_ROUTING_NAME = "ANNA_ROUTING";
     const static inline std::string ENV_IP_NAME = "IP";
+    const static inline std::string ENV_ANNA_KEY_PREFIX_NAME = "ANNA_KEY_PREFIX";
 
     const static inline std::string IP_ADDRESS = std::getenv(ENV_IP_NAME.c_str());
     const static inline std::string ANNA_ROUTING_ADDRESS = std::getenv(ENV_ANNA_ROUTING_NAME.c_str());
+    const static inline std::string ANNA_KEY_PREFIX =  std::getenv(ENV_ANNA_KEY_PREFIX_NAME.c_str());
 
     const static inline std::string AWS_AMI_ID = "ami-08ffb106d09e20436";
     const static inline std::string AWS_ARN_ID = "arn:aws:iam::966365422522:instance-profile/admin-access";
 
     const static inline std::string AWS_USER_DATA_SCRIPT = "#!/bin/bash -xe\nmkdir /paxos\n cd /paxos\nwget https://autoscaling-paxos.s3-us-west-1.amazonaws.com/";
     const static inline std::string AWS_MAKE_EXEC = "chmod +x ";
-    const static inline std::string AWS_ANNA_ROUTING_ENV = "export " + ENV_ANNA_ROUTING_NAME + "=" + ANNA_ROUTING_ADDRESS + "\n";
+    const static inline std::string AWS_ANNA_ROUTING_ENV = "export " + ENV_ANNA_ROUTING_NAME + "=" +
+    		ANNA_ROUTING_ADDRESS + "\n";
     const static inline std::string AWS_IP_ENV = "export " + ENV_IP_NAME + "=" + IP_ADDRESS + "\n";
+	const static inline std::string AWS_ANNA_KEY_PREFIX_ENV = "export " + ENV_ANNA_KEY_PREFIX_NAME + "=" +
+			ANNA_KEY_PREFIX + "\n";
 
     const static inline std::string AWS_PEM_FILE = "anna";
 
@@ -58,8 +63,8 @@ namespace config {
     const static int ZMQ_RECEIVE_RETRY_SEC = 1; // how often we check ZMQ receive buffer for new Anna messages
     const static int ANNA_RECHECK_SEC = 1; // how often we send a new get request to Anna for subscriptions
 
-    const static inline std::string KEY_OBSERVED_PREFIX = "observed";
-    const static inline std::string KEY_REMOVED_PREFIX = "removed";
+    const static inline std::string KEY_OBSERVED_PREFIX = ANNA_KEY_PREFIX + "observed";
+    const static inline std::string KEY_REMOVED_PREFIX = ANNA_KEY_PREFIX + "removed";
     const static inline std::string KEY_BATCHERS = "Batchers";
     const static inline std::string KEY_PROPOSERS = "Proposers";
     const static inline std::string KEY_PROXY_LEADERS = "ProxyLeaders";

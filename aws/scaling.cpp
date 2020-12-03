@@ -4,6 +4,10 @@
 
 #include "scaling.hpp"
 
+void scaling::startAWS() {
+	Aws::SDKOptions options;
+	Aws::InitAPI(options);
+}
 
 void scaling::startBatchers(const int numBatchers) {
 	startInstance("batcher", "", "batchers-?", numBatchers);
@@ -34,6 +38,7 @@ void scaling::startInstance(const std::string& executable, const std::string& ar
 		<< config::AWS_MAKE_EXEC << executable << "\n"
 		<< config::AWS_IP_ENV
 		<< config::AWS_ANNA_ROUTING_ENV
+		<< config::AWS_ANNA_KEY_PREFIX_ENV
 		<< "./" << executable << " " << arguments;
 	const std::string& userDataScript = ss.str();
 	const auto& userDataBase64 = Aws::Utils::Array((unsigned char*) userDataScript.c_str(), userDataScript.size());
@@ -67,7 +72,8 @@ void scaling::startInstance(const std::string& executable, const std::string& ar
 
 	auto run_outcome = ec2.RunInstances(runRequest);
 	if (!run_outcome.IsSuccess()) {
-		LOG("Error for {} based on AMI {} : {}\n", name, config::AWS_AMI_ID, run_outcome.GetError().GetMessage());
+		LOG("Error for {} based on AMI {} : {}\n", name.c_str(), config::AWS_AMI_ID.c_str(),
+	  run_outcome.GetError().GetMessage().c_str());
 		return;
 	}
 
