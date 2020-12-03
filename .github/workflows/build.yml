@@ -35,6 +35,7 @@ jobs:
             sudo ./scripts/download_aws.sh
         - name: Install protobuf
           run: |
+            sudo ./scripts/download_aws.sh
             sudo ./scripts/install_protobuf.sh
         - name: Install AWS
           run: |
