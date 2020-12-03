@@ -4,11 +4,6 @@
 
 #include "scaling.hpp"
 
-void scaling::startAWS() {
-	Aws::SDKOptions options;
-	Aws::InitAPI(options);
-}
-
 void scaling::startBatchers(const int numBatchers) {
 	startInstance("batcher", "", "batchers-?", numBatchers);
 }
@@ -33,53 +28,29 @@ void scaling::startUnbatchers(const int numUnbatchers) {
 
 void scaling::startInstance(const std::string& executable, const std::string& arguments,
 							const std::string& name, const int num) {
-	std::stringstream ss;
-	ss << config::AWS_USER_DATA_SCRIPT << executable << "\n"
-		<< config::AWS_MAKE_EXEC << executable << "\n"
-		<< config::AWS_IP_ENV
-		<< config::AWS_ANNA_ROUTING_ENV
-		<< config::AWS_ANNA_KEY_PREFIX_ENV
-		<< "./" << executable << " " << arguments;
-	const std::string& userDataScript = ss.str();
-	const auto& userDataBase64 = Aws::Utils::Array((unsigned char*) userDataScript.c_str(), userDataScript.size());
+	std::stringstream userData;
+	userData << "'"
+			 << "#!/bin/bash -xe\n"
+			 << "mkdir /paxos\n"
+	         << "cd /paxos\n"
+	         << "wget https://autoscaling-paxos.s3-us-west-1.amazonaws.com/" << executable << "\n"
+	         << "chmod +x " << executable << "\n"
+	         << "export " << config::ENV_ANNA_ROUTING_NAME << "=" << config::ANNA_ROUTING_ADDRESS << "\n"
+	         << "export " << config::ENV_IP_NAME << "=" << config::IP_ADDRESS << "\n"
+	         << "export " << config::ENV_ANNA_KEY_PREFIX_NAME << "=" << config::ANNA_KEY_PREFIX << "\n"
+	         << "./" << executable << " " << arguments
+	         << "'";
 
-	Aws::EC2::EC2Client ec2;
-	Aws::Utils::Base64::Base64 base64;
+	//since we're not using newlines here, remember to have spaces between things
+	std::stringstream ec2Script;
+	ec2Script << "aws ec2 run-instances "
+	          << "--image-id ami-08ffb106d09e20436 "
+	          << "--count " << num << " "
+	          << "--instance-type c5.large "
+	          << "--key-name anna "
+	          << "--security-group-ids sg-0196a7a839c79446d "
+			  << "--tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=" << name << "}]' "
+	          << "--user-data " << userData.str();
 
-	Aws::EC2::Model::Tag nameTag;
-	nameTag.SetKey("Name");
-	nameTag.SetValue(Aws::String(name.c_str(), name.size()));
-
-	Aws::EC2::Model::TagSpecification tagSpecification;
-	tagSpecification.AddTags(nameTag);
-	tagSpecification.SetResourceType(Aws::EC2::Model::ResourceType::instance);
-
-	Aws::Vector<Aws::EC2::Model::TagSpecification> tagSpecifications(1);
-	tagSpecifications.push_back(tagSpecification);
-
-	Aws::EC2::Model::IamInstanceProfileSpecification iamProfile;
-	iamProfile.SetArn(Aws::String(config::AWS_ARN_ID.c_str(), config::AWS_ARN_ID.size()));
-
-	Aws::EC2::Model::RunInstancesRequest runRequest;
-	runRequest.SetImageId(Aws::String(config::AWS_AMI_ID.c_str(), config::AWS_AMI_ID.size()));
-	runRequest.SetInstanceType(Aws::EC2::Model::InstanceType::c5_large);
-	runRequest.SetMinCount(num);
-	runRequest.SetMaxCount(num);
-	runRequest.SetTagSpecifications(tagSpecifications);
-	runRequest.SetIamInstanceProfile(iamProfile);
-	runRequest.SetKeyName(Aws::String(config::AWS_PEM_FILE.c_str(), config::AWS_PEM_FILE.size()));
-	runRequest.SetUserData(base64.Encode(userDataBase64));
-
-	auto run_outcome = ec2.RunInstances(runRequest);
-	if (!run_outcome.IsSuccess()) {
-		LOG("Error for {} based on AMI {} : {}\n", name.c_str(), config::AWS_AMI_ID.c_str(),
-	  run_outcome.GetError().GetMessage().c_str());
-		return;
-	}
-
-	const auto& instances = run_outcome.GetResult().GetInstances();
-	if (instances.empty()) {
-		LOG("Failed to start ec2 instance {} based on AMI: {}\n", name, config::AWS_AMI_ID);
-		return;
-	}
+	system(ec2Script.str().c_str());
 }

@@ -135,7 +135,6 @@ void paxos::benchmark() {
 }
 
 void paxos::startCluster() {
-	scaling::startAWS();
 	scaling::startBatchers(numBatchers);
 	scaling::startProposers(numAcceptorGroups);
 	scaling::startProxyLeaders(numProxyLeaders);

@@ -40,20 +40,7 @@ namespace config {
 
     const static inline std::string IP_ADDRESS = std::getenv(ENV_IP_NAME.c_str());
     const static inline std::string ANNA_ROUTING_ADDRESS = std::getenv(ENV_ANNA_ROUTING_NAME.c_str());
-    const static inline std::string ANNA_KEY_PREFIX =  std::getenv(ENV_ANNA_KEY_PREFIX_NAME.c_str());
-
-    const static inline std::string AWS_AMI_ID = "ami-08ffb106d09e20436";
-    const static inline std::string AWS_ARN_ID = "arn:aws:iam::966365422522:instance-profile/admin-access";
-
-    const static inline std::string AWS_USER_DATA_SCRIPT = "#!/bin/bash -xe\nmkdir /paxos\n cd /paxos\nwget https://autoscaling-paxos.s3-us-west-1.amazonaws.com/";
-    const static inline std::string AWS_MAKE_EXEC = "chmod +x ";
-    const static inline std::string AWS_ANNA_ROUTING_ENV = "export " + ENV_ANNA_ROUTING_NAME + "=" +
-    		ANNA_ROUTING_ADDRESS + "\n";
-    const static inline std::string AWS_IP_ENV = "export " + ENV_IP_NAME + "=" + IP_ADDRESS + "\n";
-	const static inline std::string AWS_ANNA_KEY_PREFIX_ENV = "export " + ENV_ANNA_KEY_PREFIX_NAME + "=" +
-			ANNA_KEY_PREFIX + "\n";
-
-    const static inline std::string AWS_PEM_FILE = "anna";
+    const static inline std::string ANNA_KEY_PREFIX = std::getenv(ENV_ANNA_KEY_PREFIX_NAME.c_str());
 
     const static int TCP_RETRY_TIMEOUT_SEC = 10;
     const static int HEARTBEAT_TIMEOUT_SEC = 20; // this - HEARTBEAT_SLEEP_SEC = time allowed between message send & receive

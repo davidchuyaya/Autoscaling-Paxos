@@ -6,20 +6,11 @@
 #define AUTOSCALING_PAXOS_SCALING_HPP
 
 #include <string>
-
-#include <aws/core/Aws.h>
-#include <aws/core/utils/base64/Base64.h>
-#include <aws/core/utils/Array.h>
-#include <aws/ec2/EC2Client.h>
-#include <aws/ec2/model/UserData.h>
-#include <aws/ec2/model/CreateTagsRequest.h>
-#include <aws/ec2/model/RunInstancesRequest.h>
-#include <aws/ec2/model/RunInstancesResponse.h>
-#include <aws/ec2/model/TagSpecification.h>
+#include <sstream>
+#include <cstdlib>
 #include "../utils/config.hpp"
 
 namespace scaling {
-	void startAWS();
 	void startBatchers(int numBatchers);
 	/**
 	 * @warning Only call this method once per execution, or else proposers will spawn with the same ID.

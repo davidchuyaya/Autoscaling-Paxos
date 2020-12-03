@@ -1,8 +1,5 @@
 #!/bin/bash
 
-wget https://github.com/aws/aws-sdk-cpp/archive/1.8.95.zip
-unzip 1.8.95
-rm 1.8.94.zip
-cd aws-sdk-cpp-1.8.95
-sudo cmake . -D CMAKE_BUILD_TYPE=Release -D BUILD_ONLY="ec2" -D ENABLE_TESTING=off -D AUTORUN_UNIT_TESTS=off
-sudo make -j4
+curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+unzip awscliv2.zip
+sudo ./aws/install
