@@ -57,6 +57,8 @@ void proposer::listenToAnna(const std::string& key, const two_p_set& twoPSet) {
                                         [&](const int socket, const ProposerToProposer& payload){
         	listenToProposer();
         });
+        if (proposers.twoPsetThresholdMet())
+	        annaClient->unsubscribeFrom(config::KEY_PROPOSERS);
     } else if (key == config::KEY_ACCEPTOR_GROUPS) {
         // merge new acceptor group IDs
         const two_p_set& updates = acceptorGroupIdSet.updatesFrom(twoPSet);

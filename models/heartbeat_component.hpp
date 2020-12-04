@@ -79,7 +79,7 @@ private:
     std::vector<int> slowComponents = {};
     int next = 0;
 
-    bool thresholdMet() override;
+    bool thresholdMet() const override;
     int nextComponentSocket();
     [[noreturn]] void checkHeartbeats();
 

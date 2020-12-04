@@ -21,6 +21,8 @@ void proxy_leader::listenToAnna(const std::string& key, const two_p_set& twoPSet
                                         [&](const int socket, const ProposerToAcceptor& payload) {
             listenToProposer(payload);
         });
+        if (proposers.twoPsetThresholdMet())
+	        annaClient->unsubscribeFrom(config::KEY_PROPOSERS);
     }
     else if (key == config::KEY_UNBATCHERS) {
         unbatchers.connectAndListen<Heartbeat>(twoPSet, config::UNBATCHER_PORT, WhoIsThis_Sender_proxyLeader,
@@ -50,9 +52,7 @@ void proxy_leader::processAcceptorGroup(const two_p_set& twoPSet) {
         if (!knowOfAcceptorGroup(removedAcceptorGroupId))
 	        continue;
         threshold_component* acceptors = acceptorGroupSockets.at(removedAcceptorGroupId);
-        two_p_set allMembersRemoved = {{}, acceptors->getMembers().getObserved()};
-        acceptors->connectAndMaybeListen<AcceptorToProxyLeader>(allMembersRemoved, config::ACCEPTOR_PORT,
-										WhoIsThis_Sender_proxyLeader, {});
+	    acceptors->removeAll();
         acceptorGroupSockets.erase(removedAcceptorGroupId);
 	    free(acceptors);
     }
@@ -75,6 +75,9 @@ void proxy_leader::processAcceptors(const std::string& acceptorGroupId, const tw
 								 [&](const int socket, const AcceptorToProxyLeader& payload) {
 		listenToAcceptor(payload);
 	});
+	// stop requesting for acceptors once we see 2f+1
+	if (acceptors->twoPsetThresholdMet())
+		annaClient->unsubscribeFrom(acceptorGroupId);
 }
 
 void proxy_leader::listenToProposer(const ProposerToAcceptor& payload) {
@@ -102,7 +105,6 @@ void proxy_leader::listenToProposer(const ProposerToAcceptor& payload) {
 
 void proxy_leader::listenToAcceptor(const AcceptorToProxyLeader& payload) {
     LOG("Received from acceptors: {}\n", payload.ShortDebugString());
-//	google::protobuf::util::ParseDelimitedFromCodedStream();
 
     switch (payload.type()) {
         case AcceptorToProxyLeader_Type_p1b:

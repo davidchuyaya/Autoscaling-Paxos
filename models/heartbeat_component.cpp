@@ -24,7 +24,7 @@ void heartbeat_component::addConnection(const int socket) {
 	componentCV.notify_all();
 }
 
-bool heartbeat_component::thresholdMet() {
+bool heartbeat_component::thresholdMet() const {
     return components.size() + slowComponents.size() >= waitThreshold;
 }
 

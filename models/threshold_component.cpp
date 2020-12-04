@@ -20,12 +20,23 @@ void threshold_component::addSelfAsConnection() {
     addedSelfAsConnection = true;
 }
 
+void threshold_component::removeAll() {
+	std::scoped_lock lock(ipToSocketMutex, componentMutex, membersMutex);
+	for (const std::string& ip : members.getObserved()) {
+		LOG("Removing dead member: {}\n", ip);
+		const int socket = ipToSocket[ip];
+		shutdown(socket, 1);
+		components.erase(std::remove(components.begin(), components.end(), socket), components.end());
+		ipToSocket.erase(ip);
+	}
+}
+
 void threshold_component::waitForThreshold(std::shared_lock<std::shared_mutex>& lock) {
     componentCV.wait(lock, [&]{return thresholdMet();});
     canSend = true;
 }
 
-bool threshold_component::thresholdMet() {
+bool threshold_component::thresholdMet() const {
     return components.size() + (addedSelfAsConnection ? 1 : 0) >= waitThreshold;
 }
 
@@ -34,7 +45,7 @@ int threshold_component::socketForIP(const string& ipAddress) {
 	return ipToSocket.at(ipAddress);
 }
 
-const two_p_set& threshold_component::getMembers() const {
-    return members;
+bool threshold_component::twoPsetThresholdMet() {
+	std::shared_lock lock(membersMutex);
+	return members.getObserved().size() >= waitThreshold;
 }
-

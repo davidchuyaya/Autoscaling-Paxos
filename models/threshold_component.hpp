@@ -62,6 +62,7 @@ public:
 	}
     virtual void addConnection(int socket);
     void addSelfAsConnection();
+    void removeAll();
     template<typename Message> void broadcast(const Message& payload) {
         std::shared_lock lock(componentMutex);
         if (!canSend) { //block if not enough connections
@@ -72,7 +73,7 @@ public:
         }
     }
     [[nodiscard]] int socketForIP(const std::string& ipAddress);
-    [[nodiscard]] const two_p_set& getMembers() const;
+	[[nodiscard]] bool twoPsetThresholdMet();
 protected:
     const int waitThreshold;
 
@@ -89,7 +90,7 @@ protected:
     bool addedSelfAsConnection = false;
 
     void waitForThreshold(std::shared_lock<std::shared_mutex>& lock);
-    virtual bool thresholdMet();
+    virtual bool thresholdMet() const;
 };
 
 

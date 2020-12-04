@@ -9,6 +9,8 @@ batcher::batcher() : proposers(config::F+1) {
                     [&](const std::string& key, const two_p_set& twoPSet) {
     	//template type doesn't matter, since we don't receive any messages from the proposer anyway
     	proposers.connectAndMaybeListen<Heartbeat>(twoPSet, config::PROPOSER_PORT, WhoIsThis_Sender_batcher, {});
+    	if (proposers.twoPsetThresholdMet())
+		    annaClient->unsubscribeFrom(config::KEY_PROPOSERS);
     });
 	annaClient->subscribeTo(config::KEY_PROPOSERS);
 
