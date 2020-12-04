@@ -1,18 +1,21 @@
 
 #include "main.hpp"
 
-paxos::paxos(const int numCommands, const int numClients) : numCommands(numCommands), numClients(numClients),
-	isBenchmark(numCommands != 0), requestMutex(numClients), requestCV(numClients), request(numClients),
-	batchers(config::F+1) {
-    LOG("F: %d\n", config::F);
+paxos::paxos(const int numCommands, const int numClients, const int numBatchers,
+			 const int numProxyLeaders, const int numAcceptorGroups, const int numUnbatchers) :
+			 isBenchmark(numCommands != 0),  numCommands(numCommands), numClients(numClients), numBatchers(numBatchers),
+			 numProxyLeaders(numProxyLeaders), numAcceptorGroups(numAcceptorGroups), numUnbatchers(numUnbatchers),
+			 requestMutex(numClients), requestCV(numClients), request(numClients), batchers(config::F+1) {
+    LOG("F: {}\n", config::F);
     std::thread server([&] {startServer(); });
     server.detach();
-    annaClient = new anna({config::KEY_BATCHERS}, [&](const std::string& key, const two_p_set& twoPSet) {
+    annaClient = anna::readWritable({}, [&](const std::string& key, const two_p_set& twoPSet) {
         batchers.connectAndListen<Heartbeat>(twoPSet, config::BATCHER_PORT, WhoIsThis_Sender_client,
 											 [&](const int socket, const Heartbeat& payload) {
             batchers.addHeartbeat(socket);
         });
     });
+	annaClient->subscribeTo(config::KEY_BATCHERS);
 
     if (!isBenchmark) {
 	    std::thread batchRetry([&] { resendInput(); });
@@ -32,7 +35,7 @@ void paxos::startServer() {
        [](const int socket) {
             LOG("Main connected to unbatcher\n");
     }, [&](const int socket, const UnbatcherToClient& payload) {
-            LOG("--Acked: {%s}--\n", payload.request().c_str());
+            LOG("--Acked: {}--\n", payload.request());
 
             //payload = client ID
             const int requestIndex = isBenchmark ? std::stoi(payload.request()) : 0;
@@ -45,12 +48,12 @@ void paxos::startServer() {
 		            requestCV[requestIndex].notify_all();
 	            }
             	else {
-		            LOG("Unexpected payload from unbatcher: {%s} when previous request was {%s}\n",
-		                payload.request().c_str(), request[requestIndex].value().c_str());
+		            LOG("Unexpected payload from unbatcher: {} when previous request was {}\n",
+		                payload.request(), request[requestIndex].value());
 	            }
             }
             else
-	            LOG("Unexpected payload from unbatcher: {%s} when previous request DNE\n", payload.request().c_str());
+	            LOG("Unexpected payload from unbatcher: {} when previous request DNE\n", payload.request());
     });
 }
 
@@ -65,13 +68,11 @@ void paxos::readInput() {
 
 	    std::unique_lock lock(requestMutex[0]);
 	    request[0].emplace(input);
-	    LOG("Waiting for ACK, do not input...\n");
-	    TIME();
+	    printf("Waiting for ACK, do not input...\n");
 	    requestCV[0].wait(lock, [&]{return !request[0].has_value();});
 	    auto end = std::chrono::system_clock::now();
 
 	    printf("Elapsed micro %ld\n", std::chrono::duration_cast<std::chrono::microseconds>(end - start).count());
-	    TIME();
     }
 }
 
@@ -89,12 +90,15 @@ void paxos::resendInput() {
 			lastInput = request[0].value();
 		else if (lastInput == request[0].value()) {//no response within timeout, resend
 			batchers.send(message::createClientRequest(config::IP_ADDRESS, lastInput));
-			LOG("Batcher timed out, resent request: %s\n", lastInput.c_str());
+			LOG("Batcher timed out, resent request: {}\n", lastInput);
 		}
 	}
 }
 
 void paxos::benchmark() {
+	printf("Starting cluster, you should wait until a leader has been elected before starting...\n");
+	startCluster();
+
 	printf("Enter any key to start benchmarking...\n");
 	std::string input;
 	std::cin >> input;
@@ -125,16 +129,41 @@ void paxos::benchmark() {
 
 	auto end = std::chrono::system_clock::now();
 
-	printf("Elapsed millis %ld for %d clients and %d commands\n",
+	BENCHMARK_LOG("Elapsed millis {} for {} clients and {} commands\n",
 		std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count(), numClients, numCommands);
+	printf("We're done\n");
+}
+
+void paxos::startCluster() {
+	instanceIdsOfBatchers = scaling::startBatchers(numBatchers);
+	instanceIdsOfProposers = scaling::startProposers(numAcceptorGroups);
+	instanceIdsOfProxyLeaders = scaling::startProxyLeaders(numProxyLeaders);
+	for (int i = 0; i < numAcceptorGroups; i++) {
+		const std::string& acceptorGroupId = std::to_string(uuid::generate());
+		instanceIdsOfAcceptors[acceptorGroupId] = scaling::startAcceptorGroup(acceptorGroupId);
+	}
+	instanceIdsOfUnbatchers = scaling::startUnbatchers(numUnbatchers);
 }
 
 int main(const int argc, const char** argv) {
-    if (argc != 3) {
-        printf("Usage: ./Autoscaling_Paxos <NUM COMMANDS, 0 FOR DEBUG MODE> <NUM CLIENTS, 1 FOR DEBUG MODE>\n");
+    if (argc != 1 && argc != 7) {
+        printf("Usage for interactive mode: ./Autoscaling_Paxos\n");
+        printf("Usage for debug mode: ./Autoscaling_Paxos <NUM COMMANDS> <NUM CLIENTS> <NUM BATCHERS> <NUM PROXY LEADERS> <NUM ACCEPTOR GROUPS> <NUM UNBATCHERS>\n");
         exit(0);
     }
-	const int numCommands = std::stoi(argv[1]);
-	const int numClients = std::stoi(argv[2]);
-    paxos p {numCommands, numClients};
+
+	INIT_LOGGER();
+	network::ignoreClosedSocket();
+
+    if (argc == 1)
+    	paxos p {};
+    else {
+	    const int numCommands = std::stoi(argv[1]);
+	    const int numClients = std::stoi(argv[2]);
+	    const int numBatchers = std::stoi(argv[3]);
+	    const int numProxyLeaders = std::stoi(argv[4]);
+	    const int numAcceptorGroups = std::stoi(argv[5]);
+	    const int numUnbatchers = std::stoi(argv[6]);
+	    paxos p {numCommands, numClients, numBatchers, numProxyLeaders, numAcceptorGroups, numUnbatchers};
+    }
 }

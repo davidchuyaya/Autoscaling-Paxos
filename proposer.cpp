@@ -8,10 +8,12 @@ proposer::proposer(const int id, const int numAcceptorGroups) : id(id), numAccep
     std::thread server([&] { startServer(); });
     server.detach();
     proposers.addSelfAsConnection();
-    annaClient = new anna(config::KEY_PROPOSERS,{config::KEY_PROPOSERS, config::KEY_ACCEPTOR_GROUPS},
+    annaClient = anna::readWritable({{config::KEY_PROPOSERS, config::IP_ADDRESS}},
                     [&](const std::string& key, const two_p_set& twoPSet) {
     	listenToAnna(key, twoPSet);
     });
+	annaClient->subscribeTo(config::KEY_PROPOSERS);
+	annaClient->subscribeTo(config::KEY_ACCEPTOR_GROUPS);
 
     //wait for acceptor group IDs before starting phase 1 or phase 2. All batches will be dropped until then.
     std::unique_lock lock(acceptorMutex);
@@ -31,7 +33,7 @@ void proposer::leaderLoop() {
 
         //send heartbeats
         if (isLeader) {
-            LOG("%d = leader, sending at time: %s\n", id, std::asctime(std::localtime(&now)));
+            LOG("{} = leader, sending at time: {}\n", id, std::asctime(std::localtime(&now)));
             proposers.broadcast(iAmLeader);
         }
         //receive heartbeats, timeout existing leaders
@@ -85,13 +87,13 @@ void proposer::startServer() {
            [&](const int socket, const WhoIsThis_Sender& whoIsThis, google::protobuf::io::ZeroCopyInputStream* inputStream) {
             switch (whoIsThis) {
                 case WhoIsThis_Sender_batcher:
-	                LOG("Server %d connected to batcher\n", id);
+	                LOG("Connected to batcher\n");
 	                network::listenToStream<Batch>(socket, inputStream, [&](const int socket, const Batch& batch) {
 		                listenToBatcher(batch);
 	                });
 	                break;
                 case WhoIsThis_Sender_proxyLeader:
-                    LOG("Server %d connected to proxy leader\n", id);
+                    LOG("Connected to proxy leader\n");
                     proxyLeaders.addConnection(socket);
 		            network::listenToStream<ProxyLeaderToProposer>(socket, inputStream,
 															 [&](const int socket, const ProxyLeaderToProposer& payload) {
@@ -99,7 +101,7 @@ void proposer::startServer() {
 		            });
                     break;
                 case WhoIsThis_Sender_proposer: {
-                    LOG("Server %d connected to proposer\n", id);
+                    LOG("Connected to proposer\n");
                     proposers.addConnection(socket);
 	                network::listenToStream<ProposerToProposer>(socket, inputStream,
 	                                                               [&](const int socket, const ProposerToProposer& payload) {
@@ -113,7 +115,7 @@ void proposer::startServer() {
 }
 
 void proposer::listenToBatcher(const Batch& payload) {
-    LOG("Proposer %d received a batch request\n", id);
+    LOG("Received batch request: {}\n", payload.ShortDebugString());
     if (!isLeader)
         return;
 
@@ -153,7 +155,7 @@ void proposer::listenToProxyLeader(const int socket, const ProxyLeaderToProposer
 
 void proposer::listenToProposer() {
     std::unique_lock lock(heartbeatMutex);
-    LOG("%d received leader heartbeat for time: %s\n", id, std::asctime(std::localtime(&lastLeaderHeartbeat)));
+    LOG("Received leader heartbeat for time: {}\n", std::asctime(std::localtime(&lastLeaderHeartbeat)));
     time(&lastLeaderHeartbeat); // store the time we received the heartbeat
     lock.unlock();
 
@@ -169,7 +171,7 @@ void proposer::sendScouts() {
     ballotNum += 1;
     currentBallotNum = ballotNum;
     ballotLock.unlock();
-    LOG("P1A blasting out: id = %d, ballotNum = %d\n", id, currentBallotNum);
+    LOG("P1A blasting out: id = {}, ballotNum = {}\n", id, currentBallotNum);
 
     std::shared_lock acceptorsLock(acceptorMutex, std::defer_lock);
     std::shared_lock logLock(logMutex, std::defer_lock);
@@ -181,8 +183,7 @@ void proposer::sendScouts() {
 }
 
 void proposer::handleP1B(const ProxyLeaderToProposer& message) {
-    LOG("Proposer %d received p1b from acceptor group: %s, committed log length: %d, uncommitted log length: %d, highest ballot: [%d, %d]\n", id, message.acceptorgroupid().c_str(), message.committedlog_size(),
-		message.uncommittedlog_size(), message.ballot().id(), message.ballot().ballotnum());
+    LOG("Received p1b: {}\n", message.ShortDebugString());
 
     if (message.ballot().id() != id) { // we lost the election
         // store the largest ballot we last saw so we can immediately catch up
@@ -204,7 +205,7 @@ void proposer::handleP1B(const ProxyLeaderToProposer& message) {
 
     //leader election complete
     isLeader = true;
-    LOG("Proposer %d is leader\n", id);
+    LOG("I am leader!\n");
     proposers.broadcast(message::createIamLeader());
 
     mergeLogs();
@@ -231,14 +232,14 @@ void proposer::mergeLogs() {
 }
 
 void proposer::handleP2B(const ProxyLeaderToProposer& message) {
-    LOG("Proposer %d received p2b, highest ballot: [%d, %d]\n", id, message.ballot().id(), message.ballot().ballotnum());
+    LOG("Received p2b: {}\n", message.ShortDebugString());
     if (message.ballot().id() != id) { //yikes, we got preempted
         noLongerLeader();
     }
 }
 
 void proposer::noLongerLeader() {
-    LOG("Proposer %d is no longer the leader\n", id);
+    LOG("No longer the leader\n");
     isLeader = false;
 
     std::scoped_lock lock(acceptorGroupLogsMutex, remainingAcceptorGroupsForScoutsMutex);
@@ -258,7 +259,11 @@ int main(const int argc, const char** argv) {
         printf("Usage: ./proposer <PROPOSER ID> <NUM ACCEPTOR GROUPS>.\n");
         exit(0);
     }
-    const int id = std::stoi( argv[1] );
+
+    INIT_LOGGER();
+	network::ignoreClosedSocket();
+
+	const int id = std::stoi(argv[1]);
 	const int numAcceptorGroups = std::stoi(argv[2]);
     proposer p(id, numAcceptorGroups);
 }

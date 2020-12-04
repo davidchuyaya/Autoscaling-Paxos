@@ -8,7 +8,7 @@
 #include <shared_mutex>
 #include <thread>
 #include <vector>
-#include <models/threshold_component.hpp>
+#include "../models/threshold_component.hpp"
 #include "config.hpp"
 #include "network.hpp"
 

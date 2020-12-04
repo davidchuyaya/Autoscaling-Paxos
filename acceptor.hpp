@@ -7,23 +7,24 @@
 
 #include <shared_mutex>
 #include <vector>
-#include <mutex>
 #include <thread>
+
+#include "utils/config.hpp"
 #include "models/log.hpp"
+#include "spdlog/spdlog.h"
 #include "utils/network.hpp"
 #include "models/message.hpp"
 #include "message.pb.h"
-#include "lib/storage/anna_write_only.hpp"
+#include "lib/storage/anna.hpp"
 
 class acceptor {
 public:
-    acceptor(int id, std::string&& acceptorGroupId);
+    explicit acceptor(std::string&& acceptorGroupId);
 private:
-    const int id;
     const std::string acceptorGroupId;
-	anna_write_only* annaWriteOnlyClient;
+	anna* annaWriteOnlyClient;
 
-    std::shared_mutex ballotMutex;
+	std::shared_mutex ballotMutex;
     Ballot highestBallot = {};
 
     std::shared_mutex logMutex;

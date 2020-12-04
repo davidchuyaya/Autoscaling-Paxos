@@ -12,11 +12,12 @@
 #include <thread>
 #include <algorithm>
 #include <functional>
-#include <mutex>
+#include <shared_mutex>
 #include <atomic>
 #include <condition_variable>
 #include <queue>
 #include <google/protobuf/message.h>
+
 #include "utils/network.hpp"
 #include "utils/config.hpp"
 #include "models/message.hpp"

@@ -4,6 +4,10 @@
 
 #include "network.hpp"
 
+void network::ignoreClosedSocket() {
+	signal(SIGPIPE, SIG_IGN);
+}
+
 [[noreturn]]
 void network::startServerAtPortMultitype(const int port, const std::function<void(int, const WhoIsThis_Sender&,
 		google::protobuf::io::ZeroCopyInputStream*)>& onConnect) {

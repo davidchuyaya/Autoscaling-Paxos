@@ -12,6 +12,7 @@
 #include <unordered_map>
 #include <unistd.h>
 #include <google/protobuf/message.h>
+
 #include "utils/config.hpp"
 #include "models/message.hpp"
 #include "utils/network.hpp"
@@ -23,9 +24,8 @@
 
 class batcher {
 public:
-    explicit batcher(int id);
+    explicit batcher();
 private:
-    const int id = 0;
     anna* annaClient;
 
     std::shared_mutex payloadsMutex;
