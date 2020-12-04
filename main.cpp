@@ -96,8 +96,10 @@ void paxos::resendInput() {
 }
 
 void paxos::benchmark() {
-	printf("Starting cluster, you should wait until a leader has been elected before starting...\n");
-	startCluster();
+	if (numBatchers > 0) {
+		printf("Starting cluster, you should wait until a leader has been elected before starting...\n");
+		startCluster();
+	}
 
 	printf("Enter any key to start benchmarking...\n");
 	std::string input;
@@ -146,9 +148,10 @@ void paxos::startCluster() {
 }
 
 int main(const int argc, const char** argv) {
-    if (argc != 1 && argc != 7) {
+    if (argc != 1 && argc != 3 && argc != 7) {
         printf("Usage for interactive mode: ./Autoscaling_Paxos\n");
-        printf("Usage for debug mode: ./Autoscaling_Paxos <NUM COMMANDS> <NUM CLIENTS> <NUM BATCHERS> <NUM PROXY LEADERS> <NUM ACCEPTOR GROUPS> <NUM UNBATCHERS>\n");
+	    printf("Usage for benchmark mode without starting a new cluster: ./Autoscaling_Paxos <NUM COMMANDS> <NUM CLIENTS>\n");
+        printf("Usage for benchmark mode: ./Autoscaling_Paxos <NUM COMMANDS> <NUM CLIENTS> <NUM BATCHERS> <NUM PROXY LEADERS> <NUM ACCEPTOR GROUPS> <NUM UNBATCHERS>\n");
         exit(0);
     }
 
@@ -160,10 +163,15 @@ int main(const int argc, const char** argv) {
     else {
 	    const int numCommands = std::stoi(argv[1]);
 	    const int numClients = std::stoi(argv[2]);
-	    const int numBatchers = std::stoi(argv[3]);
-	    const int numProxyLeaders = std::stoi(argv[4]);
-	    const int numAcceptorGroups = std::stoi(argv[5]);
-	    const int numUnbatchers = std::stoi(argv[6]);
-	    paxos p {numCommands, numClients, numBatchers, numProxyLeaders, numAcceptorGroups, numUnbatchers};
+	    if (argc == 3) {
+		    paxos p {numCommands, numClients};
+	    }
+	    else {
+		    const int numBatchers = std::stoi(argv[3]);
+		    const int numProxyLeaders = std::stoi(argv[4]);
+		    const int numAcceptorGroups = std::stoi(argv[5]);
+		    const int numUnbatchers = std::stoi(argv[6]);
+		    paxos p {numCommands, numClients, numBatchers, numProxyLeaders, numAcceptorGroups, numUnbatchers};
+	    }
     }
 }
