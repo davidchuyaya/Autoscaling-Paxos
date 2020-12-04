@@ -98,6 +98,7 @@ void anna::listenerThread(const annaListener& listener) {
 					        client.put_async(keyTuple.key(), keyTuple.payload(), keyTuple.lattice_type());
 				        lock2.unlock();
 			        }
+			        break;
 		        }
 		        case GET: {
 			        LOG("GET response received: {}\n", response.ShortDebugString());
@@ -117,6 +118,7 @@ void anna::listenerThread(const annaListener& listener) {
 			        	if (keysToListenTo.find(keyTuple.key()) != keysToListenTo.end())
 					        client.get_async(keyTuple.key());
 			        }
+			        break;
 		        }
 		        default: {}
 	        }
