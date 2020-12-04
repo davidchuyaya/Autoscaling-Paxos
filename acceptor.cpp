@@ -5,9 +5,10 @@
 #include "acceptor.hpp"
 
 acceptor::acceptor(std::string&& acceptorGroupId) :acceptorGroupId(acceptorGroupId) {
-	annaWriteOnlyClient = new anna_write_only{};
-	annaWriteOnlyClient->putSingletonSet(config::KEY_ACCEPTOR_GROUPS, acceptorGroupId);
-	annaWriteOnlyClient->putSingletonSet(acceptorGroupId, config::IP_ADDRESS);
+	annaWriteOnlyClient = anna::writeOnly({
+		{config::KEY_ACCEPTOR_GROUPS, acceptorGroupId},
+		{acceptorGroupId, config::IP_ADDRESS}
+	});
 
 	startServer();
 }

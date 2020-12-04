@@ -47,8 +47,7 @@ namespace config {
     const static int HEARTBEAT_SLEEP_SEC = 5;
     const static int CLIENT_TIMEOUT_SEC = 1;
     const static int ID_SCOUT_DELAY_MULTIPLIER = 5; // this * proposer ID = number of seconds to delay before sending scouts
-    const static int ZMQ_RECEIVE_RETRY_SEC = 1; // how often we check ZMQ receive buffer for new Anna messages
-    const static int ANNA_RECHECK_SEC = 1; // how often we send a new get request to Anna for subscriptions
+    const static int ANNA_RECHECK_SEC = 1; // how often we send a new request to Anna & how often we check for updates
 
     const static inline std::string KEY_OBSERVED_PREFIX = ANNA_KEY_PREFIX + "observed";
     const static inline std::string KEY_REMOVED_PREFIX = ANNA_KEY_PREFIX + "removed";

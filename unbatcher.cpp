@@ -5,9 +5,7 @@
 #include "unbatcher.hpp"
 
 unbatcher::unbatcher() {
-	annaWriteOnlyClient = new anna_write_only{};
-	annaWriteOnlyClient->putSingletonSet(config::KEY_UNBATCHERS, config::IP_ADDRESS);
-
+	annaWriteOnlyClient = anna::writeOnly({{config::KEY_UNBATCHERS, config::IP_ADDRESS}});
     heartbeater::heartbeat(proxyLeaderMutex, proxyLeaders);
 	startServer();
 }

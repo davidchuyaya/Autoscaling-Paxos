@@ -9,12 +9,13 @@ paxos::paxos(const int numCommands, const int numClients, const int numBatchers,
     LOG("F: {}\n", config::F);
     std::thread server([&] {startServer(); });
     server.detach();
-    annaClient = new anna({config::KEY_BATCHERS}, [&](const std::string& key, const two_p_set& twoPSet) {
+    annaClient = anna::readWritable({}, [&](const std::string& key, const two_p_set& twoPSet) {
         batchers.connectAndListen<Heartbeat>(twoPSet, config::BATCHER_PORT, WhoIsThis_Sender_client,
 											 [&](const int socket, const Heartbeat& payload) {
             batchers.addHeartbeat(socket);
         });
     });
+	annaClient->subscribeTo(config::KEY_BATCHERS);
 
     if (!isBenchmark) {
 	    std::thread batchRetry([&] { resendInput(); });
@@ -95,10 +96,10 @@ void paxos::resendInput() {
 }
 
 void paxos::benchmark() {
-	BENCHMARK_LOG("Starting cluster, you should wait until a leader has been elected before starting...\n");
+	printf("Starting cluster, you should wait until a leader has been elected before starting...\n");
 	startCluster();
 
-	BENCHMARK_LOG("Enter any key to start benchmarking...\n");
+	printf("Enter any key to start benchmarking...\n");
 	std::string input;
 	std::cin >> input;
 
@@ -130,6 +131,7 @@ void paxos::benchmark() {
 
 	BENCHMARK_LOG("Elapsed millis {} for {} clients and {} commands\n",
 		std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count(), numClients, numCommands);
+	printf("We're done\n");
 }
 
 void paxos::startCluster() {

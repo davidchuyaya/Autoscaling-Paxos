@@ -5,11 +5,13 @@
 #include "batcher.hpp"
 
 batcher::batcher() : proposers(config::F+1) {
-    annaClient = new anna(config::KEY_BATCHERS, {config::KEY_PROPOSERS},
+    annaClient = anna::readWritable({{config::KEY_BATCHERS, config::IP_ADDRESS}},
                     [&](const std::string& key, const two_p_set& twoPSet) {
     	//template type doesn't matter, since we don't receive any messages from the proposer anyway
     	proposers.connectAndMaybeListen<Heartbeat>(twoPSet, config::PROPOSER_PORT, WhoIsThis_Sender_batcher, {});
     });
+	annaClient->subscribeTo(config::KEY_PROPOSERS);
+
     heartbeater::heartbeat(clientMutex, clientSockets);
 	startServer();
 }

@@ -8,10 +8,12 @@ proposer::proposer(const int id, const int numAcceptorGroups) : id(id), numAccep
     std::thread server([&] { startServer(); });
     server.detach();
     proposers.addSelfAsConnection();
-    annaClient = new anna(config::KEY_PROPOSERS,{config::KEY_PROPOSERS, config::KEY_ACCEPTOR_GROUPS},
+    annaClient = anna::readWritable({{config::KEY_PROPOSERS, config::IP_ADDRESS}},
                     [&](const std::string& key, const two_p_set& twoPSet) {
     	listenToAnna(key, twoPSet);
     });
+	annaClient->subscribeTo(config::KEY_PROPOSERS);
+	annaClient->subscribeTo(config::KEY_ACCEPTOR_GROUPS);
 
     //wait for acceptor group IDs before starting phase 1 or phase 2. All batches will be dropped until then.
     std::unique_lock lock(acceptorMutex);

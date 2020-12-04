@@ -5,11 +5,13 @@
 #include "proxy_leader.hpp"
 
 proxy_leader::proxy_leader() : unbatchers(config::F+1), proposers(config::F+1) {
-	annaClient = new anna{config::KEY_PROXY_LEADERS,
-					   {config::KEY_PROPOSERS, config::KEY_UNBATCHERS, config::KEY_ACCEPTOR_GROUPS},
+	annaClient = anna::readWritable({{config::KEY_PROXY_LEADERS, config::IP_ADDRESS}},
 					   [&](const std::string& key, const two_p_set& twoPSet) {
 		listenToAnna(key, twoPSet);
-	}};
+	});
+	annaClient->subscribeTo(config::KEY_PROPOSERS);
+	annaClient->subscribeTo(config::KEY_ACCEPTOR_GROUPS);
+	annaClient->subscribeTo(config::KEY_UNBATCHERS);
     heartbeater::mainThreadHeartbeat(message::createProxyLeaderHeartbeat(), proposers);
 }
 

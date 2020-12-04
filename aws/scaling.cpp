@@ -41,7 +41,7 @@ std::vector<std::string> scaling::startInstance(const std::string& executable, c
 	         << "wget https://autoscaling-paxos.s3-us-west-1.amazonaws.com/" << executable << "\n"
 	         << "chmod +x " << executable << "\n"
 	         << "export " << config::ENV_ANNA_ROUTING_NAME << "=" << config::ANNA_ROUTING_ADDRESS << "\n"
-	         << "export " << config::ENV_IP_NAME << "=" << config::IP_ADDRESS << "\n"
+	         << "export " << config::ENV_IP_NAME << "=$(curl http://169.254.169.254/latest/meta-data/public-ipv4)\n"
 	         << "export " << config::ENV_ANNA_KEY_PREFIX_NAME << "=" << config::ANNA_KEY_PREFIX << "\n"
 	         << "./" << executable << " " << arguments
 	         << "'";
@@ -54,7 +54,8 @@ std::vector<std::string> scaling::startInstance(const std::string& executable, c
 	          << "--instance-type c5.large "
 	          << "--key-name anna "
 	          << "--security-group-ids sg-0196a7a839c79446d "
-			  << "--tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=" << name << "}]' "
+			  << "--tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=" << config::ANNA_KEY_PREFIX << "_"
+			        << name << "}]' "
 			  << "--query 'Instances[*].InstanceId' "
 			  << "--output text "
 	          << "--user-data " << userData.str();
