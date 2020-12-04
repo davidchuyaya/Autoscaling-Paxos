@@ -4,29 +4,34 @@
 
 #include "scaling.hpp"
 
-void scaling::startBatchers(const int numBatchers) {
-	startInstance("batcher", "", "batchers-?", numBatchers);
+std::vector<std::string> scaling::startBatchers(const int numBatchers) {
+	return startInstance("batcher", "", "batchers-?", numBatchers);
 }
 
-void scaling::startProposers(const int numAcceptorGroups) {
-	for (int i = 1; i <= config::F+1; i++)
-		startInstance("proposer", std::to_string(i) + " " + std::to_string(numAcceptorGroups),
-				"proposer-" + std::to_string(i), 1);
+std::vector<std::string> scaling::startProposers(const int numAcceptorGroups) {
+	const std::string& numAcceptorGroupsString = std::to_string(numAcceptorGroups);
+	std::vector<std::string> instances = {};
+	for (int i = 1; i <= config::F+1; i++) {
+		const std::vector<std::string>& instanceId = startInstance("proposer",std::to_string(i)
+			+ " " + numAcceptorGroupsString,"proposer-" + std::to_string(i), 1);
+		instances.insert(instances.end(), instanceId.begin(), instanceId.end());
+	}
+	return instances;
 }
 
-void scaling::startProxyLeaders(const int numProxyLeaders) {
-	startInstance("proxy_leader", "", "proxyLeader-?", numProxyLeaders);
+std::vector<std::string> scaling::startProxyLeaders(const int numProxyLeaders) {
+	return startInstance("proxy_leader", "", "proxyLeader-?", numProxyLeaders);
 }
 
-void scaling::startAcceptorGroup(const std::string& acceptorGroupId) {
-	startInstance("acceptor", acceptorGroupId, "acceptor-?." + acceptorGroupId, 2*config::F+1);
+std::vector<std::string> scaling::startAcceptorGroup(const std::string& acceptorGroupId) {
+	return startInstance("acceptor", acceptorGroupId, "acceptor-?." + acceptorGroupId, 2*config::F+1);
 }
 
-void scaling::startUnbatchers(const int numUnbatchers) {
-	startInstance("unbatcher", "", "unbatcher-?", numUnbatchers);
+std::vector<std::string> scaling::startUnbatchers(const int numUnbatchers) {
+	return startInstance("unbatcher", "", "unbatcher-?", numUnbatchers);
 }
 
-void scaling::startInstance(const std::string& executable, const std::string& arguments,
+std::vector<std::string> scaling::startInstance(const std::string& executable, const std::string& arguments,
 							const std::string& name, const int num) {
 	std::stringstream userData;
 	userData << "'"
@@ -50,11 +55,39 @@ void scaling::startInstance(const std::string& executable, const std::string& ar
 	          << "--key-name anna "
 	          << "--security-group-ids sg-0196a7a839c79446d "
 			  << "--tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=" << name << "}]' "
+			  << "--query 'Instances[*].InstanceId' "
+			  << "--output text "
 	          << "--user-data " << userData.str();
 
-	system(ec2Script.str().c_str());
+	return executeAndOutputToVector(ec2Script.str());
 }
 
 void scaling::shutdown() {
 	system("shutdown -h now");
+}
+
+void scaling::killInstance(const std::string& instanceId) {
+	//since we're not using newlines here, remember to have spaces between things
+	std::stringstream terminateScript;
+	terminateScript << "aws ec2 terminate-instances "
+	          << "--instance-ids " << instanceId;
+
+	system(terminateScript.str().c_str());
+}
+
+std::vector<std::string> scaling::executeAndOutputToVector(const std::string& command) {
+	FILE* file = popen(command.c_str(), "r");
+
+	std::stringstream output;
+	char readBuffer[128];
+	while (fgets(readBuffer, 128, file))
+		output << readBuffer;
+
+	std::vector<std::string> outputVector;
+	std::istringstream splitter(output.str());
+	std::string temp;
+	while (splitter >> temp)
+		outputVector.emplace_back(temp);
+
+	return outputVector;
 }

@@ -12,6 +12,9 @@
 #include <string>
 #include <numeric>
 #include <chrono>
+#include <vector>
+#include <unordered_map>
+#include <optional>
 
 #include "utils/config.hpp"
 #include "acceptor.hpp"
@@ -31,6 +34,11 @@ private:
 	const int numProxyLeaders;
 	const int numAcceptorGroups;
 	const int numUnbatchers;
+	std::vector<string> instanceIdsOfBatchers;
+	std::vector<string> instanceIdsOfProposers;
+	std::vector<string> instanceIdsOfProxyLeaders;
+	std::unordered_map<std::string, std::vector<string>> instanceIdsOfAcceptors;
+	std::vector<string> instanceIdsOfUnbatchers;
 
 	anna* annaClient;
     heartbeat_component batchers;

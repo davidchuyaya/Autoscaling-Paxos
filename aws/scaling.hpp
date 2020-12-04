@@ -8,20 +8,25 @@
 #include <string>
 #include <sstream>
 #include <cstdlib>
+#include <vector>
+#include <cstdio>
 #include "../utils/config.hpp"
 
 namespace scaling {
-	void startBatchers(int numBatchers);
+	std::vector<std::string> startBatchers(int numBatchers);
 	/**
 	 * @warning Only call this method once per execution, or else proposers will spawn with the same ID.
 	 * @param numAcceptorGroups
 	 */
-	void startProposers(int numAcceptorGroups);
-	void startProxyLeaders(int numProxyLeaders);
-	void startAcceptorGroup(const std::string& acceptorGroupId);
-	void startUnbatchers(int numUnbatchers);
-    void startInstance(const std::string& executable, const std::string& arguments, const std::string& name, int num);
+	std::vector<std::string> startProposers(int numAcceptorGroups);
+	std::vector<std::string> startProxyLeaders(int numProxyLeaders);
+	std::vector<std::string> startAcceptorGroup(const std::string& acceptorGroupId);
+	std::vector<std::string> startUnbatchers(int numUnbatchers);
+    std::vector<std::string> startInstance(const std::string& executable, const std::string& arguments,
+										   const std::string& name, int num);
+	void killInstance(const std::string& name);
     void shutdown();
+	std::vector<std::string> executeAndOutputToVector(const std::string& command);
 };
 
 #endif //AUTOSCALING_PAXOS_SCALING_HPP

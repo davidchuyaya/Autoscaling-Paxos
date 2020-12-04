@@ -133,14 +133,14 @@ void paxos::benchmark() {
 }
 
 void paxos::startCluster() {
-	scaling::startBatchers(numBatchers);
-	scaling::startProposers(numAcceptorGroups);
-	scaling::startProxyLeaders(numProxyLeaders);
+	instanceIdsOfBatchers = scaling::startBatchers(numBatchers);
+	instanceIdsOfProposers = scaling::startProposers(numAcceptorGroups);
+	instanceIdsOfProxyLeaders = scaling::startProxyLeaders(numProxyLeaders);
 	for (int i = 0; i < numAcceptorGroups; i++) {
 		const std::string& acceptorGroupId = std::to_string(uuid::generate());
-		scaling::startAcceptorGroup(acceptorGroupId);
+		instanceIdsOfAcceptors[acceptorGroupId] = scaling::startAcceptorGroup(acceptorGroupId);
 	}
-	scaling::startUnbatchers(numUnbatchers);
+	instanceIdsOfUnbatchers = scaling::startUnbatchers(numUnbatchers);
 }
 
 int main(const int argc, const char** argv) {
