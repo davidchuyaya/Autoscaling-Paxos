@@ -195,5 +195,6 @@ int main(int argc, char** argv) {
     }
 
     INIT_LOGGER();
-    proxy_leader pr {};
+	network::ignoreClosedSocket();
+	proxy_leader pr {};
 }

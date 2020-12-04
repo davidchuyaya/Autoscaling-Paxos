@@ -259,8 +259,9 @@ int main(const int argc, const char** argv) {
     }
 
     INIT_LOGGER();
+	network::ignoreClosedSocket();
 
-    const int id = std::stoi(argv[1]);
+	const int id = std::stoi(argv[1]);
 	const int numAcceptorGroups = std::stoi(argv[2]);
     proposer p(id, numAcceptorGroups);
 }

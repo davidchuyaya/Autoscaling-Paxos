@@ -12,7 +12,7 @@
 #include <numeric>
 #include "spdlog/spdlog.h"
 
-#define INIT_LOGGER() std::shared_ptr<spdlog::logger> logger = spdlog::basic_logger_mt("paxos_log", "log.txt");spdlog::get("paxos_log")->flush_on(spdlog::level::info)
+#define INIT_LOGGER() spdlog::basic_logger_mt("paxos_log", "log.txt");spdlog::get("paxos_log")->flush_on(spdlog::level::info)
 #define BENCHMARK_LOG(...) spdlog::get("paxos_log")->info(__VA_ARGS__) //some logging is always on for benchmarks
 
 #define DEBUG
@@ -45,7 +45,7 @@ namespace config {
     const static int TCP_RETRY_TIMEOUT_SEC = 10;
     const static int HEARTBEAT_TIMEOUT_SEC = 20; // this - HEARTBEAT_SLEEP_SEC = time allowed between message send & receive
     const static int HEARTBEAT_SLEEP_SEC = 5;
-    const static int CLIENT_TIMEOUT_SEC = 10;
+    const static int CLIENT_TIMEOUT_SEC = 1;
     const static int ID_SCOUT_DELAY_MULTIPLIER = 5; // this * proposer ID = number of seconds to delay before sending scouts
     const static int ZMQ_RECEIVE_RETRY_SEC = 1; // how often we check ZMQ receive buffer for new Anna messages
     const static int ANNA_RECHECK_SEC = 1; // how often we send a new get request to Anna for subscriptions

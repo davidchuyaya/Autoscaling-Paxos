@@ -67,13 +67,11 @@ void paxos::readInput() {
 
 	    std::unique_lock lock(requestMutex[0]);
 	    request[0].emplace(input);
-	    LOG("Waiting for ACK, do not input...\n");
-	    TIME();
+	    printf("Waiting for ACK, do not input...\n");
 	    requestCV[0].wait(lock, [&]{return !request[0].has_value();});
 	    auto end = std::chrono::system_clock::now();
 
-	    LOG("Elapsed micro {}\n", std::chrono::duration_cast<std::chrono::microseconds>(end - start).count());
-	    TIME();
+	    printf("Elapsed micro %ld\n", std::chrono::duration_cast<std::chrono::microseconds>(end - start).count());
     }
 }
 
@@ -153,6 +151,7 @@ int main(const int argc, const char** argv) {
     }
 
 	INIT_LOGGER();
+	network::ignoreClosedSocket();
 
     if (argc == 1)
     	paxos p {};

@@ -54,5 +54,6 @@ int main(const int argc, const char** argv) {
     }
 
     INIT_LOGGER();
-    batcher b {};
+	network::ignoreClosedSocket();
+	batcher b {};
 }

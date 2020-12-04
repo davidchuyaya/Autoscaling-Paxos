@@ -57,5 +57,6 @@ int main(const int argc, const char** argv) {
     }
 
     INIT_LOGGER();
-    acceptor a {argv[1]};
+	network::ignoreClosedSocket();
+	acceptor a {argv[1]};
 }
