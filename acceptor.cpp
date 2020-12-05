@@ -17,7 +17,7 @@ acceptor::acceptor(std::string&& acceptorGroupId) :acceptorGroupId(acceptorGroup
 void acceptor::startServer() {
     network::startServerAtPort<ProposerToAcceptor>(config::ACCEPTOR_PORT,
        [&](const int socket) {
-            LOG("Connected to proxy leader\n");
+            BENCHMARK_LOG("Connected to proxy leader\n");
         }, [&](const int socket, const ProposerToAcceptor& payload) {
             listenToProxyLeaders(socket, payload);
     });
@@ -27,7 +27,7 @@ void acceptor::listenToProxyLeaders(const int socket, const ProposerToAcceptor& 
     std::scoped_lock lock(ballotMutex, logMutex);
     switch (payload.type()) {
         case ProposerToAcceptor_Type_p1a: {
-            LOG("Received p1a: {}, highestBallot: {}\n", payload.ShortDebugString(), highestBallot.ShortDebugString());
+            BENCHMARK_LOG("Received p1a: {}, highestBallot: {}\n", payload.ShortDebugString(), highestBallot.ShortDebugString());
             if (Log::isBallotGreaterThan(payload.ballot(), highestBallot))
                 highestBallot = payload.ballot();
             network::sendPayload(socket, message::createP1B(payload.messageid(), acceptorGroupId, highestBallot, log));

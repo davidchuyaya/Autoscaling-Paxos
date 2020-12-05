@@ -33,7 +33,7 @@ paxos::paxos(const int numCommands, const int numClients, const int numBatchers,
 void paxos::startServer() {
     network::startServerAtPort<UnbatcherToClient>(config::CLIENT_PORT,
        [](const int socket) {
-            LOG("Main connected to unbatcher\n");
+            BENCHMARK_LOG("Main connected to unbatcher\n");
     }, [&](const int socket, const UnbatcherToClient& payload) {
             LOG("--Acked: {}--\n", payload.request());
 

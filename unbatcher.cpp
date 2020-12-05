@@ -13,7 +13,7 @@ unbatcher::unbatcher() {
 void unbatcher::startServer() {
     network::startServerAtPort<Batch>(config::UNBATCHER_PORT,
        [&](const int socket) {
-           LOG("Unbatcher connected to proxy leader\n");
+           BENCHMARK_LOG("Unbatcher connected to proxy leader\n");
            std::unique_lock lock(proxyLeaderMutex);
            proxyLeaders.emplace_back(socket);
         }, [&](const int socket, const Batch& batch) {

@@ -127,7 +127,7 @@ void proxy_leader::handleP1B(const AcceptorToProxyLeader& payload) {
 
     if (Log::isBallotGreaterThan(payload.ballot(), sentValue.ballot())) {
         //yikes, the proposer got preempted
-	    LOG("P1B preempted for proposer {}\n", payload.ballot().id());
+	    BENCHMARK_LOG("P1B preempted for proposer {}\n", payload.ballot().id());
         const ProxyLeaderToProposer& messageToProposer = message::createProxyP1B(payload.messageid(),
                                                                                  payload.acceptorgroupid(),
                                                                                  payload.ballot(), {}, {});
@@ -141,7 +141,7 @@ void proxy_leader::handleP1B(const AcceptorToProxyLeader& payload) {
 
         if (unmergedLogs[payload.messageid()].size() >= config::F + 1) {
             //we have f+1 good logs, merge them & tell the proposer
-	        LOG("P1B approved for proposer {}\n", payload.ballot().id());
+	        BENCHMARK_LOG("P1B approved for proposer {}\n", payload.ballot().id());
             const auto&[committedLog, uncommittedLog] = Log::mergeLogsOfAcceptorGroup(unmergedLogs[payload.messageid()]);
             const ProxyLeaderToProposer& messageToProposer = message::createProxyP1B(payload.messageid(),
 																					 payload.acceptorgroupid(),

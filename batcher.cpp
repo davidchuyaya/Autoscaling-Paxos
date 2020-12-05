@@ -22,7 +22,7 @@ batcher::batcher() : proposers(config::F+1) {
 void batcher::startServer() {
     network::startServerAtPort<ClientToBatcher>(config::BATCHER_PORT,
        [&](const int socket) {
-           LOG("Connected to client\n");
+           BENCHMARK_LOG("Connected to client\n");
            std::unique_lock lock(clientMutex);
            clientSockets.emplace_back(socket);
         }, [&](const int socket, const ClientToBatcher& payload) {

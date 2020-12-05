@@ -173,7 +173,7 @@ void proposer::sendScouts() {
     ballotNum += 1;
     currentBallotNum = ballotNum;
     ballotLock.unlock();
-    LOG("P1A blasting out: id = {}, ballotNum = {}\n", id, currentBallotNum);
+    BENCHMARK_LOG("P1A blasting out: id = {}, ballotNum = {}\n", id, currentBallotNum);
 
     std::shared_lock acceptorsLock(acceptorMutex, std::defer_lock);
     std::shared_lock logLock(logMutex, std::defer_lock);
@@ -185,7 +185,7 @@ void proposer::sendScouts() {
 }
 
 void proposer::handleP1B(const ProxyLeaderToProposer& message) {
-    LOG("Received p1b: {}\n", message.ShortDebugString());
+    BENCHMARK_LOG("Received p1b: {}\n", message.ShortDebugString());
 
     if (message.ballot().id() != id) { // we lost the election
         // store the largest ballot we last saw so we can immediately catch up
