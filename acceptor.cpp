@@ -42,7 +42,6 @@ void acceptor::listenToProxyLeaders(const int socket, const ProposerToAcceptor& 
                 *pValue.mutable_ballot() = payload.ballot();
                 log[payload.slot()] = pValue;
                 highestBallot = payload.ballot();
-                LOG("New log: {}\n", Log::printLog(log));
             }
             network::sendPayload(socket, message::createP2B(payload.messageid(), acceptorGroupId, highestBallot, payload.slot()));
 		    TIME();
