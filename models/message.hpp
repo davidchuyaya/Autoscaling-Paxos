@@ -29,7 +29,7 @@ namespace message {
     Heartbeat createGenericHeartbeat();
     ProposerToProposer createIamLeader();
     ClientToBatcher createClientRequest(const std::string& ipAddress, const std::string& payload);
-    Batch createBatchMessage(const std::unordered_map<std::string, std::string>& requests);
+    Batch createBatchMessage(const std::unordered_map<std::string, std::vector<std::string>>& requests);
     UnbatcherToClient createUnbatcherToClientAck(const std::string& request);
 }
 

@@ -35,18 +35,18 @@ void batcher::listenToClient(const ClientToBatcher& payload) {
 	TIME();
 
 	std::unique_lock lock(payloadsMutex);
-    clientToPayload[payload.ipaddress()] = payload.request();
+    clientToPayloads[payload.ipaddress()].emplace_back(payload.request());
     numPayloads += 1;
 
 	if (numPayloads < config::THRESHOLD_BATCH_SIZE)
 		return;
 
 	LOG("Sending batch\n");
-	const Batch& batchMessage = message::createBatchMessage(clientToPayload);
+	const Batch& batchMessage = message::createBatchMessage(clientToPayloads);
 	proposers.broadcast(batchMessage);
 	TIME();
 
-	clientToPayload.clear();
+	clientToPayloads.clear();
 	numPayloads = 0;
 }
 

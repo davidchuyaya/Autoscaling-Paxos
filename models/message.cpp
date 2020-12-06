@@ -110,10 +110,14 @@ ClientToBatcher message::createClientRequest(const std::string& ipAddress, const
     return clientToBatcher;
 }
 
-Batch message::createBatchMessage(const std::unordered_map<std::string, std::string>& requests) {
-    Batch batch;
-    *batch.mutable_clienttorequest() = {requests.begin(), requests.end()};
-    return batch;
+Batch message::createBatchMessage(const std::unordered_map<std::string, std::vector<std::string>>& requests) {
+	std::unordered_map<std::string, Requests> protobufRequests = {};
+	for (const auto& [ip, requestsForIp] : requests)
+		*protobufRequests[ip].mutable_array() = {requestsForIp.begin(), requestsForIp.end()};
+
+	Batch batch;
+	*batch.mutable_clienttorequests() = {protobufRequests.begin(), protobufRequests.end()};
+	return batch;
 }
 
 UnbatcherToClient message::createUnbatcherToClientAck(const std::string& request) {

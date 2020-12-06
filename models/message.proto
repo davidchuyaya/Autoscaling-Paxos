@@ -25,8 +25,11 @@ message PValue {
     Ballot ballot = 1;
     string payload = 2;
 }
+message Requests {
+    repeated string array = 1;
+}
 message Batch {
-    map<string, string> clientToRequest = 1;
+    map<string, Requests> clientToRequests = 1;
 }
 message Heartbeat {
     bool dummy = 1; //must have at least 1 value for message to send
