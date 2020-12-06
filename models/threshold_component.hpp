@@ -94,25 +94,25 @@ public:
         for (int socket : components) {
 	        bool success = network::sendPayload(socket, payload);
 
-	        if (!success) { //remove broken socket
-	        	lock.unlock();
-		        {
-			        std::scoped_lock lock2(ipToSocketMutex, componentMutex);
-			        removeConnection(socket);
-		        }
-	        	lock.lock();
-	        }
+//	        if (!success) { //remove broken socket
+//	        	lock.unlock();
+//		        {
+//			        std::scoped_lock lock2(ipToSocketMutex, componentMutex);
+//			        removeConnection(socket);
+//		        }
+//	        	lock.lock();
+//	        }
         }
     }
     void sendToIp(const std::string& ipAddress, const SendMessage& payload) {
 		std::shared_lock lock(ipToSocketMutex);
 		const int socket = ipToSocket.at(ipAddress);
 		bool success = network::sendPayload(socket, payload);
-		if (!success) {
-			ipToSocketMutex.unlock();
-			std::scoped_lock lock2(ipToSocketMutex, componentMutex);
-			disconnectFromIp(ipAddress);
-		}
+//		if (!success) {
+//			ipToSocketMutex.unlock();
+//			std::scoped_lock lock2(ipToSocketMutex, componentMutex);
+//			disconnectFromIp(ipAddress);
+//		}
     }
 	[[nodiscard]] bool twoPsetThresholdMet() {
 		std::shared_lock lock(membersMutex);

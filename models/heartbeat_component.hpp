@@ -60,17 +60,17 @@ public:
         int socket = nextComponentSocket();
         bool success = network::sendPayload(socket, payload);
 
-        while (!success) { //remove this socket, try a different one
-	        lock.unlock();
-	        {
-		        std::scoped_lock lock2(this->ipToSocketMutex, this->componentMutex);
-		        this->removeConnection(socket);
-	        }
-	        lock.lock();
-
-	        socket = nextComponentSocket();
-	        success = network::sendPayload(socket, payload);
-        }
+//        while (!success) { //remove this socket, try a different one
+//	        lock.unlock();
+//	        {
+//		        std::scoped_lock lock2(this->ipToSocketMutex, this->componentMutex);
+//		        this->removeConnection(socket);
+//	        }
+//	        lock.lock();
+//
+//	        socket = nextComponentSocket();
+//	        success = network::sendPayload(socket, payload);
+//        }
     }
     void addHeartbeat(int socket) {
 	    std::unique_lock lock(heartbeatMutex);
