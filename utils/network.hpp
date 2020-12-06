@@ -5,6 +5,7 @@
 #ifndef C__PAXOS_NETWORKNODE_HPP
 #define C__PAXOS_NETWORKNODE_HPP
 
+#include <cerrno>
 #include <csignal>
 #include <netinet/in.h>
 #include <google/protobuf/message.h>
@@ -130,7 +131,7 @@ namespace network {
      * @param socketId Socket ID of recipient
      * @param payload Payload to send
      */
-    void sendPayload(int socketId, const google::protobuf::Message& payload);
+    bool sendPayload(int socketId, const google::protobuf::Message& payload);
 }
 
 #endif //C__PAXOS_NETWORKNODE_HPP

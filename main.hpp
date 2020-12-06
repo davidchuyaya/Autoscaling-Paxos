@@ -41,7 +41,7 @@ private:
 	std::vector<string> instanceIdsOfUnbatchers;
 
 	anna* annaClient;
-    heartbeat_component batchers;
+    heartbeat_component<ClientToBatcher, Heartbeat> batchers;
 
 	std::vector<std::shared_mutex> requestMutex;
     std::vector<std::condition_variable_any> requestCV;

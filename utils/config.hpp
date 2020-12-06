@@ -15,7 +15,7 @@
 #define INIT_LOGGER() spdlog::basic_logger_mt("paxos_log", "log.txt");spdlog::get("paxos_log")->flush_on(spdlog::level::info)
 #define BENCHMARK_LOG(...) spdlog::get("paxos_log")->info(__VA_ARGS__) //some logging is always on for benchmarks
 
-//#define DEBUG
+#define DEBUG
 #ifdef DEBUG
 #   define LOG(...) BENCHMARK_LOG(__VA_ARGS__)
 #   define TIME() LOG("Micro: {}\n", std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now().time_since_epoch()).count())
@@ -43,8 +43,8 @@ namespace config {
     const static inline std::string ANNA_KEY_PREFIX = std::getenv(ENV_ANNA_KEY_PREFIX_NAME.c_str());
 
     const static int TCP_RETRY_TIMEOUT_SEC = 10;
-    const static int HEARTBEAT_TIMEOUT_SEC = 20; // this - HEARTBEAT_SLEEP_SEC = time allowed between message send & receive
-    const static int HEARTBEAT_SLEEP_SEC = 5;
+    const static int HEARTBEAT_TIMEOUT_SEC = 30; // this - HEARTBEAT_SLEEP_SEC = time allowed between message send & receive
+    const static int HEARTBEAT_SLEEP_SEC = 10;
     const static int CLIENT_TIMEOUT_SEC = 1;
     const static int ID_SCOUT_DELAY_MULTIPLIER = 5; // this * proposer ID = number of seconds to delay before sending scouts
     const static int ANNA_RECHECK_SEC = 3; // how often we send a new request to Anna & how often we check for updates

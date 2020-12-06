@@ -4,11 +4,10 @@
 
 #include "batcher.hpp"
 
-batcher::batcher() : proposers(config::F+1) {
+batcher::batcher() : proposers(config::F+1, config::PROPOSER_PORT, WhoIsThis_Sender_batcher) {
     annaClient = anna::readWritable({{config::KEY_BATCHERS, config::IP_ADDRESS}},
                     [&](const std::string& key, const two_p_set& twoPSet) {
-    	//template type doesn't matter, since we don't receive any messages from the proposer anyway
-    	proposers.connectAndMaybeListen<Heartbeat>(twoPSet, config::PROPOSER_PORT, WhoIsThis_Sender_batcher, {});
+    	proposers.connectAndMaybeListen(twoPSet);
     	if (proposers.twoPsetThresholdMet())
 		    annaClient->unsubscribeFrom(config::KEY_PROPOSERS);
     });

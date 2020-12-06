@@ -56,15 +56,15 @@ void anna::putLattice(const std::string& prefixedKey, const std::unordered_set<s
 void anna::subscribeTo(const std::string& key) {
 	std::scoped_lock lock(clientMutex, keysToListenToMutex);
 	client.get_async(config::KEY_OBSERVED_PREFIX + key);
-	client.get_async(config::KEY_REMOVED_PREFIX + key);
+//	client.get_async(config::KEY_REMOVED_PREFIX + key); TODO reenable subscription to removed sets?
 	keysToListenTo.emplace(config::KEY_OBSERVED_PREFIX + key);
-	keysToListenTo.emplace(config::KEY_REMOVED_PREFIX + key);
+//	keysToListenTo.emplace(config::KEY_REMOVED_PREFIX + key);
 }
 
 void anna::unsubscribeFrom(const std::string& key) {
     std::unique_lock lock(keysToListenToMutex);
     keysToListenTo.erase(config::KEY_OBSERVED_PREFIX + key);
-	keysToListenTo.erase(config::KEY_REMOVED_PREFIX + key);
+//	keysToListenTo.erase(config::KEY_REMOVED_PREFIX + key);
 }
 
 void anna::listenerThread(const annaListener& listener) {
@@ -108,6 +108,8 @@ void anna::listenerThread(const annaListener& listener) {
 					        std::string key = twoPset.mergeAndUnprefixKey(keyTuple.key(),
 														   deserialize_set(keyTuple.payload()));
 					        LOG("Received set with key {}: {}\n", key, twoPset.printSet());
+					        if (twoPset.empty())
+						        continue;
 					        listener(key, twoPset);
 				        }
 			        }

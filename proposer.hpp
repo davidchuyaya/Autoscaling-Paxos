@@ -53,7 +53,7 @@ private:
     std::vector<Log::stringLog> acceptorGroupCommittedLogs = {};
     std::unordered_map<std::string, Log::pValueLog> acceptorGroupUncommittedLogs = {}; //key = acceptor group ID
 
-    threshold_component proposers;
+    threshold_component<ProposerToProposer, ProposerToProposer> proposers;
 
     two_p_set acceptorGroupIdSet;
 
@@ -62,7 +62,7 @@ private:
     std::vector<std::string> acceptorGroupIds = {};
     int nextAcceptorGroup = 0;
 
-    heartbeat_component proxyLeaders;
+    heartbeat_component<ProposerToAcceptor, ProxyLeaderToProposer> proxyLeaders;
 
     /**
      * If isLeader = true, periodically tell other proposers.

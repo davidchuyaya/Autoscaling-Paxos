@@ -35,17 +35,16 @@ private:
     std::shared_mutex approvedCommandersMutex;
     std::unordered_map<int, int> approvedCommanders = {}; //key = message ID
 
-    threshold_component proposers;
-
-    two_p_set acceptorGroupIdSet;
+    threshold_component<ProxyLeaderToProposer, ProposerToAcceptor> proposers;
 
     std::shared_mutex acceptorMutex;
-    std::unordered_map<std::string, threshold_component*> acceptorGroupSockets = {}; //key = acceptor group ID
+	//key = acceptor group ID
+    std::unordered_map<std::string, threshold_component<ProposerToAcceptor, AcceptorToProxyLeader>*> acceptorGroupSockets = {};
 
-    heartbeat_component unbatchers;
+    heartbeat_component<Batch, Heartbeat> unbatchers;
 
     void listenToAnna(const std::string& key, const two_p_set& twoPSet);
-    void processAcceptorGroup(const two_p_set& twoPSet);
+    void processNewAcceptorGroup(const std::string& acceptorGroupId);
     void processAcceptors(const std::string& acceptorGroupId, const two_p_set& twoPSet);
     void listenToProposer(const ProposerToAcceptor& payload);
     void listenToAcceptor(const AcceptorToProxyLeader& payload);

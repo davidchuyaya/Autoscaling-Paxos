@@ -5,15 +5,16 @@ paxos::paxos(const int numCommands, const int numClients, const int numBatchers,
 			 const int numProxyLeaders, const int numAcceptorGroups, const int numUnbatchers) :
 			 isBenchmark(numCommands != 0),  numCommands(numCommands), numClients(numClients), numBatchers(numBatchers),
 			 numProxyLeaders(numProxyLeaders), numAcceptorGroups(numAcceptorGroups), numUnbatchers(numUnbatchers),
-			 requestMutex(numClients), requestCV(numClients), request(numClients), batchers(config::F+1) {
+			 requestMutex(numClients), requestCV(numClients), request(numClients),
+			 batchers(config::F+1, config::BATCHER_PORT, WhoIsThis_Sender_client,
+			    [&](const int socket, const Heartbeat& payload) {
+			 	batchers.addHeartbeat(socket);
+			 }) {
     LOG("F: {}\n", config::F);
     std::thread server([&] {startServer(); });
     server.detach();
     annaClient = anna::readWritable({}, [&](const std::string& key, const two_p_set& twoPSet) {
-        batchers.connectAndListen<Heartbeat>(twoPSet, config::BATCHER_PORT, WhoIsThis_Sender_client,
-											 [&](const int socket, const Heartbeat& payload) {
-            batchers.addHeartbeat(socket);
-        });
+        batchers.connectAndMaybeListen(twoPSet);
     });
 	annaClient->subscribeTo(config::KEY_BATCHERS);
 

@@ -82,8 +82,9 @@ int network::createSocket() {
     return socketId;
 }
 
-void network::sendPayload(const int socketId, const google::protobuf::Message& payload) {
+bool network::sendPayload(const int socketId, const google::protobuf::Message& payload) {
 	google::protobuf::util::SerializeDelimitedToFileDescriptor(payload, socketId);
+	return errno != EBADF;
 }
 
 bool network::receivePayload(google::protobuf::Message* message, google::protobuf::io::ZeroCopyInputStream* stream) {

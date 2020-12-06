@@ -19,71 +19,119 @@
 #include "message.hpp"
 #include "threshold_component.hpp"
 
-class heartbeat_component : public threshold_component {
+template<typename SendMessage, typename ReceiveMessage>
+class heartbeat_component : public threshold_component<SendMessage, ReceiveMessage> {
 public:
-    explicit heartbeat_component(int waitThreshold);
-
-	template<typename Message>
-    void connectAndListen(const two_p_set& newMembers, int port, const WhoIsThis_Sender& whoIsThis,
-                          const std::function<void(int, const Message&)>& listener) {
-		std::unique_lock membersLock(membersMutex);
-		const two_p_set& updates = members.updatesFrom(newMembers);
-		if (updates.empty())
-			return;
-		members.merge(updates);
-		membersLock.unlock();
-
-		for (const std::string& ip : updates.getObserved()) {
-			LOG("Connecting to new member: {}\n", ip);
-			std::thread thread([&, ip, whoIsThis, port, listener]{
-				const int socket = network::connectToServerAtAddress(ip, port, whoIsThis);
-				std::unique_lock lock(ipToSocketMutex);
-				ipToSocket[ip] = socket;
-				lock.unlock();
-				heartbeat_component::addConnection(socket); //TODO figure out why virtual func isn't working normally
-				network::listenToSocketUntilClose(socket, listener);
-			});
-			thread.detach();
-		}
-
-		if (!updates.getRemoved().empty()) {
-			std::scoped_lock lock(ipToSocketMutex, componentMutex, heartbeatMutex);
-			for (const std::string& ip : updates.getRemoved()) {
-				LOG("Removing dead member: {}\n", ip);
-				const int socket = ipToSocket[ip];
-				shutdown(socket, 1);
-				components.erase(std::remove(components.begin(), components.end(), socket), components.end());
-				slowComponents.erase(std::remove(slowComponents.begin(), slowComponents.end(), socket), slowComponents.end());
-				heartbeats.erase(socket);
-				ipToSocket.erase(ip);
-			}
-		}
+	explicit heartbeat_component(const int waitThreshold, const int port = 0,
+	                    const WhoIsThis_Sender whoIsThis = WhoIsThis_Sender_null,
+	                    const std::optional<std::function<void(int, const ReceiveMessage&)>>& listener = {}) :
+	                    threshold_component<SendMessage, ReceiveMessage>(waitThreshold, port, whoIsThis, listener) {
+		std::thread thread([&]{checkHeartbeats();});
+		thread.detach();
 	}
-	void addConnection(int socket) override;
-    template<typename Message> void send(const Message& payload) {
-        std::shared_lock lock(componentMutex);
-        if (!canSend) { //block if not enough connections
-            waitForThreshold(lock);
+	void disconnectFromIp(const std::string& ipAddress) override {
+		LOG("Removing dead member: {}\n", ipAddress);
+		const int socket = this->ipToSocket[ipAddress];
+		shutdown(socket, 1);
+		this->components.erase(std::remove(this->components.begin(), this->components.end(), socket), this->components.end());
+		slowComponents.erase(std::remove(slowComponents.begin(), slowComponents.end(), socket), slowComponents.end());
+		heartbeats.erase(socket);
+		this->ipToSocket.erase(ipAddress);
+	}
+	void addConnection(int socket) override {
+		{
+			std::scoped_lock lock(this->componentMutex, heartbeatMutex);
+			this->components.emplace_back(socket);
+			//add 1st heartbeat immediately after connection is made
+			LOG("Heartbeat added for socket: {}\n", socket);
+			time(&heartbeats[socket]);
+
+			//check threshold
+			if (!thresholdMet())
+				return;
+		}
+		this->componentCV.notify_all();
+	}
+    void send(const SendMessage& payload) {
+        std::shared_lock lock(this->componentMutex);
+        if (!this->canSend) { //block if not enough connections
+	        this->waitForThreshold(lock);
         }
         int socket = nextComponentSocket();
-        network::sendPayload(socket, payload);
+        bool success = network::sendPayload(socket, payload);
+
+        while (!success) { //remove this socket, try a different one
+	        lock.unlock();
+	        {
+		        std::scoped_lock lock2(this->ipToSocketMutex, this->componentMutex);
+		        this->removeConnection(socket);
+	        }
+	        lock.lock();
+
+	        socket = nextComponentSocket();
+	        success = network::sendPayload(socket, payload);
+        }
     }
-    void addHeartbeat(int socket);
+    void addHeartbeat(int socket) {
+	    std::unique_lock lock(heartbeatMutex);
+	    time(&heartbeats[socket]);
+	}
 private:
     std::shared_mutex heartbeatMutex;
     std::unordered_map<int, time_t> heartbeats = {}; //key = socket
 
-    std::shared_mutex ipToSocketMutex;
-    std::unordered_map<std::string, int> ipToSocket = {};
-
     std::vector<int> slowComponents = {};
     int next = 0;
 
-    bool thresholdMet() const override;
-    int nextComponentSocket();
-    [[noreturn]] void checkHeartbeats();
+    [[nodiscard]] bool thresholdMet() const override {
+	    return this->components.size() + slowComponents.size() >= this->waitThreshold;
+    }
+    int nextComponentSocket() {
+	    //prioritize sending to fast proxy leaders
+	    if (!this->components.empty()) {
+		    next = (next + 1) % this->components.size();
+		    return this->components[next];
+	    }
+	    else {
+		    next = (next + 1) % slowComponents.size();
+		    return slowComponents[next];
+	    }
+    }
+    [[noreturn]] void checkHeartbeats() {
+	    time_t now;
+	    while (true) {
+		    std::this_thread::sleep_for(std::chrono::seconds(config::HEARTBEAT_TIMEOUT_SEC));
 
-    using threshold_component::connectAndMaybeListen;
+		    std::shared_lock heartbeatLock(heartbeatMutex, std::defer_lock);
+		    std::scoped_lock lock(heartbeatLock, this->componentMutex);
+		    time(&now);
+
+		    //if a node has no recent heartbeat, move it into the slow list
+		    auto iterator = this->components.begin();
+		    while (iterator != this->components.end()) {
+			    const int socket = *iterator;
+			    if (difftime(now, heartbeats[socket]) > config::HEARTBEAT_TIMEOUT_SEC) {
+				    LOG("Node failed to heartbeat\n");
+				    slowComponents.emplace_back(socket);
+				    iterator = this->components.erase(iterator);
+			    }
+			    else
+				    ++iterator;
+		    }
+
+		    //if a node has a heartbeat, move it into the fast list
+		    iterator = slowComponents.begin();
+		    while (iterator != slowComponents.end()) {
+			    const int socket = *iterator;
+			    if (difftime(now, heartbeats[socket]) < config::HEARTBEAT_TIMEOUT_SEC) {
+				    this->components.emplace_back(socket);
+				    iterator = slowComponents.erase(iterator);
+			    }
+			    else
+				    ++iterator;
+		    }
+	    }
+    }
 };
 
 

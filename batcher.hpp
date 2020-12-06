@@ -32,7 +32,8 @@ private:
     std::unordered_map<std::string, std::string> clientToPayload = {};
     int numPayloads = 0;
 
-    threshold_component proposers;
+	//ReceiveMessage type doesn't matter, since we don't receive any messages from the proposer
+    threshold_component<Batch, Heartbeat> proposers;
 
     std::shared_mutex clientMutex;
     std::vector<int> clientSockets = {};

@@ -19,19 +19,24 @@ namespace heartbeater {
             while (true) {
                 std::this_thread::sleep_for(std::chrono::seconds(config::HEARTBEAT_SLEEP_SEC));
                 std::shared_lock lock(mutex);
-                for (const int socket : sockets)
-                    network::sendPayload(socket, message);
+                for (const int socket : sockets) {
+	                bool success = network::sendPayload(socket, message);
+	                if (!success) //removed failed heartbeat destination
+		                sockets.erase(std::remove(sockets.begin(), sockets.end(), socket), sockets.end());
+                }
             }}, std::ref(mutex), std::ref(sockets));
         thread.detach();
     }
-    template<typename Message>
-    void heartbeat(const Message& message, threshold_component& component) {
-        std::thread thread([message](threshold_component& component){mainThreadHeartbeat(message, component);},
-						   std::ref(component));
+	template<typename SendMessage, typename ReceiveMessage>
+    void heartbeat(const SendMessage& message, threshold_component<SendMessage, ReceiveMessage>& component) {
+        std::thread thread([message](threshold_component<SendMessage, ReceiveMessage>& component){
+        	mainThreadHeartbeat(message, component);
+        	}, std::ref(component));
         thread.detach();
     }
-	template<typename Message>
-	[[noreturn]] void mainThreadHeartbeat(const Message& message, threshold_component& component) {
+	template<typename SendMessage, typename ReceiveMessage>
+	[[noreturn]] void mainThreadHeartbeat(const SendMessage& message,
+									   threshold_component<SendMessage, ReceiveMessage>& component) {
 		while (true) {
 			std::this_thread::sleep_for(std::chrono::seconds(config::HEARTBEAT_SLEEP_SEC));
 			component.broadcast(message);

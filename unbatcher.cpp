@@ -20,8 +20,18 @@ void unbatcher::startServer() {
         	LOG("Unbatcher received payload: {}\n", batch.ShortDebugString());
         	TIME();
         	for (const auto&[clientIp, request] : batch.clienttorequest()) {
-        		const int clientSocket = connectToClient(clientIp);
-        		network::sendPayload(clientSocket, message::createUnbatcherToClientAck(request));
+		        //send payload
+		        const int clientSocket = connectToClient(clientIp);
+        		const bool sendSucceeded = network::sendPayload(clientSocket,
+														  message::createUnbatcherToClientAck(request));
+
+        		if (!sendSucceeded) {
+        			//close socket. Note: Next time a client starts at the same IP, 1 message will be dropped first.
+			        std::unique_lock lock(ipToSocketMutex);
+			        close(clientSocket);
+			        ipToSocket.erase(clientIp);
+			        lock.unlock();
+        		}
         	}
         	TIME();
         });

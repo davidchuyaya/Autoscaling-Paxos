@@ -4,7 +4,9 @@
 #include "proposer.hpp"
 
 proposer::proposer(const int id, const int numAcceptorGroups) : id(id), numAcceptorGroups(numAcceptorGroups),
-	proxyLeaders(config::F+1), proposers(config::F+1) {
+	proxyLeaders(config::F+1), proposers(config::F+1, config::PROPOSER_PORT,WhoIsThis_Sender_proposer,[&](const int socket, const ProposerToProposer& payload){
+		listenToProposer();
+	}) {
     std::thread server([&] { startServer(); });
     server.detach();
     proposers.addSelfAsConnection();
@@ -53,10 +55,7 @@ void proposer::leaderLoop() {
 void proposer::listenToAnna(const std::string& key, const two_p_set& twoPSet) {
     if (key == config::KEY_PROPOSERS) {
         // connect to new proposer
-        proposers.connectAndMaybeListen<ProposerToProposer>(twoPSet, config::PROPOSER_PORT, WhoIsThis_Sender_proposer,
-                                        [&](const int socket, const ProposerToProposer& payload){
-        	listenToProposer();
-        });
+        proposers.connectAndMaybeListen(twoPSet);
         if (proposers.twoPsetThresholdMet())
 	        annaClient->unsubscribeFrom(config::KEY_PROPOSERS);
     } else if (key == config::KEY_ACCEPTOR_GROUPS) {
@@ -111,7 +110,7 @@ void proposer::startServer() {
 	                });
                     break;
                 }
-                default: {}
+                default: {} //TODO listen to new acceptors
             }
         });
 }
@@ -165,7 +164,7 @@ void proposer::listenToProposer() {
 }
 
 void proposer::sendScouts() {
-    // random timeout so a leader is easily elected
+	// random timeout so a leader is easily elected TODO leader election still very slow when # of acceptor groups increase...
     std::this_thread::sleep_for(std::chrono::seconds(id * config::ID_SCOUT_DELAY_MULTIPLIER));
 
     int currentBallotNum;
