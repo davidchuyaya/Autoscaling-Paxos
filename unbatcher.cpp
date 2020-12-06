@@ -44,6 +44,7 @@ int unbatcher::connectToClient(const std::string& ipAddress) {
         return socket;
 
     socket = network::connectToServerAtAddress(ipAddress, config::CLIENT_PORT, WhoIsThis_Sender_unbatcher);
+    BENCHMARK_LOG("Unbatcher connected to client: {}", ipAddress);
     ipToSocket[ipAddress] = socket;
     return socket;
 }

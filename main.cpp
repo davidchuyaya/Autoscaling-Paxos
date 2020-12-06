@@ -108,6 +108,7 @@ void paxos::benchmark() {
 
 	//flush first few slow commands
 	sendBenchmarkCommands(100);
+	printf("Done flushing...\n");
 
 	auto start = std::chrono::system_clock::now();
 	sendBenchmarkCommands(numCommands);
