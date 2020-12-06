@@ -25,7 +25,7 @@ public:
 	//Note: Must provide listener if they will send you messages
     explicit threshold_component(const int waitThreshold, const int port = 0,
 								 const WhoIsThis_Sender whoIsThis = WhoIsThis_Sender_null,
-								 const std::optional<std::function<void(int, const ReceiveMessage&)>>& listener = {}) :
+								 const std::function<void(int, const ReceiveMessage&)>& listener = [](int, const ReceiveMessage&){}) :
 								 waitThreshold(waitThreshold), port(port), whoIsThis(whoIsThis), listener(listener) {}
 
     void connectAndMaybeListen(const two_p_set& newMembers) {
@@ -56,8 +56,7 @@ public:
 			ipToSocket[ipAddress] = socket;
 			lock.unlock();
 			addConnection(socket);
-			if (listener.has_value())
-				network::listenToSocketUntilClose(socket, listener.value());
+			network::listenToSocketUntilClose<ReceiveMessage>(socket, listener);
 		});
 		thread.detach();
 	}
@@ -123,7 +122,7 @@ protected:
     const int waitThreshold;
     const int port;
     const WhoIsThis_Sender whoIsThis;
-	const std::optional<std::function<void(int, const ReceiveMessage&)>>& listener;
+	const std::function<void(int, const ReceiveMessage&)> listener;
 
     std::shared_mutex membersMutex;
     two_p_set members;

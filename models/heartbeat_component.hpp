@@ -24,7 +24,7 @@ class heartbeat_component : public threshold_component<SendMessage, ReceiveMessa
 public:
 	explicit heartbeat_component(const int waitThreshold, const int port = 0,
 	                    const WhoIsThis_Sender whoIsThis = WhoIsThis_Sender_null,
-	                    const std::optional<std::function<void(int, const ReceiveMessage&)>>& listener = {}) :
+	                    const std::function<void(int, const ReceiveMessage&)>& listener = [](int, const ReceiveMessage&){}) :
 	                    threshold_component<SendMessage, ReceiveMessage>(waitThreshold, port, whoIsThis, listener) {
 		std::thread thread([&]{checkHeartbeats();});
 		thread.detach();

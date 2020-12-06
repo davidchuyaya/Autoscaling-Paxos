@@ -93,7 +93,7 @@ namespace network {
 					onConnect(socket);
 
 					//start receiving regular messages
-					listenToStream(socket, inputStream, onPayloadReceived);
+					listenToStream<Message>(socket, inputStream, onPayloadReceived);
 				}
 				delete inputStream;
 				close(socket);
@@ -106,7 +106,7 @@ namespace network {
 	template <typename Message>
     void listenToSocketUntilClose(const int socket, const std::function<void(int, const Message&)>& onPayloadReceived) {
 		google::protobuf::io::ZeroCopyInputStream* inputStream = new google::protobuf::io::FileInputStream(socket);
-		listenToStream(socket, inputStream, onPayloadReceived);
+		listenToStream<Message>(socket, inputStream, onPayloadReceived);
 		delete inputStream;
 		close(socket);
 	}

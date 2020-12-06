@@ -78,6 +78,7 @@ void proposer::listenToAnna(const std::string& key, const two_p_set& twoPSet) {
         if (acceptorGroupIds.size() >= numAcceptorGroups) {
         	lock.unlock();
 	        acceptorCV.notify_all();
+	        annaClient->unsubscribeFrom(config::KEY_ACCEPTOR_GROUPS);
         }
     }
 }
