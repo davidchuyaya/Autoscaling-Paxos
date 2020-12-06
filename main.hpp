@@ -52,6 +52,7 @@ private:
     [[noreturn]] void resendInput();
 
 	void benchmark();
+	void sendBenchmarkCommands(int commands);
 	void startCluster();
 };
 

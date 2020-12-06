@@ -106,17 +106,28 @@ void paxos::benchmark() {
 	std::string input;
 	std::cin >> input;
 
-	std::vector<std::thread> threads;
-	threads.reserve(numClients);
+	//flush first few slow commands
+	sendBenchmarkCommands(100);
 
 	auto start = std::chrono::system_clock::now();
+	sendBenchmarkCommands(numCommands);
+	auto end = std::chrono::system_clock::now();
+
+	BENCHMARK_LOG("Elapsed millis {} for {} clients and {} commands\n",
+		std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count(), numClients, numCommands);
+	printf("We're done\n");
+}
+
+void paxos::sendBenchmarkCommands(int commands) {
+	std::vector<std::thread> threads;
+	threads.reserve(numClients);
 
 	for (int client = 0; client < numClients; client++) {
 		threads.emplace_back([&, client]{
 			//payload = client ID
 			const std::string& payload = std::to_string(client);
 			const ClientToBatcher& protoMessage = message::createClientRequest(config::IP_ADDRESS, payload);
-			for (int i = 0; i < numCommands; i++) {
+			for (int i = 0; i < commands; i++) {
 				batchers.send(protoMessage);
 
 				std::unique_lock lock(requestMutex[client]);
@@ -126,15 +137,10 @@ void paxos::benchmark() {
 			}
 		});
 	}
+
 	//wait for all threads to complete
 	for (std::thread& t : threads)
 		t.join();
-
-	auto end = std::chrono::system_clock::now();
-
-	BENCHMARK_LOG("Elapsed millis {} for {} clients and {} commands\n",
-		std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count(), numClients, numCommands);
-	printf("We're done\n");
 }
 
 void paxos::startCluster() {
