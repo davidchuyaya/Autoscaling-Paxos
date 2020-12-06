@@ -38,7 +38,7 @@ void proxy_leader::listenToAnna(const std::string& key, const two_p_set& twoPSet
 
 void proxy_leader::processNewAcceptorGroup(const std::string& acceptorGroupId) {
 	std::unique_lock lock(acceptorMutex);
-	LOG("New acceptor group from proposer: {}", acceptorGroupId);
+	BENCHMARK_LOG("New acceptor group from proposer: {}", acceptorGroupId);
 	acceptorGroupSockets[acceptorGroupId] = new threshold_component<ProposerToAcceptor, AcceptorToProxyLeader>
 			(2 * config::F + 1, config::ACCEPTOR_PORT,WhoIsThis_Sender_proxyLeader,
 	[&](const int socket, const AcceptorToProxyLeader& payload) {

@@ -21,7 +21,7 @@ proposer::proposer(const int id, const int numAcceptorGroups) : id(id), numAccep
     std::unique_lock lock(acceptorMutex);
     acceptorCV.wait(lock, [&]{ return acceptorGroupIds.size() >= numAcceptorGroups; });
     lock.unlock();
-    LOG("Acceptor group threshold met\n");
+    BENCHMARK_LOG("Acceptor group threshold met\n");
 
     leaderLoop();
 }
@@ -89,13 +89,13 @@ void proposer::startServer() {
            [&](const int socket, const WhoIsThis_Sender& whoIsThis, google::protobuf::io::ZeroCopyInputStream* inputStream) {
             switch (whoIsThis) {
                 case WhoIsThis_Sender_batcher:
-	                LOG("Connected to batcher\n");
+	                BENCHMARK_LOG("Connected to batcher\n");
 	                network::listenToStream<Batch>(socket, inputStream, [&](const int socket, const Batch& batch) {
 		                listenToBatcher(batch);
 	                });
 	                break;
                 case WhoIsThis_Sender_proxyLeader:
-                    LOG("Connected to proxy leader\n");
+	                BENCHMARK_LOG("Connected to proxy leader\n");
                     proxyLeaders.addConnection(socket);
 		            network::listenToStream<ProxyLeaderToProposer>(socket, inputStream,
 															 [&](const int socket, const ProxyLeaderToProposer& payload) {
@@ -103,7 +103,7 @@ void proposer::startServer() {
 		            });
                     break;
                 case WhoIsThis_Sender_proposer: {
-                    LOG("Connected to proposer\n");
+	                BENCHMARK_LOG("Connected to proposer\n");
                     proposers.addConnection(socket);
 	                network::listenToStream<ProposerToProposer>(socket, inputStream,
 	                                                               [&](const int socket, const ProposerToProposer& payload) {
