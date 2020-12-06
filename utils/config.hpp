@@ -45,6 +45,7 @@ namespace config {
     const static int TCP_RETRY_TIMEOUT_SEC = 10;
     const static int HEARTBEAT_TIMEOUT_SEC = 20; // this - HEARTBEAT_SLEEP_SEC = time allowed between message send & receive
     const static int HEARTBEAT_SLEEP_SEC = 5;
+    const static int BATCHER_TIMEOUT_SEC = 5;
     const static int CLIENT_TIMEOUT_SEC = 1;
     const static int ID_SCOUT_DELAY_MULTIPLIER = 5; // this * proposer ID = number of seconds to delay before sending scouts
     const static int ANNA_RECHECK_SEC = 3; // how often we send a new request to Anna & how often we check for updates

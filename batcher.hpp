@@ -51,6 +51,8 @@ private:
      * @param client_address Address of the client
      */
     void listenToClient(const ClientToBatcher& payload);
+    [[noreturn]] void checkLaggingBatches();
+    void sendBatch();
 };
 
 #endif //AUTOSCALING_PAXOS_BATCHER_HPP

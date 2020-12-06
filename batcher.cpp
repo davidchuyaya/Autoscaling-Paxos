@@ -14,6 +14,8 @@ batcher::batcher() : proposers(config::F+1, config::PROPOSER_PORT, WhoIsThis_Sen
 	annaClient->subscribeTo(config::KEY_PROPOSERS);
 
     heartbeater::heartbeat(clientMutex, clientSockets);
+    std::thread t([&]{ checkLaggingBatches(); });
+    t.detach();
 	startServer();
 }
 
@@ -40,7 +42,20 @@ void batcher::listenToClient(const ClientToBatcher& payload) {
 
 	if (numPayloads < config::THRESHOLD_BATCH_SIZE)
 		return;
+	sendBatch();
+}
 
+void batcher::checkLaggingBatches() {
+	while (true) {
+		std::this_thread::sleep_for(std::chrono::seconds(config::BATCHER_TIMEOUT_SEC));
+
+		std::unique_lock lock(payloadsMutex);
+		if (numPayloads > 0)
+			sendBatch();
+	}
+}
+
+void batcher::sendBatch() {
 	LOG("Sending batch\n");
 	const Batch& batchMessage = message::createBatchMessage(clientToPayloads);
 	proposers.broadcast(batchMessage);
