@@ -24,11 +24,11 @@
 
 class paxos {
 public:
-    paxos(int numCommands = 0, int numClients = 1, int numBatchers = 0, int numProxyLeaders = 0, int numAcceptorGroups = 0,
-		  int numUnbatchers = 0);
+    explicit paxos(int numSeconds = 0, int numClients = 1, int numBatchers = 0, int numProxyLeaders = 0,
+				   int numAcceptorGroups = 0, int numUnbatchers = 0);
 private:
 	const bool isBenchmark;
-	const int numCommands;
+	const int numSeconds;
 	const int numClients;
 	const int numBatchers;
 	const int numProxyLeaders;
@@ -54,6 +54,7 @@ private:
 	void benchmark();
 	void sendBenchmarkCommands(int commands);
 	void startCluster();
+	void timedShutdown();
 };
 
 #endif //C__PAXOS_MAIN_HPP

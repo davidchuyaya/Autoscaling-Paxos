@@ -48,6 +48,9 @@ void proposer::leaderLoop() {
             }
         }
 
+        //Note: Lock-free read of nextSlot. Don't want this print to affect the critical path
+        BENCHMARK_LOG("Processed {} messages", nextSlot);
+
         std::this_thread::sleep_for(std::chrono::seconds(config::HEARTBEAT_SLEEP_SEC));
     }
 }

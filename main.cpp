@@ -1,12 +1,12 @@
 
 #include "main.hpp"
 
-paxos::paxos(const int numCommands, const int numClients, const int numBatchers,
+paxos::paxos(const int numSeconds, const int numClients, const int numBatchers,
 			 const int numProxyLeaders, const int numAcceptorGroups, const int numUnbatchers) :
-			 isBenchmark(numCommands != 0),  numCommands(numCommands), numClients(numClients), numBatchers(numBatchers),
-			 numProxyLeaders(numProxyLeaders), numAcceptorGroups(numAcceptorGroups), numUnbatchers(numUnbatchers),
-			 requestMutex(numClients), requestCV(numClients), request(numClients),
-			 batchers(config::F+1, config::BATCHER_PORT, WhoIsThis_Sender_client,
+		isBenchmark(numSeconds != 0), numSeconds(numSeconds), numClients(numClients), numBatchers(numBatchers),
+		numProxyLeaders(numProxyLeaders), numAcceptorGroups(numAcceptorGroups), numUnbatchers(numUnbatchers),
+		requestMutex(numClients), requestCV(numClients), request(numClients),
+		batchers(config::F+1, config::BATCHER_PORT, WhoIsThis_Sender_client,
 			    [&](const int socket, const Heartbeat& payload) {
 			 	batchers.addHeartbeat(socket);
 			 }) {
@@ -109,17 +109,17 @@ void paxos::benchmark() {
 	//flush first few slow commands
 	sendBenchmarkCommands(100);
 	printf("Done flushing...\n");
-	sendBenchmarkCommands(numCommands);
-	printf("We're done\n");
+
+	std::thread t([&]{timedShutdown();});
+	sendBenchmarkCommands(INT32_MAX); //this is not intended to terminate
 }
 
 void paxos::sendBenchmarkCommands(int commands) {
 	std::vector<std::thread> threads;
 	threads.reserve(numClients);
 
-	auto start = std::chrono::system_clock::now();
 	for (int client = 0; client < numClients; client++) {
-		threads.emplace_back([&, client, start]{
+		threads.emplace_back([&, client]{
 			//payload = client ID
 			const std::string& payload = std::to_string(client);
 			const ClientToBatcher& protoMessage = message::createClientRequest(config::IP_ADDRESS, payload);
@@ -131,9 +131,6 @@ void paxos::sendBenchmarkCommands(int commands) {
 				LOG("Waiting for ACK, do not input...\n");
 				requestCV[client].wait(lock, [&]{return !request[client].has_value();});
 			}
-			auto end = std::chrono::system_clock::now();
-			BENCHMARK_LOG("Elapsed millis {} for client {}, {} commands\n",
-			              std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count(), client, commands);
 		});
 	}
 
@@ -153,11 +150,18 @@ void paxos::startCluster() {
 	instanceIdsOfUnbatchers = scaling::startUnbatchers(numUnbatchers);
 }
 
+void paxos::timedShutdown() {
+	printf("Timer begin\n");
+	std::this_thread::sleep_for(std::chrono::seconds(numSeconds));
+	printf("We're done, executed for %d seconds\n", numSeconds);
+	exit(1);
+}
+
 int main(const int argc, const char** argv) {
     if (argc != 1 && argc != 3 && argc != 7) {
         printf("Usage for interactive mode: ./Autoscaling_Paxos\n");
-	    printf("Usage for benchmark mode without starting a new cluster: ./Autoscaling_Paxos <NUM COMMANDS> <NUM CLIENTS>\n");
-        printf("Usage for benchmark mode: ./Autoscaling_Paxos <NUM COMMANDS> <NUM CLIENTS> <NUM BATCHERS> <NUM PROXY LEADERS> <NUM ACCEPTOR GROUPS> <NUM UNBATCHERS>\n");
+	    printf("Usage for benchmark mode without starting a new cluster: ./Autoscaling_Paxos <NUM SECONDS> <NUM CLIENTS>\n");
+        printf("Usage for benchmark mode: ./Autoscaling_Paxos <NUM SECONDS> <NUM CLIENTS> <NUM BATCHERS> <NUM PROXY LEADERS> <NUM ACCEPTOR GROUPS> <NUM UNBATCHERS>\n");
         exit(0);
     }
 
@@ -167,17 +171,17 @@ int main(const int argc, const char** argv) {
     if (argc == 1)
     	paxos p {};
     else {
-	    const int numCommands = std::stoi(argv[1]);
+	    const int numSeconds = std::stoi(argv[1]);
 	    const int numClients = std::stoi(argv[2]);
 	    if (argc == 3) {
-		    paxos p {numCommands, numClients};
+		    paxos p {numSeconds, numClients};
 	    }
 	    else {
 		    const int numBatchers = std::stoi(argv[3]);
 		    const int numProxyLeaders = std::stoi(argv[4]);
 		    const int numAcceptorGroups = std::stoi(argv[5]);
 		    const int numUnbatchers = std::stoi(argv[6]);
-		    paxos p {numCommands, numClients, numBatchers, numProxyLeaders, numAcceptorGroups, numUnbatchers};
+		    paxos p {numSeconds, numClients, numBatchers, numProxyLeaders, numAcceptorGroups, numUnbatchers};
 	    }
     }
 }
