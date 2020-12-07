@@ -26,7 +26,7 @@
 
 namespace config {
     const static int F = 1;
-    const static int THRESHOLD_BATCH_SIZE = 10; //Note: If this is > than the # of clients, clients won't make progress
+    const static int THRESHOLD_BATCH_SIZE = 40; //Note: If this is > than the # of clients, clients won't make progress
     const static int CLIENT_PORT = 10000;
     const static int PROPOSER_PORT = 11000;
     const static int ACCEPTOR_PORT = 12000;
