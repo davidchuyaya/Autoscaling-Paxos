@@ -43,6 +43,7 @@ std::vector<std::string> scaling::startInstance(const std::string& executable, c
 	         << "export " << config::ENV_ANNA_ROUTING_NAME << "=" << config::ANNA_ROUTING_ADDRESS << "\n"
 	         << "export " << config::ENV_IP_NAME << "=$(curl http://169.254.169.254/latest/meta-data/public-ipv4)\n"
 	         << "export " << config::ENV_ANNA_KEY_PREFIX_NAME << "=" << config::ANNA_KEY_PREFIX << "\n"
+	         << "export " << config::ENV_BATCH_SIZE_NAME << "=" << config::BATCH_SIZE << "\n"
 	         << "./" << executable << " " << arguments
 	         << "'";
 

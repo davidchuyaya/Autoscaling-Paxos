@@ -26,7 +26,6 @@
 
 namespace config {
     const static int F = 1;
-    const static int THRESHOLD_BATCH_SIZE = 40; //Note: If this is > than the # of clients, clients won't make progress
     const static int CLIENT_PORT = 10000;
     const static int PROPOSER_PORT = 11000;
     const static int ACCEPTOR_PORT = 12000;
@@ -37,10 +36,12 @@ namespace config {
     const static inline std::string ENV_ANNA_ROUTING_NAME = "ANNA_ROUTING";
     const static inline std::string ENV_IP_NAME = "IP";
     const static inline std::string ENV_ANNA_KEY_PREFIX_NAME = "ANNA_KEY_PREFIX";
+	const static inline std::string ENV_BATCH_SIZE_NAME = "BATCH_SIZE";
 
     const static inline std::string IP_ADDRESS = std::getenv(ENV_IP_NAME.c_str());
     const static inline std::string ANNA_ROUTING_ADDRESS = std::getenv(ENV_ANNA_ROUTING_NAME.c_str());
     const static inline std::string ANNA_KEY_PREFIX = std::getenv(ENV_ANNA_KEY_PREFIX_NAME.c_str());
+	const static int BATCH_SIZE = std::stoi(std::getenv(ENV_BATCH_SIZE_NAME.c_str()));
 
     const static int TCP_RETRY_TIMEOUT_SEC = 10;
     const static int HEARTBEAT_TIMEOUT_SEC = 20; // this - HEARTBEAT_SLEEP_SEC = time allowed between message send & receive

@@ -13,9 +13,10 @@
 #include <tuple>
 #include <unordered_map>
 #include <queue>
+#include <google/protobuf/util/message_differencer.h>
 
 namespace Log {
-    using stringLog = std::unordered_map<int, std::string>; //key = slot
+    using stringLog = std::unordered_map<int, Batch>; //key = slot
     using pValueLog = std::unordered_map<int, PValue>;
     using acceptorGroupLog = std::vector<pValueLog>;
 

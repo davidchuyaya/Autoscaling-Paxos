@@ -137,7 +137,7 @@ void proposer::listenToBatcher(const Batch& payload) {
         slot = logHoles.front();
         logHoles.pop();
     }
-    proxyLeaders.send(message::createP2A(id, ballotNum, slot, payload.SerializeAsString(),
+    proxyLeaders.send(message::createP2A(id, ballotNum, slot, payload,
 										 fetchNextAcceptorGroupId(), config::IP_ADDRESS));
 	TIME();
 }

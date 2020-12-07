@@ -40,7 +40,7 @@ void batcher::listenToClient(const ClientToBatcher& payload) {
     clientToPayloads[payload.ipaddress()].emplace_back(payload.request());
     numPayloads += 1;
 
-	if (numPayloads < config::THRESHOLD_BATCH_SIZE)
+	if (numPayloads < config::BATCH_SIZE)
 		return;
 	sendBatch();
 }
@@ -59,8 +59,10 @@ void batcher::checkLaggingBatches() {
 
 void batcher::sendBatch() {
 	LOG("Sending batch\n");
-	const Batch& batchMessage = message::createBatchMessage(clientToPayloads);
-	proposers.broadcast(batchMessage);
+	for (const auto&[client, payloads] : clientToPayloads) {
+		const Batch& batchMessage = message::createBatchMessage(client, payloads);
+		proposers.broadcast(batchMessage);
+	}
 	TIME();
 
 	clientToPayloads.clear();

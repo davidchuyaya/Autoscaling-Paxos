@@ -35,7 +35,7 @@ message::createP1B(const int messageId, const std::string& acceptorGroupId, cons
     return p1b;
 }
 
-ProposerToAcceptor message::createP2A(const int id, const int ballotNum, const int slot, const std::string& payload,
+ProposerToAcceptor message::createP2A(const int id, const int ballotNum, const int slot, const Batch& payload,
                                       const std::string& acceptorGroupId, const std::string& ipAddress) {
     ProposerToAcceptor p2a;
     p2a.set_messageid(uuid::generate());
@@ -44,7 +44,7 @@ ProposerToAcceptor message::createP2A(const int id, const int ballotNum, const i
     ballot->set_id(id);
     ballot->set_ballotnum(ballotNum);
     p2a.set_slot(slot);
-    p2a.set_payload(payload);
+    *p2a.mutable_payload() = payload;
     p2a.set_acceptorgroupid(acceptorGroupId);
 	p2a.set_ipaddress(ipAddress);
     return p2a;
@@ -110,13 +110,10 @@ ClientToBatcher message::createClientRequest(const std::string& ipAddress, const
     return clientToBatcher;
 }
 
-Batch message::createBatchMessage(const std::unordered_map<std::string, std::vector<std::string>>& requests) {
-	std::unordered_map<std::string, Requests> protobufRequests = {};
-	for (const auto& [ip, requestsForIp] : requests)
-		*protobufRequests[ip].mutable_array() = {requestsForIp.begin(), requestsForIp.end()};
-
+Batch message::createBatchMessage(const std::string& ipAddress, const std::vector<std::string>& requests) {
 	Batch batch;
-	*batch.mutable_clienttorequests() = {protobufRequests.begin(), protobufRequests.end()};
+	batch.set_client(ipAddress);
+	*batch.mutable_requests() = {requests.begin(), requests.end()};
 	return batch;
 }
 

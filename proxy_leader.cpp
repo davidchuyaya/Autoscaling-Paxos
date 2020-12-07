@@ -153,9 +153,7 @@ void proxy_leader::handleP2B(const AcceptorToProxyLeader& payload) {
         if (approvedCommanders[payload.messageid()] >= config::F + 1) {
             //we have f+1 approved commanders, tell the unbatcher. No need to tell proposer
 	        LOG("P2B approved for proposer: {}, slot: {}\n", payload.ballot().id(), payload.slot());
-	        Batch batch;
-	        batch.ParseFromString(sentMessages[payload.messageid()].payload());
-	        unbatchers.send(batch);
+	        unbatchers.send(sentMessages[payload.messageid()].payload());
             sentMessages.erase(payload.messageid());
             approvedCommanders.erase(payload.messageid());
 	        TIME();

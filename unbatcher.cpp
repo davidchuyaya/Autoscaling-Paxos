@@ -19,12 +19,10 @@ void unbatcher::startServer() {
         }, [&](const int socket, const Batch& batch) {
         	LOG("Unbatcher received payload: {}\n", batch.ShortDebugString());
         	TIME();
-        	for (const auto&[clientIp, requests] : batch.clienttorequests()) {
+		    const int clientSocket = connectToClient(batch.client());
+        	for (const std::string& request : batch.requests()) {
 		        //send payload
-		        const int clientSocket = connectToClient(clientIp);
-		        bool success = false;
-		        for (const std::string& request : requests.array())
-			        success = network::sendPayload(clientSocket, message::createUnbatcherToClientAck(request));
+		        bool success = network::sendPayload(clientSocket, message::createUnbatcherToClientAck(request));
 
 //        		if (!success) { TODO check send success
 //        			//close socket. Note: Next time a client starts at the same IP, 1 message will be dropped first.

@@ -38,7 +38,7 @@ void acceptor::listenToProxyLeaders(const int socket, const ProposerToAcceptor& 
 		    TIME();
             if (!Log::isBallotGreaterThan(highestBallot, payload.ballot())) {
                 PValue pValue;
-                pValue.set_payload(payload.payload());
+                *pValue.mutable_payload() = payload.payload();
                 *pValue.mutable_ballot() = payload.ballot();
                 log[payload.slot()] = pValue;
                 highestBallot = payload.ballot();

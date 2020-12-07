@@ -23,13 +23,11 @@ message Ballot {
 }
 message PValue {
     Ballot ballot = 1;
-    string payload = 2;
-}
-message Requests {
-    repeated string array = 1;
+    Batch payload = 2;
 }
 message Batch {
-    map<string, Requests> clientToRequests = 1;
+    string client = 1;
+    repeated string requests = 2;
 }
 message Heartbeat {
     bool dummy = 1; //must have at least 1 value for message to send
@@ -49,7 +47,7 @@ message ProposerToAcceptor {
     string acceptorGroupId = 3; //Acceptor group ID of recipient
     Ballot ballot = 4;
     int32 slot = 5;
-    string payload = 6;
+    Batch payload = 6;
     string ipAddress = 7;
 }
 
@@ -79,7 +77,7 @@ message ProxyLeaderToProposer {
     string acceptorGroupId = 3;
     Ballot ballot = 4;
     int32 slot = 5;
-    map<int32, string> committedLog = 6;
+    map<int32, Batch> committedLog = 6;
     map<int32, PValue> uncommittedLog = 7;
 }
 
