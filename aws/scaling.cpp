@@ -51,7 +51,7 @@ std::vector<std::string> scaling::startInstance(const std::string& executable, c
 	ec2Script << "aws ec2 run-instances "
 	          << "--image-id ami-08ffb106d09e20436 "
 	          << "--count " << num << " "
-	          << "--instance-type c5.large "
+	          << "--instance-type m5.2xlarge "
 	          << "--key-name anna "
 	          << "--security-group-ids sg-0196a7a839c79446d "
 			  << "--tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=" << config::ANNA_KEY_PREFIX << "_"

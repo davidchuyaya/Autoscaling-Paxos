@@ -50,8 +50,10 @@ void batcher::checkLaggingBatches() {
 		std::this_thread::sleep_for(std::chrono::seconds(config::BATCHER_TIMEOUT_SEC));
 
 		std::unique_lock lock(payloadsMutex);
-		if (numPayloads > 0)
+		if (numPayloads > 0) {
+			BENCHMARK_LOG("Sending batch based on timeout, num payloads: {}", numPayloads);
 			sendBatch();
+		}
 	}
 }
 
