@@ -59,7 +59,7 @@ namespace config {
     const static inline std::string KEY_ACCEPTOR_GROUPS = "AcceptorGroups";
     const static inline std::string KEY_UNBATCHERS = "Unbatchers";
 
-	const static inline std::string REQUEST_DELIMITER = "|";
+	const static inline std::string REQUEST_DELIMITER = "|"; //note: cannot be >1 char
 }
 
 #endif //AUTOSCALING_PAXOS_CONFIG_HPP
