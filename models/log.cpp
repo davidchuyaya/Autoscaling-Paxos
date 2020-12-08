@@ -51,11 +51,11 @@ std::tuple<Log::stringLog, Log::pValueLog> Log::mergeLogsOfAcceptorGroup(const a
 
     for (const auto& log : logs) {
         for (const auto& [slot, pValue] : log) {
-            if (pValue.payload().client().empty())
+            if (pValue.payload().empty())
                 continue;
 
             const PValue& bestValue = bestUncommittedValueForSlot[slot];
-            if (google::protobuf::util::MessageDifferencer::Equals(bestValue, pValue)) {
+            if (bestValue.payload() == pValue.payload()) {
                 countForSlot[slot] += 1;
                 if (countForSlot[slot] == logs.size()) {
                     //the value is committed
@@ -75,7 +75,7 @@ std::tuple<Log::stringLog, Log::pValueLog> Log::mergeLogsOfAcceptorGroup(const a
 std::string Log::printLog(const pValueLog& log) {
     std::stringstream out;
     for (const auto&[slot, pValue] : log)
-        out << slot << ") " << pValue.payload().ShortDebugString() << ", ";
+        out << slot << ") " << pValue.ShortDebugString() << ", ";
     return out.str();
 }
 

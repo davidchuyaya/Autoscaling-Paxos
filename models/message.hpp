@@ -18,7 +18,7 @@ namespace message {
     ProposerToAcceptor createP1A(int id, int ballotNum, const std::string& acceptorGroupId, const std::string& ipAddress);
     AcceptorToProxyLeader createP1B(int messageId, const std::string& acceptorGroupId, const Ballot& highestBallot,
                                     const Log::pValueLog& log);
-    ProposerToAcceptor createP2A(int id, int ballotNum, int slot, const Batch& payload,
+    ProposerToAcceptor createP2A(int id, int ballotNum, int slot, const std::string& client, const std::string& payload,
                                  const std::string& acceptorGroupId, const std::string& ipAddress);
     AcceptorToProxyLeader createP2B(int messageId, const std::string& acceptorGroupId, const Ballot& highestBallot, int slot);
     ProxyLeaderToProposer createProxyP1B(int messageId, const std::string& acceptorGroupId, const Ballot& highestBallot,
@@ -29,7 +29,7 @@ namespace message {
     Heartbeat createGenericHeartbeat();
     ProposerToProposer createIamLeader();
     ClientToBatcher createClientRequest(const std::string& ipAddress, const std::string& payload);
-    Batch createBatchMessage(const std::string& ipAddress, const std::vector<std::string>& requests);
+    Batch createBatchMessage(const std::string& ipAddress, const std::string& requests);
     UnbatcherToClient createUnbatcherToClientAck(const std::string& request);
 }
 

@@ -58,6 +58,8 @@ namespace config {
     const static inline std::string KEY_PROXY_LEADERS = "ProxyLeaders";
     const static inline std::string KEY_ACCEPTOR_GROUPS = "AcceptorGroups";
     const static inline std::string KEY_UNBATCHERS = "Unbatchers";
+
+	const static inline std::string REQUEST_DELIMITER = "|";
 }
 
 #endif //AUTOSCALING_PAXOS_CONFIG_HPP

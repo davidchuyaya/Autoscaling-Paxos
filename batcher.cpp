@@ -37,7 +37,7 @@ void batcher::listenToClient(const ClientToBatcher& payload) {
 	TIME();
 
 	std::unique_lock lock(payloadsMutex);
-    clientToPayloads[payload.ipaddress()].emplace_back(payload.request());
+    clientToPayloads[payload.ipaddress()] += payload.request() + config::REQUEST_DELIMITER;
     numPayloads += 1;
 
 	if (numPayloads < config::BATCH_SIZE)

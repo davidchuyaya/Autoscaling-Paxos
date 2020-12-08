@@ -137,7 +137,7 @@ void proposer::listenToBatcher(const Batch& payload) {
         slot = logHoles.front();
         logHoles.pop();
     }
-    proxyLeaders.send(message::createP2A(id, ballotNum, slot, payload,
+    proxyLeaders.send(message::createP2A(id, ballotNum, slot, payload.client(), payload.request(),
 										 fetchNextAcceptorGroupId(), config::IP_ADDRESS));
 	TIME();
 }
@@ -232,8 +232,8 @@ void proposer::mergeLogs() {
 
     //resend uncommitted messages
     for (const auto& [slot, pValue] : uncommittedLog)
-        proxyLeaders.send(message::createP2A(id, ballotNum, slot, pValue.payload(), acceptorGroupForSlot.at(slot),
-											 config::IP_ADDRESS));
+        proxyLeaders.send(message::createP2A(id, ballotNum, slot, pValue.client(), pValue.payload(),
+											 acceptorGroupForSlot.at(slot), config::IP_ADDRESS));
 }
 
 void proposer::handleP2B(const ProxyLeaderToProposer& message) {

@@ -29,7 +29,7 @@ private:
     anna* annaClient;
 
     std::shared_mutex payloadsMutex;
-    std::unordered_map<std::string, std::vector<std::string>> clientToPayloads = {};
+    std::unordered_map<std::string, std::string> clientToPayloads = {};
     int numPayloads = 0;
 
 	//ReceiveMessage type doesn't matter, since we don't receive any messages from the proposer

@@ -35,8 +35,9 @@ message::createP1B(const int messageId, const std::string& acceptorGroupId, cons
     return p1b;
 }
 
-ProposerToAcceptor message::createP2A(const int id, const int ballotNum, const int slot, const Batch& payload,
-                                      const std::string& acceptorGroupId, const std::string& ipAddress) {
+ProposerToAcceptor message::createP2A(const int id, const int ballotNum, const int slot, const std::string& client,
+									  const std::string& payload, const std::string& acceptorGroupId,
+									  const std::string& ipAddress) {
     ProposerToAcceptor p2a;
     p2a.set_messageid(uuid::generate());
     p2a.set_type(ProposerToAcceptor_Type_p2a);
@@ -44,7 +45,8 @@ ProposerToAcceptor message::createP2A(const int id, const int ballotNum, const i
     ballot->set_id(id);
     ballot->set_ballotnum(ballotNum);
     p2a.set_slot(slot);
-    *p2a.mutable_payload() = payload;
+    p2a.set_client(client);
+    p2a.set_payload(payload);
     p2a.set_acceptorgroupid(acceptorGroupId);
 	p2a.set_ipaddress(ipAddress);
     return p2a;
@@ -110,10 +112,10 @@ ClientToBatcher message::createClientRequest(const std::string& ipAddress, const
     return clientToBatcher;
 }
 
-Batch message::createBatchMessage(const std::string& ipAddress, const std::vector<std::string>& requests) {
+Batch message::createBatchMessage(const std::string& ipAddress, const std::string& requests) {
 	Batch batch;
 	batch.set_client(ipAddress);
-	*batch.mutable_requests() = {requests.begin(), requests.end()};
+	batch.set_request(requests);
 	return batch;
 }
 
