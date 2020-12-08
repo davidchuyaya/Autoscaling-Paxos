@@ -24,11 +24,10 @@
 
 class paxos {
 public:
-    explicit paxos(int numSeconds = 0, int numClients = 1, int numBatchers = 0, int numProxyLeaders = 0,
-				   int numAcceptorGroups = 0, int numUnbatchers = 0);
+    explicit paxos(int numClients = 0, int numBatchers = 0, int numProxyLeaders = 0, int numAcceptorGroups = 0,
+				   int numUnbatchers = 0);
 private:
 	const bool isBenchmark;
-	const int numSeconds;
 	const int numClients;
 	const int numBatchers;
 	const int numProxyLeaders;
@@ -43,18 +42,11 @@ private:
 	anna* annaClient;
     heartbeat_component<ClientToBatcher, Heartbeat> batchers;
 
-	std::vector<std::shared_mutex> requestMutex;
-    std::vector<std::condition_variable_any> requestCV;
-    std::vector<std::optional<std::string>> request;
-
     [[noreturn]] void startServer();
-    [[noreturn]] void readInput();
-    [[noreturn]] void resendInput();
+    void readInput();
 
 	void benchmark();
-	void sendBenchmarkCommands(int commands);
 	void startCluster();
-	void timedShutdown();
 };
 
 #endif //C__PAXOS_MAIN_HPP
