@@ -26,6 +26,7 @@ void unbatcher::startServer() {
 		    char *mutableRequestsChar = &mutableRequests[0];
 		    char* request = strtok(mutableRequestsChar, config::REQUEST_DELIMITER.c_str());
 		    do {
+		    	LOG("Sending split request: {}", request);
 		        bool success = network::sendPayload(clientSocket, message::createUnbatcherToClientAck(request));
 			    request = strtok(nullptr, config::REQUEST_DELIMITER.c_str());
 

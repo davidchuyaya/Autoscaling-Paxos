@@ -32,7 +32,6 @@ void batcher::startServer() {
 }
 
 void batcher::listenToClient(const ClientToBatcher& payload) {
-    //first payload is IP address of client
     LOG("Received payload: {}\n", payload.request());
 	TIME();
 
@@ -59,10 +58,8 @@ void batcher::checkLaggingBatches() {
 
 void batcher::sendBatch() {
 	LOG("Sending batch\n");
-	for (const auto&[client, payloads] : clientToPayloads) {
-		const Batch& batchMessage = message::createBatchMessage(client, payloads);
-		proposers.broadcast(batchMessage);
-	}
+	for (const auto&[client, payloads] : clientToPayloads)
+		proposers.broadcast(message::createBatchMessage(client, payloads));
 	TIME();
 
 	clientToPayloads.clear();
