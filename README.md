@@ -1,5 +1,6 @@
 # Autoscaling-Paxos
 A Paxos protocol that is capable of scaling dynamically.
+Checkout our paper (work in progress) on [Overleaf](https://www.overleaf.com/read/bvnnzjbpxybc)!
 
 ## Setup
 Our code is meant to run on AWS EC2 and contact an Anna cluster that is also running on EC2.
