@@ -147,7 +147,7 @@ Do remember that
 1. You cannot remove values from Anna. We store routing information in an unordered set, so if you want to clear the routing information, you'd need to restart Anna between runs. **TODO on how to do that**
 2. Anna is expensive, so you might want to shut down Anna when you're not using it.
 
-### Running on an EC2 instance
+## Creating an AMI
 We need EC2 instances to run components of Autoscaling Paxos.
 
 We will use AMIs. Our executables depend upon dynamically linked libraries (such as protobuf and 0MQ), so we'd either have to `make install` them every time we boot up (which can take 10+ minutes), or package it into a system snapshot that's loaded on boot. Our goal is to scale in real time, so boot time is precious.
@@ -158,7 +158,7 @@ scripts/install_dependencies_for_running.sh
 scripts/download_protobuf.sh
 scripts/install_protobuf.sh
 ```
-Continue with the instructions above to create your custom AMI.
+Continue with the instructions above to create your custom AMI. Make sure to change **Shutdown behavior** to **Terminate**.
 Record your custom AMI address. We will refer to it as `<your AMI>` from now on.
 
 ## Setup Autoscaling Paxos
