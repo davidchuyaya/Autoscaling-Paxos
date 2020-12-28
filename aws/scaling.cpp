@@ -38,23 +38,26 @@ std::vector<std::string> scaling::startInstance(const std::string& executable, c
 			 << "#!/bin/bash -xe\n"
 			 << "mkdir /paxos\n"
 	         << "cd /paxos\n"
-	         << "wget https://autoscaling-paxos.s3-us-west-1.amazonaws.com/" << executable << "\n"
+	         << "wget https://" << config::AWS_S3_BUCKET << ".s3-" << config::AWS_REGION << ".amazonaws.com/" << executable << "\n"
 	         << "chmod +x " << executable << "\n"
 	         << "export " << config::ENV_ANNA_ROUTING_NAME << "=" << config::ANNA_ROUTING_ADDRESS << "\n"
 	         << "export " << config::ENV_IP_NAME << "=$(curl http://169.254.169.254/latest/meta-data/public-ipv4)\n"
 	         << "export " << config::ENV_ANNA_KEY_PREFIX_NAME << "=" << config::ANNA_KEY_PREFIX << "\n"
 	         << "export " << config::ENV_BATCH_SIZE_NAME << "=" << config::BATCH_SIZE << "\n"
-	         << "./" << executable << " " << arguments
+			 << "export " << config::ENV_AWS_REGION_NAME << "=" << config::AWS_REGION << "\n"
+			 << "export " << config::ENV_AWS_AMI_NAME << "=" << config::AWS_AMI << "\n"
+			 << "export " << config::ENV_AWS_S3_BUCKET_NAME << "=" << config::AWS_S3_BUCKET << "\n"
+			 << "./" << executable << " " << arguments
 	         << "'";
 
 	//since we're not using newlines here, remember to have spaces between things
 	std::stringstream ec2Script;
 	ec2Script << "aws ec2 run-instances "
-	          << "--image-id ami-08ffb106d09e20436 "
+	          << "--image-id " << config::AWS_AMI << " "
 	          << "--count " << num << " "
 	          << "--instance-type m5.2xlarge "
-	          << "--key-name anna "
-	          << "--security-group-ids sg-0196a7a839c79446d "
+	          << "--key-name paxos-key "
+	          << "--security-groups paxos-security-group "
 			  << "--tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=" << config::ANNA_KEY_PREFIX << "_"
 			        << name << "}]' "
 			  << "--query 'Instances[*].InstanceId' "

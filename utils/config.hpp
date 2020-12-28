@@ -37,13 +37,19 @@ namespace config {
     const static inline std::string ENV_IP_NAME = "IP";
     const static inline std::string ENV_ANNA_KEY_PREFIX_NAME = "ANNA_KEY_PREFIX";
 	const static inline std::string ENV_BATCH_SIZE_NAME = "BATCH_SIZE";
+	const static inline std::string ENV_AWS_REGION_NAME = "AWS_REGION";
+	const static inline std::string ENV_AWS_AMI_NAME = "AWS_AMI";
+	const static inline std::string ENV_AWS_S3_BUCKET_NAME = "AWS_S3_BUCKET";
 
-    const static inline std::string IP_ADDRESS = std::getenv(ENV_IP_NAME.c_str());
+	const static inline std::string IP_ADDRESS = std::getenv(ENV_IP_NAME.c_str());
     const static inline std::string ANNA_ROUTING_ADDRESS = std::getenv(ENV_ANNA_ROUTING_NAME.c_str());
     const static inline std::string ANNA_KEY_PREFIX = std::getenv(ENV_ANNA_KEY_PREFIX_NAME.c_str());
 	const static int BATCH_SIZE = std::stoi(std::getenv(ENV_BATCH_SIZE_NAME.c_str()));
+	const static inline std::string AWS_REGION = std::getenv(ENV_AWS_REGION_NAME.c_str());
+	const static inline std::string AWS_AMI = std::getenv(ENV_AWS_AMI_NAME.c_str());
+	const static inline std::string AWS_S3_BUCKET = std::getenv(ENV_AWS_S3_BUCKET_NAME.c_str());
 
-    const static int TCP_RETRY_TIMEOUT_SEC = 10;
+	const static int TCP_RETRY_TIMEOUT_SEC = 10;
     const static int HEARTBEAT_TIMEOUT_SEC = 20; // this - HEARTBEAT_SLEEP_SEC = time allowed between message send & receive
     const static int HEARTBEAT_SLEEP_SEC = 5;
     const static int BATCHER_TIMEOUT_SEC = 5;
