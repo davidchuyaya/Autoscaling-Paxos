@@ -45,6 +45,7 @@ std::vector<std::string> scaling::startInstance(const std::string& executable, c
 	         << "export " << config::ENV_ANNA_KEY_PREFIX_NAME << "=" << config::ANNA_KEY_PREFIX << "\n"
 	         << "export " << config::ENV_BATCH_SIZE_NAME << "=" << config::BATCH_SIZE << "\n"
 			 << "export " << config::ENV_AWS_REGION_NAME << "=" << config::AWS_REGION << "\n"
+			 << "export " << config::ENV_AWS_AVAILABILITY_ZONE_NAME << "=" << config::AWS_AVAILABILITY_ZONE << "\n"
 			 << "export " << config::ENV_AWS_AMI_NAME << "=" << config::AWS_AMI << "\n"
 			 << "export " << config::ENV_AWS_S3_BUCKET_NAME << "=" << config::AWS_S3_BUCKET << "\n"
 			 << "./" << executable << " " << arguments
@@ -56,6 +57,7 @@ std::vector<std::string> scaling::startInstance(const std::string& executable, c
 	          << "--image-id " << config::AWS_AMI << " "
 	          << "--count " << num << " "
 	          << "--instance-type m5.2xlarge "
+	          << "--placement AvailabilityZone=" << config::AWS_AVAILABILITY_ZONE << " "
 	          << "--key-name paxos-key "
 	          << "--security-groups paxos-security-group "
 			  << "--tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=" << config::ANNA_KEY_PREFIX << "_"

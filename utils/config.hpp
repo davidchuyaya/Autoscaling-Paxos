@@ -40,6 +40,7 @@ namespace config {
     const static inline std::string ENV_ANNA_KEY_PREFIX_NAME = "ANNA_KEY_PREFIX";
 	const static inline std::string ENV_BATCH_SIZE_NAME = "BATCH_SIZE";
 	const static inline std::string ENV_AWS_REGION_NAME = "AWS_REGION";
+	const static inline std::string ENV_AWS_AVAILABILITY_ZONE_NAME = "AWS_AVAILABILITY_ZONE";
 	const static inline std::string ENV_AWS_AMI_NAME = "AWS_AMI";
 	const static inline std::string ENV_AWS_S3_BUCKET_NAME = "AWS_S3_BUCKET";
 
@@ -48,6 +49,7 @@ namespace config {
     const static inline std::string ANNA_KEY_PREFIX = std::getenv(ENV_ANNA_KEY_PREFIX_NAME.c_str());
 	const static int BATCH_SIZE = std::stoi(std::getenv(ENV_BATCH_SIZE_NAME.c_str()));
 	const static inline std::string AWS_REGION = std::getenv(ENV_AWS_REGION_NAME.c_str());
+	const static inline std::string AWS_AVAILABILITY_ZONE = std::getenv(ENV_AWS_AVAILABILITY_ZONE_NAME.c_str());
 	const static inline std::string AWS_AMI = std::getenv(ENV_AWS_AMI_NAME.c_str());
 	const static inline std::string AWS_S3_BUCKET = std::getenv(ENV_AWS_S3_BUCKET_NAME.c_str());
 
