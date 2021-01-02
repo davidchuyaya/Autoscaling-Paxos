@@ -19,10 +19,11 @@ class acceptor {
 public:
     explicit acceptor(std::string&& acceptorGroupId);
 private:
-	network zmqNetwork;
+	anna* annaWriteOnlyClient;
+	network *zmqNetwork;
+	server_component* proxyLeaders;
 
     const std::string acceptorGroupId;
-	anna* annaWriteOnlyClient;
     Ballot highestBallot = {};
     Log::pValueLog log = {};
 
@@ -30,8 +31,7 @@ private:
      * Process p1a and p2a messages from proxy leaders.
      * @param socket Socket ID of proxy leader
      */
-    void listenToProxyLeaders(const std::string& ipAddress, const ProposerToAcceptor& payload,
-							  server_component& proxyLeaders);
+    void listenToProxyLeaders(const std::string& ipAddress, const ProposerToAcceptor& payload);
 };
 
 #endif //C__PAXOS_ACCEPTOR_HPP

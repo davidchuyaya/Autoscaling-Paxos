@@ -14,8 +14,9 @@ proposer::proposer(const int id, const int numAcceptorGroups) : id(id), numAccep
     //wait for acceptor group IDs before starting phase 1 or phase 2. All batches will be dropped until then.
 //    acceptorCV.wait(lock, [&]{ return acceptorGroupIds.size() >= numAcceptorGroups; });
 //    BENCHMARK_LOG("Acceptor group threshold met\n");
+	zmqNetwork = new network();
 
-	client_component proposers(zmqNetwork, config::PROPOSER_PORT_FOR_PROPOSERS, Proposer,
+	proposers = new client_component(zmqNetwork, config::PROPOSER_PORT_FOR_PROPOSERS, Proposer,
 							[](const std::string& address, const time_t now) {
 		BENCHMARK_LOG("Proposer connected to proposer at {}", address);
 	},[](const std::string& address, const time_t now) {
@@ -23,52 +24,52 @@ proposer::proposer(const int id, const int numAcceptorGroups) : id(id), numAccep
 	}, [&](const std::string& address, const std::string& payload, const time_t now) {
 		listenToProposer();
 	});
-	proposers.connectToNewMembers({}, 0); //TODO add new members with anna
+	proposers->connectToNewMembers({{"54.219.37.153", "13.52.215.70"},{}}, 0); //TODO add new members with anna
 	//we don't talk to other proposers through the server port
-	zmqNetwork.startServerAtPort(config::PROPOSER_PORT_FOR_PROPOSERS, Proposer);
+	zmqNetwork->startServerAtPort(config::PROPOSER_PORT_FOR_PROPOSERS, Proposer);
 
-	heartbeat_component proxyLeaderHeartbeat(zmqNetwork);
-	ProxyLeaderToProposer proxyLeaderToProposer;
-	server_component proxyLeaders(zmqNetwork, config::PROPOSER_PORT_FOR_PROXY_LEADERS, ProxyLeader,
+	proxyLeaderHeartbeat = new heartbeat_component(zmqNetwork);
+	proxyLeaders = new server_component(zmqNetwork, config::PROPOSER_PORT_FOR_PROXY_LEADERS, ProxyLeader,
 	                              [&](const std::string& address, const time_t now) {
 		BENCHMARK_LOG("Proxy leader from {} connected to proposer", address);
-		proxyLeaderHeartbeat.addConnection(address, now);
+		proxyLeaderHeartbeat->addConnection(address, now);
 	}, [&](const std::string& address, const std::string& payload, const time_t now) {
-		proxyLeaderHeartbeat.addHeartbeat(address, now);
+		proxyLeaderHeartbeat->addHeartbeat(address, now);
 		if (payload.empty()) //just a heartbeat
 			return;
+		ProxyLeaderToProposer proxyLeaderToProposer;
 		proxyLeaderToProposer.ParseFromString(payload);
-		listenToProxyLeader(proxyLeaderToProposer, proposers, proxyLeaders, proxyLeaderHeartbeat);
+		listenToProxyLeader(proxyLeaderToProposer);
 		proxyLeaderToProposer.Clear();
 	});
 
-	Batch batch;
-	server_component batchers(zmqNetwork, config::PROPOSER_PORT_FOR_BATCHERS, Batcher,
+	batchers = new server_component(zmqNetwork, config::PROPOSER_PORT_FOR_BATCHERS, Batcher,
 						   [](const std::string& address, const time_t now) {
 		BENCHMARK_LOG("Batcher from {} connected to proposer", address);
 	}, [&](const std::string& address, const std::string& payload, const time_t now) {
+		Batch batch;
 		batch.ParseFromString(payload);
-		listenToBatcher(batch, proxyLeaders, proxyLeaderHeartbeat);
+		listenToBatcher(batch);
 		batch.Clear();
 	});
 
-	acceptorGroupIds.emplace_back(""); //TODO add new acceptor groups with anna
+	acceptorGroupIds.emplace_back("1"); //TODO add new acceptor groups with anna
 
 	//leader loop
-	zmqNetwork.addTimer([&](const time_t now) {
+	zmqNetwork->addTimer([&](const time_t now) {
 		//send heartbeats
 		if (isLeader) {
 			LOG("I am leader, sending at time: {}", std::asctime(std::localtime(&now)));
-			proposers.broadcast("");
+			proposers->broadcast("");
 		}
 		//ID-based timeout so a leader doesn't have much competition
 		else if (difftime(now, lastLeaderHeartbeat) > config::HEARTBEAT_TIMEOUT_SEC + id * config::ID_SCOUT_DELAY_MULTIPLIER) {
-			sendScouts(proxyLeaders, proxyLeaderHeartbeat);
+			sendScouts();
 		}
 		BENCHMARK_LOG("Processed {} messages", nextSlot);
 	}, config::HEARTBEAT_SLEEP_SEC, true);
 
-	zmqNetwork.poll();
+	zmqNetwork->poll();
 }
 
 void proposer::listenToAnna(const std::string& key, const two_p_set& twoPSet) {
@@ -99,7 +100,7 @@ void proposer::listenToAnna(const std::string& key, const two_p_set& twoPSet) {
 //    }
 }
 
-void proposer::listenToBatcher(const Batch& payload, server_component& proxyLeaders, heartbeat_component& proxyLeaderHeartbeat) {
+void proposer::listenToBatcher(const Batch& payload) {
     LOG("Received batch request: {}", payload.ShortDebugString());
     if (!isLeader)
         return;
@@ -114,17 +115,16 @@ void proposer::listenToBatcher(const Batch& payload, server_component& proxyLead
         slot = logHoles.front();
         logHoles.pop();
     }
-    proxyLeaders.sendToIp(proxyLeaderHeartbeat.nextAddress(),
+    proxyLeaders->sendToIp(proxyLeaderHeartbeat->nextAddress(),
 						  message::createP2A(id, ballotNum, slot, payload.client(), payload.request(),
 						   fetchNextAcceptorGroupId()).SerializeAsString());
 	TIME();
 }
 
-void proposer::listenToProxyLeader(const ProxyLeaderToProposer& payload, client_component& proposers,
-								   server_component& proxyLeaders, heartbeat_component& proxyLeaderHeartbeat) {
+void proposer::listenToProxyLeader(const ProxyLeaderToProposer& payload) {
     switch (payload.type()) {
         case ProxyLeaderToProposer_Type_p1b:
-            handleP1B(payload, proposers, proxyLeaders, proxyLeaderHeartbeat);
+            handleP1B(payload);
             break;
         case ProxyLeaderToProposer_Type_p2b:
             handleP2B(payload);
@@ -139,7 +139,7 @@ void proposer::listenToProposer() {
     noLongerLeader();
 }
 
-void proposer::sendScouts(server_component& proxyLeaders, heartbeat_component& proxyLeaderHeartbeat) {
+void proposer::sendScouts() {
 	if (acceptorGroupIds.size() < numAcceptorGroups) {
 		BENCHMARK_LOG("Not sending scouts because we don't have all acceptor groups yet");
 		return;
@@ -153,13 +153,12 @@ void proposer::sendScouts(server_component& proxyLeaders, heartbeat_component& p
 
     for (const std::string& acceptorGroupId : acceptorGroupIds) {
         remainingAcceptorGroupsForScouts.emplace(acceptorGroupId);
-        proxyLeaders.sendToIp(proxyLeaderHeartbeat.nextAddress(),
+        proxyLeaders->sendToIp(proxyLeaderHeartbeat->nextAddress(),
 							  message::createP1A(id, currentBallotNum, acceptorGroupId).SerializeAsString());
     }
 }
 
-void proposer::handleP1B(const ProxyLeaderToProposer& message, client_component& proposers, server_component& proxyLeaders,
-						 heartbeat_component& proxyLeaderHeartbeat) {
+void proposer::handleP1B(const ProxyLeaderToProposer& message) {
     BENCHMARK_LOG("Received p1b: {}", message.ShortDebugString());
 
     if (message.ballot().id() != id) { // we lost the election
@@ -180,12 +179,12 @@ void proposer::handleP1B(const ProxyLeaderToProposer& message, client_component&
     //leader election complete
     isLeader = true;
     LOG("I am leader!");
-    proposers.broadcast("");
+    proposers->broadcast("");
 
-    mergeLogs(proxyLeaders, proxyLeaderHeartbeat);
+    mergeLogs();
 }
 
-void proposer::mergeLogs(server_component& proxyLeaders, heartbeat_component& proxyLeaderHeartbeat) {
+void proposer::mergeLogs() {
     const Log::stringLog& committedLog = Log::mergeCommittedLogs(acceptorGroupCommittedLogs);
     const auto& [uncommittedLog, acceptorGroupForSlot] = Log::mergeUncommittedLogs(acceptorGroupUncommittedLogs);
     acceptorGroupCommittedLogs.clear();
@@ -198,7 +197,7 @@ void proposer::mergeLogs(server_component& proxyLeaders, heartbeat_component& pr
 
     //resend uncommitted messages
     for (const auto& [slot, pValue] : uncommittedLog)
-        proxyLeaders.sendToIp(proxyLeaderHeartbeat.nextAddress(),
+        proxyLeaders->sendToIp(proxyLeaderHeartbeat->nextAddress(),
 							  message::createP2A(id, ballotNum, slot, pValue.client(), pValue.payload(),
 							acceptorGroupForSlot.at(slot)).SerializeAsString());
 }

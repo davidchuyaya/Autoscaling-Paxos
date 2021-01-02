@@ -22,8 +22,11 @@ class proxy_leader {
 public:
     explicit proxy_leader();
 private:
-	network zmqNetwork;
     anna* annaClient;
+	network* zmqNetwork;
+	client_component* proposers;
+	heartbeat_component* unbatcherHeartbeat;
+	client_component* unbatchers;
 
     struct sentMetadata {
     	ProposerToAcceptor value;
@@ -36,11 +39,9 @@ private:
     std::unordered_set<std::string> connectedAcceptorGroups;
 
     void listenToAnna(const std::string& key, const two_p_set& twoPSet);
-    void processNewAcceptorGroup(const std::string& acceptorGroupId, client_component& proposers,
-								 client_component& unbatchers, heartbeat_component& unbatcherHeartbeat);
+    void processNewAcceptorGroup(const std::string& acceptorGroupId);
     void listenToProposer(const ProposerToAcceptor& payload, const std::string& ipAddress);
-    void listenToAcceptor(const AcceptorToProxyLeader& payload, client_component& proposers, client_component& unbatchers,
-						  heartbeat_component& unbatcherHeartbeat);
+    void listenToAcceptor(const AcceptorToProxyLeader& payload);
 
     /**
      * Handle a p1b from an acceptor group.
@@ -49,7 +50,7 @@ private:
      *
      * @param payload
      */
-    void handleP1B(const AcceptorToProxyLeader& payload, client_component& proposers);
+    void handleP1B(const AcceptorToProxyLeader& payload);
     /**
      * Handle a p2b from an acceptor group.
      * If the acceptor preempted us, immediately tell the leader. Clear the value.
@@ -57,8 +58,7 @@ private:
      *
      * @param payload
      */
-    void handleP2B(const AcceptorToProxyLeader& payload, client_component& proposers, client_component& unbatchers,
-                   heartbeat_component& unbatcherHeartbeat);
+    void handleP2B(const AcceptorToProxyLeader& payload);
 };
 
 

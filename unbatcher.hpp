@@ -18,10 +18,12 @@ class unbatcher {
 public:
     explicit unbatcher();
 private:
-	network zmqNetwork;
 	anna* annaWriteOnlyClient;
+	network* zmqNetwork;
+	client_component* clients;
+	server_component* proxyLeaders;
 
-    void listenToProxyLeaders(const Batch& batch, client_component& clients);
+    void listenToProxyLeaders(const Batch& batch);
 };
 
 

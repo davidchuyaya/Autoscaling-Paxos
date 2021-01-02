@@ -4,7 +4,7 @@
 
 #include "heartbeat_component.hpp"
 
-heartbeat_component::heartbeat_component(network& zmqNetwork) : zmqNetwork(zmqNetwork) {}
+heartbeat_component::heartbeat_component(network* zmqNetwork) : zmqNetwork(zmqNetwork) {}
 
 void heartbeat_component::addHeartbeat(const std::string& ipAddress, const time_t now) {
 	heartbeats[ipAddress] = now;
@@ -12,7 +12,7 @@ void heartbeat_component::addHeartbeat(const std::string& ipAddress, const time_
 
 void heartbeat_component::addConnection(const std::string& ipAddress, const time_t now) {
 	fastComponents.emplace_back(ipAddress);
-	zmqNetwork.addTimer([&](const time_t now) {
+	zmqNetwork->addTimer([&](const time_t now) {
 		checkHeartbeat(now, ipAddress);
 	}, now, config::HEARTBEAT_TIMEOUT_SEC, true);
 	addHeartbeat(ipAddress, now);

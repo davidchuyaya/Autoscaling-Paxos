@@ -49,12 +49,12 @@ std::shared_ptr<socketInfo> network::startServerAtPort(int port, const Component
 	return server;
 }
 
-std::shared_ptr<socketInfo> network::connectToAddress(const std::string& address, const ComponentType serverType) {
+std::shared_ptr<socketInfo> network::connectToAddress(const std::string& address, const int port, const ComponentType serverType) {
 	auto client = sockets.emplace_back(std::make_shared<socketInfo>(
 			socketInfo::clientSocket(context, serverType, address)));
 	client->socket.setsockopt(ZMQ_IDENTITY, config::IP_ADDRESS.c_str(), config::IP_ADDRESS.size()); //send router our IP
 	client->socket.setsockopt(ZMQ_LINGER, 0);
-	client->socket.connect("tcp://" + address);
+	client->socket.connect("tcp://" + address + ":" + std::to_string(port));
 	pollItems.emplace_back(zmq::pollitem_t{static_cast<void*>(client->socket), 0, ZMQ_POLLIN, 0});
 	return client;
 }

@@ -8,7 +8,6 @@
 #include <string>
 #include <unordered_map>
 #include <unistd.h>
-#include <google/protobuf/message.h>
 #include "models/message.hpp"
 #include "models/server_component.hpp"
 #include "models/client_component.hpp"
@@ -23,12 +22,14 @@ public:
     explicit batcher();
 private:
     anna* annaClient;
-    network zmqNetwork;
+    network* zmqNetwork;
+	client_component* proposers;
+	server_component* clients;
 
     std::unordered_map<std::string, std::string> clientToPayloads = {};
     int numPayloads = 0;
 
-    void sendBatch(client_component& proposers);
+    void sendBatch();
 };
 
 #endif //AUTOSCALING_PAXOS_BATCHER_HPP

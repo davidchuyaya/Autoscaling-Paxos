@@ -9,21 +9,22 @@ acceptor::acceptor(std::string&& acceptorGroupId) :acceptorGroupId(acceptorGroup
 //		{config::KEY_ACCEPTOR_GROUPS, acceptorGroupId},
 //		{acceptorGroupId, config::IP_ADDRESS}
 //	});
-	ProposerToAcceptor proposerToAcceptor;
-	server_component proxyLeaders(zmqNetwork, config::ACCEPTOR_PORT_FOR_PROXY_LEADERS, ProxyLeader,
+	zmqNetwork = new network();
+
+	proxyLeaders = new server_component(zmqNetwork, config::ACCEPTOR_PORT_FOR_PROXY_LEADERS, ProxyLeader,
 	                              [](const std::string& address, const time_t now) {
 		BENCHMARK_LOG("Proxy leader from {} connected to acceptor", address);
 	}, [&](const std::string& address, const std::string& payload, const time_t now) {
+		ProposerToAcceptor proposerToAcceptor;
 		proposerToAcceptor.ParseFromString(payload);
-		listenToProxyLeaders(address, proposerToAcceptor, proxyLeaders);
+		listenToProxyLeaders(address, proposerToAcceptor);
 		proposerToAcceptor.Clear();
 	});
 
-	zmqNetwork.poll();
+	zmqNetwork->poll();
 }
 
-void acceptor::listenToProxyLeaders(const std::string& ipAddress, const ProposerToAcceptor& payload,
-									server_component& proxyLeaders) {
+void acceptor::listenToProxyLeaders(const std::string& ipAddress, const ProposerToAcceptor& payload) {
 	std::string reply;
     switch (payload.type()) {
         case ProposerToAcceptor_Type_p1a: {
@@ -51,12 +52,12 @@ void acceptor::listenToProxyLeaders(const std::string& ipAddress, const Proposer
             break;
         default: {}
     }
-	proxyLeaders.sendToIp(ipAddress, reply);
+	proxyLeaders->sendToIp(ipAddress, reply);
 }
 
 int main(const int argc, const char** argv) {
     if (argc != 2) {
-        printf("Usage: ./acceptor <ACCEPTOR GROUP ID>.");
+        printf("Usage: ./acceptor <ACCEPTOR GROUP ID>\n");
         exit(0);
     }
 

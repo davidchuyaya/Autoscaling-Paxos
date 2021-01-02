@@ -11,37 +11,39 @@ proxy_leader::proxy_leader() {
 //	});
 //	annaClient->subscribeTo(config::KEY_PROPOSERS);
 //	annaClient->subscribeTo(config::KEY_UNBATCHERS);
-	ProposerToAcceptor proposerToAcceptor;
-	client_component proposers(zmqNetwork, config::PROPOSER_PORT_FOR_PROXY_LEADERS, Proposer,
+	zmqNetwork = new network();
+
+	proposers = new client_component(zmqNetwork, config::PROPOSER_PORT_FOR_PROXY_LEADERS, Proposer,
 	                           [](const std::string& address, const time_t now) {
 		BENCHMARK_LOG("Proxy leader connected to proposer at {}", address);
 	},[](const std::string& address, const time_t now) {
 		BENCHMARK_LOG("ERROR??: Proposer disconnected from proposer at {}", address);
 	}, [&](const std::string& address, const std::string& payload, const time_t now) {
+		ProposerToAcceptor proposerToAcceptor;
 		proposerToAcceptor.ParseFromString(payload);
 		listenToProposer(proposerToAcceptor, address);
 		proposerToAcceptor.Clear();
 	});
-	proposers.connectToNewMembers({}, 0); //TODO add new members with anna
-	proposers.startHeartbeater();
+	proposers->connectToNewMembers({{"54.219.37.153", "13.52.215.70"},{}}, 0); //TODO add new members with anna
+	proposers->startHeartbeater();
 
-	heartbeat_component unbatcherHeartbeat(zmqNetwork);
-	client_component unbatchers(zmqNetwork, config::UNBATCHER_PORT_FOR_PROXY_LEADERS, Unbatcher,
+	unbatcherHeartbeat = new heartbeat_component(zmqNetwork);
+	unbatchers = new client_component(zmqNetwork, config::UNBATCHER_PORT_FOR_PROXY_LEADERS, Unbatcher,
 	                           [&](const std::string& address, const time_t now) {
 		BENCHMARK_LOG("Proxy leader connected to unbatcher at {}", address);
-		unbatcherHeartbeat.addConnection(address, now);
+		unbatcherHeartbeat->addConnection(address, now);
 	},[&](const std::string& address, const time_t now) {
 		BENCHMARK_LOG("Proxy leader disconnected from unbatcher at {}", address);
-		unbatcherHeartbeat.removeConnection(address);
+		unbatcherHeartbeat->removeConnection(address);
 	}, [&](const std::string& address, const std::string& payload, const time_t now) {
-		unbatcherHeartbeat.addHeartbeat(address, now);
+		unbatcherHeartbeat->addHeartbeat(address, now);
 	});
-	unbatchers.connectToNewMembers({}, 0); //TODO add new members with anna
+	unbatchers->connectToNewMembers({{"54.153.68.114", "54.215.93.58"},{}}, 0); //TODO add new members with anna
 
-	processNewAcceptorGroup("", proposers, unbatchers, unbatcherHeartbeat); //TODO add new acceptor groups with anna
-	acceptorGroups[""]->connectToNewMembers({}, 0); //TODO add new acceptors with anna
+	processNewAcceptorGroup("1"); //TODO add new acceptor groups with anna
+	acceptorGroups["1"]->connectToNewMembers({{"54.151.124.140", "54.215.157.62", "54.67.42.161"},{}}, 0); //TODO add new acceptors with anna
 
-	zmqNetwork.poll();
+	zmqNetwork->poll();
 }
 
 void proxy_leader::listenToAnna(const std::string& key, const two_p_set& twoPSet) {
@@ -59,8 +61,7 @@ void proxy_leader::listenToAnna(const std::string& key, const two_p_set& twoPSet
 //    }
 }
 
-void proxy_leader::processNewAcceptorGroup(const std::string& acceptorGroupId, client_component& proposers,
-										   client_component& unbatchers, heartbeat_component& unbatcherHeartbeat) {
+void proxy_leader::processNewAcceptorGroup(const std::string& acceptorGroupId) {
 	BENCHMARK_LOG("New acceptor group from proposer: {}", acceptorGroupId);
 	acceptorGroups[acceptorGroupId] =
 			new client_component(zmqNetwork, config::ACCEPTOR_PORT_FOR_PROXY_LEADERS, Acceptor,
@@ -77,7 +78,7 @@ void proxy_leader::processNewAcceptorGroup(const std::string& acceptorGroupId, c
 			}, [&](const std::string& address, const std::string& payload, const time_t now) {
 				AcceptorToProxyLeader acceptorToProxyLeader;
 				acceptorToProxyLeader.ParseFromString(payload);
-				listenToAcceptor(acceptorToProxyLeader, proposers, unbatchers, unbatcherHeartbeat);
+				listenToAcceptor(acceptorToProxyLeader);
 			});
 
 //	annaClient->subscribeTo(acceptorGroupId); //find the IP addresses of acceptors in this group
@@ -96,22 +97,21 @@ void proxy_leader::listenToProposer(const ProposerToAcceptor& payload, const std
 	TIME();
 }
 
-void proxy_leader::listenToAcceptor(const AcceptorToProxyLeader& payload, client_component& proposers,
-									client_component& unbatchers, heartbeat_component& unbatcherHeartbeat) {
+void proxy_leader::listenToAcceptor(const AcceptorToProxyLeader& payload) {
     LOG("Received from acceptors: {}", payload.ShortDebugString());
 
     switch (payload.type()) {
         case AcceptorToProxyLeader_Type_p1b:
-            handleP1B(payload, proposers);
+            handleP1B(payload);
             break;
         case AcceptorToProxyLeader_Type_p2b:
-            handleP2B(payload, proposers, unbatchers, unbatcherHeartbeat);
+            handleP2B(payload);
             break;
         default: {}
     }
 }
 
-void proxy_leader::handleP1B(const AcceptorToProxyLeader& payload, client_component& proposers) {
+void proxy_leader::handleP1B(const AcceptorToProxyLeader& payload) {
     const sentMetadata& sentValue = sentMessages[payload.messageid()];
     if (sentValue.value.ballot().ballotnum() == 0)  //p1b is arriving for a nonexistent sentValue
         return;
@@ -122,7 +122,7 @@ void proxy_leader::handleP1B(const AcceptorToProxyLeader& payload, client_compon
         const ProxyLeaderToProposer& messageToProposer = message::createProxyP1B(payload.messageid(),
                                                                                  payload.acceptorgroupid(),
                                                                                  payload.ballot(), {}, {});
-	    proposers.sendToIp(sentValue.proposerAddress, messageToProposer.SerializeAsString());
+	    proposers->sendToIp(sentValue.proposerAddress, messageToProposer.SerializeAsString());
         sentMessages.erase(payload.messageid());
         unmergedLogs.erase(payload.messageid());
     }
@@ -138,15 +138,14 @@ void proxy_leader::handleP1B(const AcceptorToProxyLeader& payload, client_compon
 																					 payload.acceptorgroupid(),
                                                                                      payload.ballot(),
                                                                                      committedLog, uncommittedLog);
-	        proposers.sendToIp(sentValue.proposerAddress, messageToProposer.SerializeAsString());
+	        proposers->sendToIp(sentValue.proposerAddress, messageToProposer.SerializeAsString());
             sentMessages.erase(payload.messageid());
             unmergedLogs.erase(payload.messageid());
         }
     }
 }
 
-void proxy_leader::handleP2B(const AcceptorToProxyLeader& payload, client_component& proposers,
-							 client_component& unbatchers, heartbeat_component& unbatcherHeartbeat) {
+void proxy_leader::handleP2B(const AcceptorToProxyLeader& payload) {
     const sentMetadata& sentValue = sentMessages[payload.messageid()];
     if (sentValue.proposerAddress.empty()) //p2b is arriving for a nonexistent sentValue
         return;
@@ -157,7 +156,7 @@ void proxy_leader::handleP2B(const AcceptorToProxyLeader& payload, client_compon
         const ProxyLeaderToProposer& messageToProposer = message::createProxyP2B(payload.messageid(),
 																				 payload.acceptorgroupid(),
                                                                                 payload.ballot(), payload.slot());
-	    proposers.sendToIp(sentValue.proposerAddress, messageToProposer.SerializeAsString());
+	    proposers->sendToIp(sentValue.proposerAddress, messageToProposer.SerializeAsString());
 	    sentMessages.erase(payload.messageid());
         approvedCommanders.erase(payload.messageid());
     }
@@ -168,7 +167,7 @@ void proxy_leader::handleP2B(const AcceptorToProxyLeader& payload, client_compon
         if (approvedCommanders[payload.messageid()] >= config::F + 1) {
             //we have f+1 approved commanders, tell the unbatcher. No need to tell proposer
 	        LOG("P2B approved for proposer: {}, slot: {}", payload.ballot().id(), payload.slot());
-	        unbatchers.sendToIp(unbatcherHeartbeat.nextAddress(),
+	        unbatchers->sendToIp(unbatcherHeartbeat->nextAddress(),
 							 message::createBatchMessage(sentValue.value.client(), sentValue.value.payload())
 							 .SerializeAsString());
             sentMessages.erase(payload.messageid());

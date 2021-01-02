@@ -4,11 +4,11 @@
 
 #include "server_component.hpp"
 
-server_component::server_component(network& zmqNetwork, int port, const ComponentType& type,
+server_component::server_component(network* zmqNetwork, int port, const ComponentType& type,
                                    const onConnectHandler& onConnect,
                                    const network::messageHandler& listener)
                                    : component(zmqNetwork) {
-	zmqNetwork.addHandler(type,[&](const std::string& address, const std::string& payload, const time_t now) {
+	zmqNetwork->addHandler(type,[&](const std::string& address, const std::string& payload, const time_t now) {
 		if (!isConnected(address)) {
 			//new connection
 			clientAddresses.emplace(address);
@@ -16,13 +16,13 @@ server_component::server_component(network& zmqNetwork, int port, const Componen
 		}
 		listener(address, payload, now);
 	});
-	serverSocket = zmqNetwork.startServerAtPort(port, type);
+	serverSocket = zmqNetwork->startServerAtPort(port, type);
 }
 
 void server_component::sendToIp(const std::string& ipAddress, const std::string& payload) {
 	if (ipAddress.empty())
 		return;
-	zmqNetwork.sendToClient(serverSocket->socket, ipAddress, payload);
+	zmqNetwork->sendToClient(serverSocket->socket, ipAddress, payload);
 }
 
 void server_component::broadcast(const std::string& payload) {

@@ -6,12 +6,12 @@
 
 #include <utility>
 
-client_component::client_component(network& zmqNetwork, int port, const ComponentType& type,
+client_component::client_component(network* zmqNetwork, int port, const ComponentType& type,
 								   const onConnectHandler& onConnect, const onConnectHandler& onDisconnect,
                                    const network::messageHandler& listener)
                                    : component(zmqNetwork), port(port), type(type), onConnect(onConnect),
                                    onDisconnect(onDisconnect) {
-	zmqNetwork.addHandler(type, listener);
+	zmqNetwork->addHandler(type, listener);
 }
 
 void client_component::connectToNewMembers(const two_p_set& newMembers, const time_t now) {
@@ -25,7 +25,7 @@ void client_component::connectToNewMembers(const two_p_set& newMembers, const ti
 			continue;
 
 		LOG("Connecting to new member: {}", ip);
-		sockets[ip] = zmqNetwork.connectToAddress(ip + std::to_string(port), type);
+		sockets[ip] = zmqNetwork->connectToAddress(ip, port, type);
 		onConnect(ip, now);
 	}
 
@@ -35,7 +35,7 @@ void client_component::connectToNewMembers(const two_p_set& newMembers, const ti
 
 void client_component::removeConnection(const std::string& ipAddress, const time_t now) {
 	LOG("Removing dead member: {}", ipAddress);
-	zmqNetwork.closeSocket(sockets[ipAddress]);
+	zmqNetwork->closeSocket(sockets[ipAddress]);
 	sockets.erase(ipAddress);
 	onDisconnect(ipAddress, now);
 }
@@ -43,12 +43,12 @@ void client_component::removeConnection(const std::string& ipAddress, const time
 void client_component::sendToIp(const std::string& ipAddress, const std::string& payload) {
 	if (ipAddress.empty())
 		return;
-	zmqNetwork.sendToServer(sockets[ipAddress]->socket, payload);
+	zmqNetwork->sendToServer(sockets[ipAddress]->socket, payload);
 }
 
 void client_component::broadcast(const std::string& payload) {
 	for (const auto& [ipAddress, socket] : sockets)
-		zmqNetwork.sendToServer(socket->socket, payload);
+		zmqNetwork->sendToServer(socket->socket, payload);
 }
 
 int client_component::numConnections() const {

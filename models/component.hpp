@@ -17,16 +17,16 @@ public:
 	virtual void sendToIp(const std::string& ipAddress, const std::string& payload) = 0;
 	virtual void broadcast(const std::string& payload) = 0;
 	void startHeartbeater() {
-		zmqNetwork.addTimer([&](const time_t now) {
+		zmqNetwork->addTimer([&](const time_t now) {
 			this->broadcast("");
 		}, config::HEARTBEAT_SLEEP_SEC, true);
 	}
 	virtual int numConnections() const = 0;
 	virtual bool isConnected(const std::string& ipAddress) const = 0;
 protected:
-	network& zmqNetwork;
+	network* zmqNetwork;
 
-	explicit component(network& zmqNetwork): zmqNetwork(zmqNetwork) {}
+	explicit component(network* zmqNetwork): zmqNetwork(zmqNetwork) {}
 };
 
 

@@ -34,7 +34,10 @@ private:
 	std::vector<string> instanceIdsOfUnbatchers;
 
 	anna* annaClient;
-	network zmqNetwork;
+	network* zmqNetwork;
+	heartbeat_component* batcherHeartbeat;
+	client_component* batchers;
+	server_component* unbatchers;
 
 	void startCluster();
 };

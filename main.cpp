@@ -8,41 +8,43 @@ paxos::paxos(const int delay, const int numClients, const int numBatchers, const
 	if (shouldStartCluster)
 		startCluster();
 
-	heartbeat_component batcherHeartbeat(zmqNetwork);
-	client_component batchers(zmqNetwork, config::BATCHER_PORT_FOR_CLIENTS, Batcher,
+	zmqNetwork = new network();
+
+	batcherHeartbeat = new heartbeat_component(zmqNetwork);
+	batchers = new client_component(zmqNetwork, config::BATCHER_PORT_FOR_CLIENTS, Batcher,
 						   [&](const std::string& address, const time_t now) {
 		BENCHMARK_LOG("Client connected to batcher at {}", address);
-		batcherHeartbeat.addConnection(address, now);
+		batcherHeartbeat->addConnection(address, now);
 	},
 	[&](const std::string& address, const time_t now) {
 		BENCHMARK_LOG("Client disconnected from batcher at {}", address);
-		batcherHeartbeat.removeConnection(address);
+		batcherHeartbeat->removeConnection(address);
 	}, [&](const std::string& address, const std::string& payload, const time_t now) {
 		LOG("Batcher {} heartbeated", address);
-		batcherHeartbeat.addHeartbeat(address, now);
+		batcherHeartbeat->addHeartbeat(address, now);
 	});
-	batchers.connectToNewMembers({}, 0); //TODO add new members with anna
+	batchers->connectToNewMembers({{"13.57.245.102", "54.183.214.9"},{}}, 0); //TODO add new members with anna
 
-	server_component unbatchers(zmqNetwork, config::CLIENT_PORT_FOR_UNBATCHERS, Unbatcher,
+	unbatchers = new server_component(zmqNetwork, config::CLIENT_PORT_FOR_UNBATCHERS, Unbatcher,
 							 [](const std::string& address, const time_t now) {
 		BENCHMARK_LOG("Unbatcher from {} connected to client", address);
 	},[&](const std::string& address, const std::string& payload, const time_t now) {
 		LOG("--Acked: {}--", payload);
-		//send another message back immediately TODO make sure payload matches what batcher expects
-		batchers.sendToIp(batcherHeartbeat.nextAddress(), payload);
+		//send another message back immediately
+		batchers->sendToIp(batcherHeartbeat->nextAddress(), payload);
 	});
 
 	//send messages to batchers after delay
-	zmqNetwork.addTimer([&](const time_t t) {
-		LOG("Num batchers at start of benchmark: {}", batchers.numConnections());
+	zmqNetwork->addTimer([&](const time_t t) {
+		LOG("Num batchers at start of benchmark: {}", batchers->numConnections());
 		for (int client = 0; client < numClients; client++) {
 			//payload = client ID
 			const std::string& payload = std::to_string(client);
-			batchers.sendToIp(batcherHeartbeat.nextAddress(), payload);
+			batchers->sendToIp(batcherHeartbeat->nextAddress(), payload);
 		}
 	}, delay, false);
 
-	zmqNetwork.poll();
+	zmqNetwork->poll();
 
 //    annaClient = anna::readWritable({}, [&](const std::string& key, const two_p_set& twoPSet) {
 //        batchers.connectAndMaybeListen(twoPSet);

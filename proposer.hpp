@@ -28,10 +28,14 @@ public:
 private:
     const int id; // 0 indexed, no gaps
     const int numAcceptorGroups;
-	network zmqNetwork;
     anna* annaClient;
+	network* zmqNetwork;
+	client_component* proposers;
+	heartbeat_component* proxyLeaderHeartbeat;
+	server_component* proxyLeaders;
+	server_component* batchers;
 
-    int ballotNum = 0; // must be at least 1 the first time it is sent
+	int ballotNum = 0; // must be at least 1 the first time it is sent
     bool isLeader = false;
     time_t lastLeaderHeartbeat = 0;
 
@@ -47,16 +51,15 @@ private:
     int nextAcceptorGroup = 0;
 
     void listenToAnna(const std::string& key, const two_p_set& twoPSet);
-    void listenToBatcher(const Batch& payload, server_component& proxyLeaders, heartbeat_component& proxyLeaderHeartbeat);
-    void listenToProxyLeader(const ProxyLeaderToProposer& payload, client_component& proposers,
-							 server_component& proxyLeaders, heartbeat_component& proxyLeaderHeartbeat);
+    void listenToBatcher(const Batch& payload);
+    void listenToProxyLeader(const ProxyLeaderToProposer& payload);
     void listenToProposer();
 
     /**
      * Broadcast p1a to acceptors to become the leader.
      * @invariant isLeader = false
      */
-    void sendScouts(server_component& proxyLeaders, heartbeat_component& proxyLeaderHeartbeat);
+    void sendScouts();
     /**
      * Check if proxy leaders have replied with a win in phase 1.
      * If every acceptor group has replied, then we are the new leader, and we should merge the committed/uncommitted logs
@@ -65,14 +68,13 @@ private:
      *
      * @invariant isLeader = false, shouldSendScouts = false, uncommittedProposals.empty()
      */
-    void handleP1B(const ProxyLeaderToProposer& message, client_component& proposers, server_component& proxyLeaders,
-				   heartbeat_component& proxyLeaderHeartbeat);
+    void handleP1B(const ProxyLeaderToProposer& message);
     /**
      * Update log with newly committed slots from acceptors. Remove committed proposals from unproposedPayloads.
      * Propose uncommitted slots, add to uncommittedProposals
      * @invariant uncommittedProposals.empty()
      */
-    void mergeLogs(server_component& proxyLeaders, heartbeat_component& proxyLeaderHeartbeat);
+    void mergeLogs();
     /**
      * Check if a proxy leader has committed values for a slot. If yes, then confirm that slot as committed.
      * If we've been preempted, then that means another has become the leader. Reset values.

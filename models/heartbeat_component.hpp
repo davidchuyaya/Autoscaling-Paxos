@@ -15,14 +15,14 @@
 
 class heartbeat_component {
 public:
-	explicit heartbeat_component(network& zmqNetwork);
+	explicit heartbeat_component(network* zmqNetwork);
 	void addHeartbeat(const std::string& ipAddress, time_t now);
 	void addConnection(const std::string& ipAddress, time_t now);
 	void removeConnection(const std::string& ipAddress);
 	//Note: returns "" if no components exist
 	std::string nextAddress();
 private:
-	network& zmqNetwork;
+	network* zmqNetwork;
     std::unordered_map<std::string, time_t> heartbeats;
 	std::vector<std::string> fastComponents;
 	std::vector<std::string> slowComponents;
