@@ -5,51 +5,47 @@
 #include "unbatcher.hpp"
 
 unbatcher::unbatcher() {
-	annaWriteOnlyClient = anna::writeOnly({{config::KEY_UNBATCHERS, config::IP_ADDRESS}});
-    heartbeater::heartbeat(proxyLeaderMutex, proxyLeaders);
-	startServer();
+//	annaWriteOnlyClient = anna::writeOnly({{config::KEY_UNBATCHERS, config::IP_ADDRESS}});
+	client_component clients(zmqNetwork, config::CLIENT_PORT_FOR_UNBATCHERS, Client,
+	                           [](const std::string& address, const time_t now) {
+		BENCHMARK_LOG("Unbatcher connected to client at {}", address);
+	},[](const std::string& address, const time_t now) {
+		BENCHMARK_LOG("ERROR??: Unbatcher disconnected from client at {}", address);
+	}, [&](const std::string& address, const std::string& payload, const time_t now) {
+		BENCHMARK_LOG("ERROR??: Client at {} sent unbatcher --{}--", address, payload);
+	});
+
+	Batch batch;
+	server_component proxyLeaders(zmqNetwork, config::UNBATCHER_PORT_FOR_PROXY_LEADERS, ProxyLeader,
+	                              [&](const std::string& address, const time_t now) {
+		BENCHMARK_LOG("Proxy leader from {} connected to unbatcher", address);
+	}, [&](const std::string& address, const std::string& payload, const time_t now) {
+		batch.ParseFromString(payload);
+		listenToProxyLeaders(batch, clients);
+		batch.Clear();
+	});
+
+	zmqNetwork.poll();
 }
 
-void unbatcher::startServer() {
-    network::startServerAtPort<Batch>(config::UNBATCHER_PORT,
-       [&](const int socket) {
-           BENCHMARK_LOG("Unbatcher connected to proxy leader\n");
-           std::unique_lock lock(proxyLeaderMutex);
-           proxyLeaders.emplace_back(socket);
-        }, [&](const int socket, const Batch& batch) {
-        	LOG("Unbatcher received payload: {}\n", batch.ShortDebugString());
-        	TIME();
-		    const int clientSocket = connectToClient(batch.client());
+void unbatcher::listenToProxyLeaders(const Batch& batch, client_component& clients) {
+	LOG("Unbatcher received payload: {}", batch.ShortDebugString());
+	TIME();
 
-		    //split request
-		    std::stringstream stream(batch.request());
-		    std::string request;
-		    while (std::getline(stream, request, config::REQUEST_DELIMITER[0])) {
-		    	LOG("Sending split request: {}", request);
-		        bool success = network::sendPayload(clientSocket, message::createUnbatcherToClientAck(request));
+	if (!clients.isConnected(batch.client())) {
+		clients.connectToNewMembers({{batch.client()},{}}, 0);
+		BENCHMARK_LOG("Unbatcher connecting to client at {}", batch.client());
+	}
 
-//        		if (!success) { TODO check send success
-//        			//close socket. Note: Next time a client starts at the same IP, 1 message will be dropped first.
-//			        std::unique_lock lock(ipToSocketMutex);
-//			        close(clientSocket);
-//			        ipToSocket.erase(clientIp);
-//			        lock.unlock();
-//        		}
-        	}
-        	TIME();
-        });
-}
+	//split request
+	std::stringstream stream(batch.request());
+	std::string request;
+	while (std::getline(stream, request, config::REQUEST_DELIMITER[0])) {
+		LOG("Sending split request: {}", request);
+		clients.sendToIp(batch.client(), request);
+	}
 
-int unbatcher::connectToClient(const std::string& ipAddress) {
-    std::unique_lock lock(ipToSocketMutex); //writeLock, since we don't want 2 ppl creating new sockets for the same client
-    int socket = ipToSocket[ipAddress]; //return the socket if connection already established
-    if (socket != 0)
-        return socket;
-
-    socket = network::connectToServerAtAddress(ipAddress, config::CLIENT_PORT, WhoIsThis_Sender_unbatcher);
-    BENCHMARK_LOG("Unbatcher connected to client: {}", ipAddress);
-    ipToSocket[ipAddress] = socket;
-    return socket;
+	TIME();
 }
 
 int main(const int argc, const char** argv) {
@@ -59,6 +55,5 @@ int main(const int argc, const char** argv) {
     }
 
     INIT_LOGGER();
-	network::ignoreClosedSocket();
 	unbatcher u {};
 }

@@ -5,6 +5,5 @@
 #include "uuid.hpp"
 
 int uuid::generate() {
-    std::lock_guard<std::mutex> lock(randomNumMutex);
     return randomInt32(rng);
 }

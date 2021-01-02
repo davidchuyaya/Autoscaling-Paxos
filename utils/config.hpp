@@ -8,14 +8,12 @@
 /**
  * Designed to be swapped out with a configuration file or DB
  */
-#include <array>
-#include <numeric>
 #include "spdlog/spdlog.h"
 
 #define INIT_LOGGER() spdlog::basic_logger_mt("paxos_log", "log.txt");spdlog::get("paxos_log")->flush_on(spdlog::level::info)
 #define BENCHMARK_LOG(...) spdlog::get("paxos_log")->info(__VA_ARGS__) //some logging is always on for benchmarks
 
-//#define DEBUG
+#define DEBUG
 #ifdef DEBUG
 #   define LOG(...) BENCHMARK_LOG(__VA_ARGS__)
 #   define TIME() LOG("Micro: {}\n", std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now().time_since_epoch()).count())
@@ -26,12 +24,16 @@
 
 namespace config {
     const static int F = 1;
-    const static int CLIENT_PORT = 10000;
-    const static int PROPOSER_PORT = 11000;
-    const static int ACCEPTOR_PORT = 12000;
-    const static int BATCHER_PORT = 13000;
-    const static int UNBATCHER_PORT = 14000;
+    const static int CLIENT_PORT_FOR_UNBATCHERS = 10000;
+    const static int PROPOSER_PORT_FOR_BATCHERS = 11000;
+    const static int PROPOSER_PORT_FOR_PROXY_LEADERS = 11100;
+    const static int PROPOSER_PORT_FOR_PROPOSERS = 11200;
+    const static int ACCEPTOR_PORT_FOR_PROXY_LEADERS = 12000;
+    const static int BATCHER_PORT_FOR_CLIENTS = 13000;
+    const static int UNBATCHER_PORT_FOR_PROXY_LEADERS = 14000;
+    const static int MATCHMAKER_PORT_FOR_PROPOSERS = 15000;
     const static int SERVER_MAX_CONNECTIONS = 200;
+    const static int ZMQ_NUM_IO_THREADS = 8;
 
     const static inline std::string ENV_ANNA_ROUTING_NAME = "ANNA_ROUTING";
     const static inline std::string ENV_IP_NAME = "IP";
@@ -49,7 +51,8 @@ namespace config {
 	const static inline std::string AWS_AMI = std::getenv(ENV_AWS_AMI_NAME.c_str());
 	const static inline std::string AWS_S3_BUCKET = std::getenv(ENV_AWS_S3_BUCKET_NAME.c_str());
 
-	const static int TCP_RETRY_TIMEOUT_SEC = 10;
+
+	const static int ZMQ_POLL_TIMEOUT_SEC = 5;
     const static int HEARTBEAT_TIMEOUT_SEC = 20; // this - HEARTBEAT_SLEEP_SEC = time allowed between message send & receive
     const static int HEARTBEAT_SLEEP_SEC = 5;
     const static int BATCHER_TIMEOUT_SEC = 5;

@@ -11,7 +11,6 @@
 #include <functional>
 #include <optional>
 #include <thread>
-
 #include "client/kvs_client.hpp"
 #include "two_p_set.hpp"
 #include "../../utils/config.hpp"
