@@ -128,17 +128,18 @@ void network::checkTimers(const time_t now) {
 	if (timers.empty())
 		return;
 	while (true) {
-		const timerInfo& next = timers.top();
+		timerInfo next = timers.top();
 		if (next.expiry > now) //found the first timer that didn't expire
 			return;
 
-		LOG("Timer triggered: secondsInterval = {}", next.secondsInterval);
+		LOG("Timer triggered: expiry = {}, secondsInterval = {}", next.expiry, next.secondsInterval);
 		next.function(now);
 		timers.pop();
 
 		//update expiry, push back into priority queue if it's a repeating timer
 		if (!next.repeating)
 			continue;
+		LOG("Timer rescheduled: new expiry = {}", now + next.secondsInterval);
 		timerInfo updatedNext {next.function, now + next.secondsInterval, next.secondsInterval, next.repeating};
 		timers.push(updatedNext);
 	}
