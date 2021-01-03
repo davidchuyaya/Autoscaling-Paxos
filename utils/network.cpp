@@ -17,19 +17,19 @@ void network::poll() {
 		//Note: If we use a for-each loop instead, then we cannot add sockets along the way
 		for (int i = 0; i < pollItems.size(); ++i) {
 			if (pollItems[i].revents & ZMQ_POLLIN) {
-				auto receiver = sockets[i];
+				std::shared_ptr<socketInfo> receiver = sockets[i];
 
-				std::string senderAddress;
 				if (receiver->isServer) {
-					receiver->socket.recv(&message); //servers will receive the sender's address first
-					senderAddress = zmqMessageToString(message);
+					while (receiver->socket.recv(&message, ZMQ_DONTWAIT) > 0) {  //servers will receive the sender's address first
+						std::string senderAddress = zmqMessageToString(message);
+						receiver->socket.recv(&message);
+						handlers[receiver->type](senderAddress, zmqMessageToString(message), now);
+					}
 				}
-				else
-					senderAddress = receiver->senderAddress;
-
-				//TODO might be more performant to set DONTWAIT = true, then recv until we hit an error
-				receiver->socket.recv(&message);
-				handlers[receiver->type](senderAddress, zmqMessageToString(message), now);
+				else {
+					while (receiver->socket.recv(&message, ZMQ_DONTWAIT) > 0)
+						handlers[receiver->type](receiver->senderAddress, zmqMessageToString(message), now);
+				}
 			}
 		}
 
@@ -128,7 +128,7 @@ void network::checkTimers(const time_t now) {
 	if (timers.empty())
 		return;
 	while (true) {
-		timerInfo next = timers.top();
+		timerInfo next = timers.top(); //TODO this copies the entire function. Make pointer based?
 		if (next.expiry > now) //found the first timer that didn't expire
 			return;
 
@@ -140,6 +140,7 @@ void network::checkTimers(const time_t now) {
 		if (!next.repeating)
 			continue;
 		LOG("Timer rescheduled: new expiry = {}", now + next.secondsInterval);
+		//TODO this copies the entire function each time, which is pretty expensive. How do I make it pointer-based?
 		timerInfo updatedNext {next.function, now + next.secondsInterval, next.secondsInterval, next.repeating};
 		timers.push(updatedNext);
 	}
