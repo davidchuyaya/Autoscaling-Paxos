@@ -23,7 +23,6 @@ proxy_leader::proxy_leader() {
 		ProposerToAcceptor proposerToAcceptor;
 		proposerToAcceptor.ParseFromString(payload);
 		listenToProposer(proposerToAcceptor, address);
-		proposerToAcceptor.Clear();
 	});
 	proposers->connectToNewMembers({{"54.219.37.153", "13.52.215.70"},{}}, 0); //TODO add new members with anna
 	proposers->startHeartbeater();

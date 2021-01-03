@@ -25,7 +25,6 @@ unbatcher::unbatcher() {
 		Batch batch;
 		batch.ParseFromString(payload);
 		listenToProxyLeaders(batch);
-		batch.Clear();
 	});
 	proxyLeaders->startHeartbeater();
 

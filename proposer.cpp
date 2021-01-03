@@ -22,7 +22,9 @@ proposer::proposer(const int id, const int numAcceptorGroups) : id(id), numAccep
 	},[](const std::string& address, const time_t now) {
 		BENCHMARK_LOG("ERROR??: Proposer disconnected from proposer at {}", address);
 	}, [&](const std::string& address, const std::string& payload, const time_t now) {
-		listenToProposer();
+		Ballot leaderBallot;
+		leaderBallot.ParseFromString(payload);
+		listenToProposer(leaderBallot);
 	});
 	proposers->connectToNewMembers({{"54.219.37.153", "13.52.215.70"},{}}, 0); //TODO add new members with anna
 	//we don't talk to other proposers through the server port
@@ -40,7 +42,6 @@ proposer::proposer(const int id, const int numAcceptorGroups) : id(id), numAccep
 		ProxyLeaderToProposer proxyLeaderToProposer;
 		proxyLeaderToProposer.ParseFromString(payload);
 		listenToProxyLeader(proxyLeaderToProposer);
-		proxyLeaderToProposer.Clear();
 	});
 
 	batchers = new server_component(zmqNetwork, config::PROPOSER_PORT_FOR_BATCHERS, Batcher,
@@ -50,7 +51,6 @@ proposer::proposer(const int id, const int numAcceptorGroups) : id(id), numAccep
 		Batch batch;
 		batch.ParseFromString(payload);
 		listenToBatcher(batch);
-		batch.Clear();
 	});
 
 	acceptorGroupIds.emplace_back("1"); //TODO add new acceptor groups with anna

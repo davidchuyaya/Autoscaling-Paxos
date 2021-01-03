@@ -18,7 +18,6 @@ acceptor::acceptor(std::string&& acceptorGroupId) :acceptorGroupId(acceptorGroup
 		ProposerToAcceptor proposerToAcceptor;
 		proposerToAcceptor.ParseFromString(payload);
 		listenToProxyLeaders(address, proposerToAcceptor);
-		proposerToAcceptor.Clear();
 	});
 
 	zmqNetwork->poll();
