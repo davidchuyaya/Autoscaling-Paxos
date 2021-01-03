@@ -17,16 +17,17 @@ unbatcher::unbatcher() {
 		BENCHMARK_LOG("ERROR??: Client at {} sent unbatcher --{}--", address, payload);
 	});
 
-
 	proxyLeaders = new server_component(zmqNetwork, config::UNBATCHER_PORT_FOR_PROXY_LEADERS, ProxyLeader,
-	                              [](const std::string& address, const time_t now) {
+	                              [&](const std::string& address, const time_t now) {
 		BENCHMARK_LOG("Proxy leader from {} connected to unbatcher", address);
+		proxyLeaders->sendToIp(address, ""); //send first heartbeat
 	}, [&](const std::string& address, const std::string& payload, const time_t now) {
 		Batch batch;
 		batch.ParseFromString(payload);
 		listenToProxyLeaders(batch);
 		batch.Clear();
 	});
+	proxyLeaders->startHeartbeater();
 
 	zmqNetwork->poll();
 }

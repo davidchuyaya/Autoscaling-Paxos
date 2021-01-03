@@ -14,8 +14,8 @@
 
 class server_component: public component {
 public:
-	server_component(network* zmqNetwork, int port, const ComponentType& type,
-				  const onConnectHandler& onConnect, const network::messageHandler& listener);
+	server_component(network* zmqNetwork, int port, ComponentType type, const onConnectHandler& onConnect,
+				  const network::messageHandler& listener);
 	void sendToIp(const std::string& ipAddress, const std::string& payload) override;
 	void broadcast(const std::string& payload) override;
 	int numConnections() const override;
@@ -23,6 +23,8 @@ public:
 private:
 	std::shared_ptr<socketInfo> serverSocket;
 	std::unordered_set<std::string> clientAddresses;
+	const onConnectHandler onConnect;
+	const network::messageHandler listener;
 };
 
 

@@ -23,10 +23,10 @@ public:
 	const bool isServer;
 	const std::string senderAddress; //not set if this is a server socket
 
-	static socketInfo serverSocket(zmq::context_t& context,  const ComponentType& type){
+	static socketInfo serverSocket(zmq::context_t& context, const ComponentType type){
 		return socketInfo(context, ZMQ_ROUTER, type, true);
 	}
-	static socketInfo clientSocket(zmq::context_t& context, const ComponentType& type, const std::string& senderAddress){
+	static socketInfo clientSocket(zmq::context_t& context, const ComponentType type, const std::string& senderAddress){
 		return socketInfo(context, ZMQ_DEALER, type, false, senderAddress);
 	}
 private:

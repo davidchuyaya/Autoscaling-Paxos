@@ -4,17 +4,17 @@
 
 #include "server_component.hpp"
 
-server_component::server_component(network* zmqNetwork, int port, const ComponentType& type,
+server_component::server_component(network* zmqNetwork, int port, const ComponentType type,
                                    const onConnectHandler& onConnect,
                                    const network::messageHandler& listener)
-                                   : component(zmqNetwork) {
+                                   : component(zmqNetwork), onConnect(onConnect), listener(listener) {
 	zmqNetwork->addHandler(type,[&](const std::string& address, const std::string& payload, const time_t now) {
 		if (!isConnected(address)) {
 			//new connection
 			clientAddresses.emplace(address);
-			onConnect(address, now);
+			this->onConnect(address, now); //store functions into variables so they can still be used when stack frame is cleared
 		}
-		listener(address, payload, now);
+		this->listener(address, payload, now);
 	});
 	serverSocket = zmqNetwork->startServerAtPort(port, type);
 }

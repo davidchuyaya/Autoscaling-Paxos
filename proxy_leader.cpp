@@ -14,8 +14,9 @@ proxy_leader::proxy_leader() {
 	zmqNetwork = new network();
 
 	proposers = new client_component(zmqNetwork, config::PROPOSER_PORT_FOR_PROXY_LEADERS, Proposer,
-	                           [](const std::string& address, const time_t now) {
+	                           [&](const std::string& address, const time_t now) {
 		BENCHMARK_LOG("Proxy leader connected to proposer at {}", address);
+		proposers->sendToIp(address, ""); //send first heartbeat
 	},[](const std::string& address, const time_t now) {
 		BENCHMARK_LOG("ERROR??: Proposer disconnected from proposer at {}", address);
 	}, [&](const std::string& address, const std::string& payload, const time_t now) {

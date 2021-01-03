@@ -4,9 +4,7 @@
 
 #include "client_component.hpp"
 
-#include <utility>
-
-client_component::client_component(network* zmqNetwork, int port, const ComponentType& type,
+client_component::client_component(network* zmqNetwork, int port, const ComponentType type,
 								   const onConnectHandler& onConnect, const onConnectHandler& onDisconnect,
                                    const network::messageHandler& listener)
                                    : component(zmqNetwork), port(port), type(type), onConnect(onConnect),
@@ -23,8 +21,6 @@ void client_component::connectToNewMembers(const two_p_set& newMembers, const ti
 	for (const std::string& ip : updates.getObserved()) {
 		if (ip == config::IP_ADDRESS) //Don't connect to yourself
 			continue;
-
-		LOG("Connecting to new member: {}", ip);
 		sockets[ip] = zmqNetwork->connectToAddress(ip, port, type);
 		onConnect(ip, now);
 	}

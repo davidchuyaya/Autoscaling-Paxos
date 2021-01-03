@@ -18,8 +18,9 @@ batcher::batcher() {
 	proposers->connectToNewMembers({{"54.219.37.153", "13.52.215.70"},{}}, 0); //TODO add new members with anna
 
 	clients = new server_component(zmqNetwork, config::BATCHER_PORT_FOR_CLIENTS, Client,
-						  [](const std::string& address, const time_t now) {
+						  [&](const std::string& address, const time_t now) {
 		BENCHMARK_LOG("Client from {} connected to batcher", address);
+		clients->sendToIp(address, ""); //send first heartbeat
 	}, [&](const std::string& address, const std::string& payload, const time_t now) {
 		LOG("Received --{}-- from client {}", payload, address);
 		TIME();

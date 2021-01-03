@@ -15,7 +15,7 @@
 
 class client_component: public component {
 public:
-	client_component(network* zmqNetwork, int port, const ComponentType& type, const onConnectHandler& onConnect,
+	client_component(network* zmqNetwork, int port, ComponentType type, const onConnectHandler& onConnect,
 				  const onConnectHandler& onDisconnect, const network::messageHandler& listener);
 	void connectToNewMembers(const two_p_set& newMembers, time_t now);
 	void removeConnection(const std::string& ipAddress, time_t now);

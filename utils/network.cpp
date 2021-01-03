@@ -29,7 +29,6 @@ void network::poll() {
 
 				//TODO might be more performant to set DONTWAIT = true, then recv until we hit an error
 				receiver->socket.recv(&message);
-				printf("Message: %s\n", message.str().c_str());
 				handlers[receiver->type](senderAddress, zmqMessageToString(message), now);
 			}
 		}
@@ -126,6 +125,8 @@ void network::removeClosedSockets() {
 }
 
 void network::checkTimers(const time_t now) {
+	if (timers.empty())
+		return;
 	while (true) {
 		const timerInfo& next = timers.top();
 		if (next.expiry > now) //found the first timer that didn't expire
@@ -138,7 +139,7 @@ void network::checkTimers(const time_t now) {
 		//update expiry, push back into priority queue if it's a repeating timer
 		if (!next.repeating)
 			continue;
-		timerInfo updatedNext {next.function, now + next.secondsInterval, next.secondsInterval};
+		timerInfo updatedNext {next.function, now + next.secondsInterval, next.secondsInterval, next.repeating};
 		timers.push(updatedNext);
 	}
 }
