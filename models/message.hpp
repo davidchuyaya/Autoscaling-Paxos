@@ -22,6 +22,7 @@ namespace message {
     ProxyLeaderToProposer createProxyP2B(int messageId, const std::string& acceptorGroupId, const Ballot& highestBallot,
                                          int slot);
     Batch createBatchMessage(const std::string& ipAddress, const std::string& requests);
+	Ballot createIamLeader(int id, int ballotNum);
 }
 
 #endif //AUTOSCALING_PAXOS_MESSAGE_HPP

@@ -83,3 +83,10 @@ Batch message::createBatchMessage(const std::string& ipAddress, const std::strin
 	batch.set_request(requests);
 	return batch;
 }
+
+Ballot message::createIamLeader(int id, int ballotNum) {
+	Ballot ballot;
+	ballot.set_id(id);
+	ballot.set_ballotnum(ballotNum);
+	return ballot;
+}

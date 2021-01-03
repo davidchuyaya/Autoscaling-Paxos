@@ -36,6 +36,7 @@ private:
 	server_component* batchers;
 
 	int ballotNum = 0; // must be at least 1 the first time it is sent
+	Ballot ballot;
     bool isLeader = false;
     time_t lastLeaderHeartbeat = 0;
 
@@ -53,7 +54,7 @@ private:
     void listenToAnna(const std::string& key, const two_p_set& twoPSet);
     void listenToBatcher(const Batch& payload);
     void listenToProxyLeader(const ProxyLeaderToProposer& payload);
-    void listenToProposer();
+    void listenToProposer(const Ballot& leaderBallot);
 
     /**
      * Broadcast p1a to acceptors to become the leader.

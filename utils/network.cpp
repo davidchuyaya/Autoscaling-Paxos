@@ -132,7 +132,7 @@ void network::checkTimers(const time_t now) {
 		if (next.expiry > now) //found the first timer that didn't expire
 			return;
 
-		LOG("Timer triggered: expiry = {}", next.expiry);
+		LOG("Timer triggered: secondsInterval = {}", next.secondsInterval);
 		next.function(now);
 		timers.pop();
 

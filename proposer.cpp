@@ -60,7 +60,7 @@ proposer::proposer(const int id, const int numAcceptorGroups) : id(id), numAccep
 		//send heartbeats
 		if (isLeader) {
 			LOG("I am leader, sending at time: {}", std::asctime(std::localtime(&now)));
-			proposers->broadcast("");
+			proposers->broadcast(ballot.SerializeAsString());
 		}
 		//ID-based timeout so a leader doesn't have much competition
 		else if (difftime(now, lastLeaderHeartbeat) > config::HEARTBEAT_TIMEOUT_SEC + id * config::ID_SCOUT_DELAY_MULTIPLIER) {
@@ -133,10 +133,12 @@ void proposer::listenToProxyLeader(const ProxyLeaderToProposer& payload) {
     }
 }
 
-void proposer::listenToProposer() {
-    LOG("Received leader heartbeat for time: {}", std::asctime(std::localtime(&lastLeaderHeartbeat)));
+void proposer::listenToProposer(const Ballot& leaderBallot) {
+	if (Log::isBallotGreaterThan(ballot, leaderBallot))
+		return;
     time(&lastLeaderHeartbeat); // store the time we received the heartbeat
-    noLongerLeader();
+	LOG("Received leader heartbeat for time: {}", std::asctime(std::localtime(&lastLeaderHeartbeat)));
+	noLongerLeader();
 }
 
 void proposer::sendScouts() {
@@ -179,7 +181,8 @@ void proposer::handleP1B(const ProxyLeaderToProposer& message) {
     //leader election complete
     isLeader = true;
     LOG("I am leader!");
-    proposers->broadcast("");
+	ballot = message.ballot();
+    proposers->broadcast(ballot.SerializeAsString());
 
     mergeLogs();
 }

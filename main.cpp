@@ -35,8 +35,9 @@ paxos::paxos(const int delay, const int numClients, const int numBatchers, const
 	});
 
 	//send messages to batchers after delay
-	zmqNetwork->addTimer([&](const time_t t) {
+	zmqNetwork->addTimer([&, numClients](const time_t t) {
 		LOG("Num batchers at start of benchmark: {}", batchers->numConnections());
+		BENCHMARK_LOG("Begin benchmark");
 		for (int client = 0; client < numClients; client++) {
 			//payload = client ID
 			const std::string& payload = std::to_string(client);
