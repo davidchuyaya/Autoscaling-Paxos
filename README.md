@@ -259,6 +259,41 @@ scripts/install_protobuf.sh
 Continue with the instructions above to create your custom AMI. Make sure to change **Shutdown behavior** to **Terminate**.
 Record your custom AMI address. We will refer to it as `<your AMI>` from now on.
 
+## Metrics
+We'll use Prometheus + Grafana to scrape metrics from each of our nodes. Launch a Ubuntu EC2 node in the same region, then run the following to install both and launch Grafana:
+```shell
+wget -q -O - https://packages.grafana.com/gpg.key | sudo apt-key add -
+echo "deb https://packages.grafana.com/oss/deb stable main" | sudo tee -a /etc/apt/sources.list.d/grafana.list
+sudo apt-get update
+sudo apt-get install -y prometheus apt-transport-https software-properties-common wget grafana
+
+sudo service grafana-server start
+```
+Prometheus needs to be reconfigured to find the EC2 nodes on-the-fly. Replace `/etc/prometheus/prometheus.yml` with the following, substituting values as necessary:
+```yaml
+global:
+  scrape_interval: 5s
+  evaluation_interval: 5s
+
+scrape_configs:
+  - job_name: 'paxos'
+    ec2_sd_configs:
+      - region: us-west-1
+        access_key: <AWS_ACCESS_KEY_ID>
+        secret_key: <AWS_SECRET_ACCESS_KEY>
+        port: 16000
+        # how often we check for new nodes
+        refresh_interval: 5s
+    relabel_configs:
+      # Only monitor instances with our AMI
+      - source_labels: [__meta_ec2_ami]
+        regex: <your AMI>
+        action: keep
+      # Use the instance ID as the instance label
+      - source_labels: [__meta_ec2_instance_id]
+        target_label: instance
+```
+Then run `sudo systemctl restart prometheus` for the configuration to go live.
 
 TODO
 

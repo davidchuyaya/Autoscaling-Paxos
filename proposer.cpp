@@ -14,6 +14,8 @@ proposer::proposer(const int id, const int numAcceptorGroups) : id(id), numAccep
     //wait for acceptor group IDs before starting phase 1 or phase 2. All batches will be dropped until then.
 //    acceptorCV.wait(lock, [&]{ return acceptorGroupIds.size() >= numAcceptorGroups; });
 //    BENCHMARK_LOG("Acceptor group threshold met\n");
+	metricsVars = metrics::createMetricsVars({metrics::NumProcessedMessages},{},{},{});
+
 	zmqNetwork = new network();
 
 	proposers = new client_component(zmqNetwork, config::PROPOSER_PORT_FOR_PROPOSERS, Proposer,
@@ -104,6 +106,8 @@ void proposer::listenToBatcher(const Batch& payload) {
     LOG("Received batch request: {}", payload.ShortDebugString());
     if (!isLeader)
         return;
+
+    metricsVars->counters[metrics::NumProcessedMessages]->Increment();
 
 	TIME();
     int slot;

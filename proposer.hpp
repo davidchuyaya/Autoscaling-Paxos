@@ -15,6 +15,7 @@
 #include "message.pb.h"
 #include "utils/network.hpp"
 #include "utils/config.hpp"
+#include "utils/metrics.hpp"
 #include "models/message.hpp"
 #include "models/log.hpp"
 #include "models/client_component.hpp"
@@ -28,6 +29,8 @@ public:
 private:
     const int id; // 0 indexed, no gaps
     const int numAcceptorGroups;
+
+    std::shared_ptr<metrics::variables> metricsVars;
     anna* annaClient;
 	network* zmqNetwork;
 	client_component* proposers;

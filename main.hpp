@@ -14,6 +14,7 @@
 #include "utils/config.hpp"
 #include "utils/network.hpp"
 #include "utils/uuid.hpp"
+#include "utils/metrics.hpp"
 #include "aws/scaling.hpp"
 
 class paxos {

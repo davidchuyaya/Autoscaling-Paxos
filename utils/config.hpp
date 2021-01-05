@@ -32,8 +32,9 @@ namespace config {
     const static int BATCHER_PORT_FOR_CLIENTS = 13000;
     const static int UNBATCHER_PORT_FOR_PROXY_LEADERS = 14000;
     const static int MATCHMAKER_PORT_FOR_PROPOSERS = 15000;
+    const static int PROMETHEUS_PORT = 16000;
     const static int SERVER_MAX_CONNECTIONS = 200;
-    const static int ZMQ_NUM_IO_THREADS = 7;
+    const static int ZMQ_NUM_IO_THREADS = 6; //8 - 1 prometheus thread - 1 main thread
 
     const static inline std::string ENV_ANNA_ROUTING_NAME = "ANNA_ROUTING";
     const static inline std::string ENV_IP_NAME = "IP";

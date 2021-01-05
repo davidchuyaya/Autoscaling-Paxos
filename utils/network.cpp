@@ -127,10 +127,7 @@ void network::removeClosedSockets() {
 void network::checkTimers(const time_t now) {
 	if (timers.empty())
 		return;
-	while (true) {
-		if (timers.top().expiry > now) //found the first timer that didn't expire
-			return;
-
+	while (timers.top().expiry <= now) {
 		const timerInfo& next = timers.top();
 		LOG("Timer triggered: expiry = {}, secondsInterval = {}", next.expiry, next.secondsInterval);
 		next.function(now);
