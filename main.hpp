@@ -34,7 +34,6 @@ private:
 	std::unordered_map<std::string, std::vector<string>> instanceIdsOfAcceptors;
 	std::vector<string> instanceIdsOfUnbatchers;
 
-	std::shared_ptr<metrics::variables> metricsVars;
 	anna* annaClient;
 	network* zmqNetwork;
 	heartbeat_component* batcherHeartbeat;
