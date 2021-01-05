@@ -128,20 +128,20 @@ void network::checkTimers(const time_t now) {
 	if (timers.empty())
 		return;
 	while (true) {
-		timerInfo next = timers.top(); //TODO this copies the entire function. Make pointer based?
-		if (next.expiry > now) //found the first timer that didn't expire
+		if (timers.top().expiry > now) //found the first timer that didn't expire
 			return;
 
+		const timerInfo& next = timers.top();
 		LOG("Timer triggered: expiry = {}, secondsInterval = {}", next.expiry, next.secondsInterval);
 		next.function(now);
-		timers.pop();
 
 		//update expiry, push back into priority queue if it's a repeating timer
-		if (!next.repeating)
-			continue;
-		LOG("Timer rescheduled: new expiry = {}", now + next.secondsInterval);
-		//TODO this copies the entire function each time, which is pretty expensive. How do I make it pointer-based?
-		timerInfo updatedNext {next.function, now + next.secondsInterval, next.secondsInterval, next.repeating};
-		timers.push(updatedNext);
+		if (next.repeating) {
+			LOG("Timer rescheduled: new expiry = {}", now + next.secondsInterval);
+			timerInfo updatedNext {next.function, now + next.secondsInterval, next.secondsInterval, next.repeating};
+			timers.push(updatedNext);
+		}
+
+		timers.pop(); //if we pop earlier, the pointer to "next" becomes invalid
 	}
 }
