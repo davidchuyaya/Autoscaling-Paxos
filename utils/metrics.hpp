@@ -17,6 +17,9 @@ namespace metrics {
 	enum Counter {
 		NumProcessedMessages
 	};
+	const static std::unordered_map<Counter, std::string> counterNames = {
+			{NumProcessedMessages, "num_processed_messages"}
+	};
 	enum Gauge {
 
 	};

@@ -36,9 +36,10 @@ namespace config {
     const static int SERVER_MAX_CONNECTIONS = 200;
     const static int ZMQ_NUM_IO_THREADS = 6; //8 - 1 prometheus thread - 1 main thread
 
-    const static inline std::string ENV_ANNA_ROUTING_NAME = "ANNA_ROUTING";
     const static inline std::string ENV_IP_NAME = "IP";
-    const static inline std::string ENV_ANNA_KEY_PREFIX_NAME = "ANNA_KEY_PREFIX";
+    const static inline std::string ENV_PRIVATE_IP_NAME = "PRIVATE_IP";
+	const static inline std::string ENV_ANNA_ROUTING_NAME = "ANNA_ROUTING";
+	const static inline std::string ENV_ANNA_KEY_PREFIX_NAME = "ANNA_KEY_PREFIX";
 	const static inline std::string ENV_BATCH_SIZE_NAME = "BATCH_SIZE";
 	const static inline std::string ENV_AWS_REGION_NAME = "AWS_REGION";
 	const static inline std::string ENV_AWS_AVAILABILITY_ZONE_NAME = "AWS_AVAILABILITY_ZONE";
@@ -46,7 +47,8 @@ namespace config {
 	const static inline std::string ENV_AWS_S3_BUCKET_NAME = "AWS_S3_BUCKET";
 
 	const static inline std::string IP_ADDRESS = std::getenv(ENV_IP_NAME.c_str());
-    const static inline std::string ANNA_ROUTING_ADDRESS = std::getenv(ENV_ANNA_ROUTING_NAME.c_str());
+	const static inline std::string PRIVATE_IP_ADDRESS = std::getenv(ENV_PRIVATE_IP_NAME.c_str());
+	const static inline std::string ANNA_ROUTING_ADDRESS = std::getenv(ENV_ANNA_ROUTING_NAME.c_str());
     const static inline std::string ANNA_KEY_PREFIX = std::getenv(ENV_ANNA_KEY_PREFIX_NAME.c_str());
 	const static int BATCH_SIZE = std::stoi(std::getenv(ENV_BATCH_SIZE_NAME.c_str()));
 	const static inline std::string AWS_REGION = std::getenv(ENV_AWS_REGION_NAME.c_str());

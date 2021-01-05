@@ -35,15 +35,11 @@ paxos::paxos(const int delay, const int numClients, const int numBatchers, const
 	});
 
 	//send messages to batchers after delay
-	zmqNetwork->addTimer([&, numClients](const time_t t) {
-		LOG("Num batchers at start of benchmark: {}", batchers->numConnections());
-		BENCHMARK_LOG("Begin benchmark");
-		for (int client = 0; client < numClients; client++) {
-			//payload = client ID
-			const std::string& payload = std::to_string(client);
-			batchers->sendToIp(batcherHeartbeat->nextAddress(), payload);
-		}
-	}, delay, false);
+	metricsVars = metrics::createMetricsVars({metrics::NumProcessedMessages},{},{},{});
+	zmqNetwork->addTimer([&](const time_t t) {
+		printf("Incrementing...\n");
+		metricsVars->counters[metrics::NumProcessedMessages]->Increment();
+	}, 1, true);
 
 	zmqNetwork->poll();
 

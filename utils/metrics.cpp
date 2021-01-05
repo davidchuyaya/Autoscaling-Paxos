@@ -9,7 +9,7 @@ std::shared_ptr<metrics::variables> metrics::createMetricsVars(const std::unorde
 											  const std::unordered_set<Histogram>& histograms,
 											  const std::unordered_set<Summary>& summaries) {
 	std::shared_ptr<variables> vars = std::make_shared<variables>();
-	vars->exposer = std::make_shared<prometheus::Exposer>("127.0.0.1:" +
+	vars->exposer = std::make_shared<prometheus::Exposer>(config::PRIVATE_IP_ADDRESS + ":" +
 			std::to_string(config::PROMETHEUS_PORT), 1);
 	vars->registry = std::make_shared<prometheus::Registry>();
 
@@ -24,16 +24,11 @@ std::shared_ptr<metrics::variables> metrics::createMetricsVars(const std::unorde
 
 void metrics::addCounters(std::shared_ptr<variables> vars, const std::unordered_set<Counter>& counters) {
 	for (const Counter& counter: counters) {
-		switch (counter) {
-			case NumProcessedMessages: {
-				prometheus::Family<prometheus::Counter>& family = prometheus::BuildCounter()
-						.Name("num_processed_messages")
-						.Register(*vars->registry);
-				// add a counter to the metric family
-				vars->counters[NumProcessedMessages] = &family.Add({});
-				break;
-			}
-		}
+		prometheus::Family<prometheus::Counter>& family = prometheus::BuildCounter()
+				.Name(counterNames.at(counter))
+				.Register(*vars->registry);
+		// add a counter to the metric family
+		vars->counters[counter] = &family.Add({});
 	}
 }
 

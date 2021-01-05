@@ -48,6 +48,8 @@ LINK_DIRECTORIES(${ZEROMQ_LINK_DIRS} ${YAMLCPP_LINK_DIRS})
 # End Anna things -------------------------------------------------------------
 
 ADD_SUBDIRECTORY(include/prometheus-cpp)
+SET(ENABLE_TESTING OFF)
+SET(prometheus-cpp_DIR include/prometheus-cpp/_build/deploy/usr/local/lib/cmake/prometheus-cpp)
 FIND_PACKAGE(prometheus-cpp CONFIG REQUIRED)
 
 set(PROXY_LEADERS_SRC proxy_leader.cpp proxy_leader.hpp)
