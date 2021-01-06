@@ -16,6 +16,7 @@ scripts/submodule_update.sh
 scripts/install_dependencies_for_building.sh
 scripts/download_protobuf.sh
 scripts/install_protobuf.sh
+scripts/install_prometheus.sh
 ```
 and to build, choose from
 ```shell script
@@ -132,6 +133,7 @@ export AWS_REGION=<your AWS region>
 export AWS_AVAILABILITY_ZONE=<your AWS availability zone>
 export AWS_AMI=<your AMI>
 export AWS_S3_BUCKET=<your executable S3 bucket>
+export PRIVATE_IP=$(curl http://169.254.169.254/latest/meta-data/local-ipv4)
 export IP=$(curl http://169.254.169.254/latest/meta-data/public-ipv4)
 export ANNA_KEY_PREFIX=1
 export BATCH_SIZE=40
@@ -149,7 +151,7 @@ The following steps are based on [instructions here](https://github.com/hydro-pr
 1. Buy a domain in Route53. Allow a day for it to be propagated in DNS. I followed the [instructions here](https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/domain-register.html). We'll refer to this as `<your domain>` from now on.
 2. Request EC2 vCPU autoscaling limit to be raised from 32. I'm on the west coast, so I modified the [EC2 settings here](https://us-west-1.console.aws.amazon.com/ec2/v2/home?region=us-west-1#Limits:), but you can change the region to your liking. You'd request an increase for `Lunning On-Demand All Standard (A, C, D, H, I, M, R, T, Z) instances`, on page 4, to at least 500. Allow a day for this limit increase to be approved.
 
-(Time estimate: 2 hours) Start an EC2 instance with plenty of compute power (I used a c5.2xlarge) to run the following scripts. Feel free to continue using `paxos-key.pem` from earlier for this instance.
+(Time estimate: 30 minutes) Start an EC2 instance with plenty of compute power (I used a c5.2xlarge) to run the following scripts. Feel free to continue using `paxos-key.pem` from earlier for this instance.
 
 ```shell script
 sudo apt-get update
