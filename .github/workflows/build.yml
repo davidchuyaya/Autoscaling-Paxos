@@ -26,6 +26,9 @@ jobs:
         - name: Install protobuf
           run: |
             sudo ./scripts/install_protobuf.sh
+        - name: Install prometheus
+          run: |
+            sudo ./scripts/install_prometheus.sh
         - name: Building w/ CMake
           run: |
             sudo ./scripts/build.sh
