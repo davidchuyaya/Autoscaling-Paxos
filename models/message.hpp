@@ -5,10 +5,13 @@
 #ifndef AUTOSCALING_PAXOS_MESSAGE_HPP
 #define AUTOSCALING_PAXOS_MESSAGE_HPP
 
+#include <unordered_set>
 #include <string>
+#include "anna.pb.h"
 #include "message.pb.h"
 #include "log.hpp"
 #include "../utils/uuid.hpp"
+#include "../utils/config.hpp"
 
 namespace message {
     ProposerToAcceptor createP1A(int id, int ballotNum, const std::string& acceptorGroupId);
@@ -22,7 +25,11 @@ namespace message {
     ProxyLeaderToProposer createProxyP2B(int messageId, const std::string& acceptorGroupId, const Ballot& highestBallot,
                                          int slot);
     Batch createBatchMessage(const std::string& ipAddress, const std::string& requests);
-	Ballot createIamLeader(int id, int ballotNum);
+
+	KeyRequest createAnnaPutRequest(const std::string& prefixedKey, const std::string& payload);
+	KeyRequest createAnnaGetRequest(const std::string& prefixedKey);
+	KeyAddressRequest createAnnaKeyAddressRequest(const std::string& prefixedKey);
+	SetValue createAnnaSet(const std::unordered_set<std::string>& set);
 }
 
 #endif //AUTOSCALING_PAXOS_MESSAGE_HPP

@@ -5,13 +5,15 @@
 #include "proxy_leader.hpp"
 
 proxy_leader::proxy_leader() {
-//	annaClient = anna::readWritable({{config::KEY_PROXY_LEADERS, config::IP_ADDRESS}},
-//					   [&](const std::string& key, const two_p_set& twoPSet) {
-//		listenToAnna(key, twoPSet);
-//	});
-//	annaClient->subscribeTo(config::KEY_PROPOSERS);
-//	annaClient->subscribeTo(config::KEY_UNBATCHERS);
 	zmqNetwork = new network();
+
+	annaClient = new anna(zmqNetwork, {{config::KEY_PROXY_LEADERS, config::IP_ADDRESS}},
+					   [&](const std::string& key, const two_p_set& twoPSet, const time_t now) {
+		listenToAnna(key, twoPSet, now);
+	});
+	annaClient->subscribeTo(config::KEY_PROPOSERS);
+	annaClient->subscribeTo(config::KEY_ACCEPTOR_GROUPS);
+	annaClient->subscribeTo(config::KEY_UNBATCHERS);
 
 	proposers = new client_component(zmqNetwork, config::PROPOSER_PORT_FOR_PROXY_LEADERS, Proposer,
 	                           [&](const std::string& address, const time_t now) {
@@ -24,7 +26,6 @@ proxy_leader::proxy_leader() {
 		proposerToAcceptor.ParseFromString(payload);
 		listenToProposer(proposerToAcceptor, address);
 	});
-	proposers->connectToNewMembers({{"54.219.37.153", "13.52.215.70"},{}}, 0); //TODO add new members with anna
 	proposers->startHeartbeater();
 
 	unbatcherHeartbeat = new heartbeat_component(zmqNetwork);
@@ -38,27 +39,37 @@ proxy_leader::proxy_leader() {
 	}, [&](const std::string& address, const std::string& payload, const time_t now) {
 		unbatcherHeartbeat->addHeartbeat(address, now);
 	});
-	unbatchers->connectToNewMembers({{"54.153.68.114", "54.215.93.58"},{}}, 0); //TODO add new members with anna
-
-	processNewAcceptorGroup("1"); //TODO add new acceptor groups with anna
-	acceptorGroups["1"]->connectToNewMembers({{"54.151.124.140", "54.215.157.62", "54.67.42.161"},{}}, 0); //TODO add new acceptors with anna
 
 	zmqNetwork->poll();
 }
 
-void proxy_leader::listenToAnna(const std::string& key, const two_p_set& twoPSet) {
-//    if (key == config::KEY_PROPOSERS) {
-//        proposers.connectAndMaybeListen(twoPSet);
-//        if (proposers.twoPsetThresholdMet())
-//	        annaClient->unsubscribeFrom(config::KEY_PROPOSERS);
-//    }
-//    else if (key == config::KEY_UNBATCHERS) {
-//        unbatchers.connectAndMaybeListen(twoPSet);
-//    }
-//    else {
-//        //must be individual acceptor groups
-//        acceptorGroups[acceptorGroupId]->connectToNewMembers(twoPSet, now);
-//    }
+void proxy_leader::listenToAnna(const std::string& key, const two_p_set& twoPSet, const time_t now) {
+    if (key == config::KEY_PROPOSERS) {
+        proposers->connectToNewMembers(twoPSet, now);
+        if (proposers->numConnections() == config::F + 1)
+	        annaClient->unsubscribeFrom(config::KEY_PROPOSERS);
+    }
+    else if (key == config::KEY_UNBATCHERS) {
+        unbatchers->connectToNewMembers(twoPSet, now);
+    }
+    else if (key == config::KEY_ACCEPTOR_GROUPS) {
+	    // merge new acceptor group IDs
+	    const two_p_set& updates = acceptorGroupIdSet.updatesFrom(twoPSet);
+	    if (updates.empty())
+		    return;
+
+	    for (const std::string& acceptorGroupId : updates.getObserved()) {
+		    processNewAcceptorGroup(acceptorGroupId);
+	    }
+	    for (const std::string& acceptorGroupId : updates.getRemoved()) {
+		    //TODO shut down acceptor group
+	    }
+	    acceptorGroupIdSet.merge(updates);
+    }
+    else {
+	    //must be individual acceptor groups
+	    acceptorGroups[key]->connectToNewMembers(twoPSet, now);
+    }
 }
 
 void proxy_leader::processNewAcceptorGroup(const std::string& acceptorGroupId) {
@@ -71,7 +82,7 @@ void proxy_leader::processNewAcceptorGroup(const std::string& acceptorGroupId) {
 				if (acceptorGroups[acceptorGroupId]->numConnections() == 2*config::F+1) {
 					BENCHMARK_LOG("Proxy leader fully connected to acceptor group {}", acceptorGroupId);
 					connectedAcceptorGroups.emplace(acceptorGroupId);
-//					annaClient->unsubscribeFrom(acceptorGroupId);
+					annaClient->unsubscribeFrom(acceptorGroupId);
 				}
 			}, [](const std::string& address, const time_t now) {
 				BENCHMARK_LOG("ERROR??: Proxy leader disconnected from acceptor at {}", address);
@@ -81,7 +92,7 @@ void proxy_leader::processNewAcceptorGroup(const std::string& acceptorGroupId) {
 				listenToAcceptor(acceptorToProxyLeader);
 			});
 
-//	annaClient->subscribeTo(acceptorGroupId); //find the IP addresses of acceptors in this group
+	annaClient->subscribeTo(acceptorGroupId); //find the IP addresses of acceptors in this group
 }
 
 void proxy_leader::listenToProposer(const ProposerToAcceptor& payload, const std::string& ipAddress) {

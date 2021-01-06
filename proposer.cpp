@@ -4,19 +4,16 @@
 #include "proposer.hpp"
 
 proposer::proposer(const int id, const int numAcceptorGroups) : id(id), numAcceptorGroups(numAcceptorGroups) {
-//    annaClient = anna::readWritable({{config::KEY_PROPOSERS, config::IP_ADDRESS}},
-//                    [&](const std::string& key, const two_p_set& twoPSet) {
-//    	listenToAnna(key, twoPSet);
-//    });
-//	annaClient->subscribeTo(config::KEY_PROPOSERS);
-//	annaClient->subscribeTo(config::KEY_ACCEPTOR_GROUPS);
-
-    //wait for acceptor group IDs before starting phase 1 or phase 2. All batches will be dropped until then.
-//    acceptorCV.wait(lock, [&]{ return acceptorGroupIds.size() >= numAcceptorGroups; });
-//    BENCHMARK_LOG("Acceptor group threshold met\n");
 	metricsVars = metrics::createMetricsVars({metrics::NumProcessedMessages},{},{},{});
 
 	zmqNetwork = new network();
+
+    annaClient = new anna(zmqNetwork, {{config::KEY_PROPOSERS, config::IP_ADDRESS}},
+                    [&](const std::string& key, const two_p_set& twoPSet, const time_t now) {
+    	listenToAnna(key, twoPSet, now);
+    });
+	annaClient->subscribeTo(config::KEY_PROPOSERS);
+	annaClient->subscribeTo(config::KEY_ACCEPTOR_GROUPS);
 
 	proposers = new client_component(zmqNetwork, config::PROPOSER_PORT_FOR_PROPOSERS, Proposer,
 							[](const std::string& address, const time_t now) {
@@ -28,7 +25,6 @@ proposer::proposer(const int id, const int numAcceptorGroups) : id(id), numAccep
 		leaderBallot.ParseFromString(payload);
 		listenToProposer(leaderBallot);
 	});
-	proposers->connectToNewMembers({{"54.219.37.153", "13.52.215.70"},{}}, 0); //TODO add new members with anna
 	//we don't talk to other proposers through the server port
 	zmqNetwork->startServerAtPort(config::PROPOSER_PORT_FOR_PROPOSERS, Proposer);
 
@@ -55,8 +51,6 @@ proposer::proposer(const int id, const int numAcceptorGroups) : id(id), numAccep
 		listenToBatcher(batch);
 	});
 
-	acceptorGroupIds.emplace_back("1"); //TODO add new acceptor groups with anna
-
 	//leader loop
 	zmqNetwork->addTimer([&](const time_t now) {
 		//send heartbeats
@@ -74,32 +68,30 @@ proposer::proposer(const int id, const int numAcceptorGroups) : id(id), numAccep
 	zmqNetwork->poll();
 }
 
-void proposer::listenToAnna(const std::string& key, const two_p_set& twoPSet) {
-//    if (key == config::KEY_PROPOSERS) {
-//        // connect to new proposer
-//        proposers.connectAndMaybeListen(twoPSet);
-//        if (proposers.twoPsetThresholdMet())
-//	        annaClient->unsubscribeFrom(config::KEY_PROPOSERS);
-//    } else if (key == config::KEY_ACCEPTOR_GROUPS) {
-//        // merge new acceptor group IDs
-//        const two_p_set& updates = acceptorGroupIdSet.updatesFrom(twoPSet);
-//        if (updates.empty())
-//	        return;
-//
-//        for (const std::string& acceptorGroupId : updates.getObserved()) {
-//            acceptorGroupIds.emplace_back(acceptorGroupId);
-//            //TODO if leader, attempt to win matchmakers with new configuration
-//        }
-//        for (const std::string& acceptorGroupId : updates.getRemoved()) {
-//            acceptorGroupIds.erase(std::remove(acceptorGroupIds.begin(), acceptorGroupIds.end(), acceptorGroupId), acceptorGroupIds.end());
-//        }
-//        acceptorGroupIdSet.merge(updates);
-//
-//        //awaken main thread if we're past the threshold
-//        if (acceptorGroupIds.size() >= numAcceptorGroups) {
-//	        annaClient->unsubscribeFrom(config::KEY_ACCEPTOR_GROUPS);
-//        }
-//    }
+void proposer::listenToAnna(const std::string& key, const two_p_set& twoPSet, const time_t now) {
+    if (key == config::KEY_PROPOSERS) {
+        // connect to new proposer
+        proposers->connectToNewMembers(twoPSet, now);
+        if (proposers->numConnections() == config::F) //heard from all proposers (not f+1, since we count ourselves)
+	        annaClient->unsubscribeFrom(config::KEY_PROPOSERS);
+    } else if (key == config::KEY_ACCEPTOR_GROUPS) {
+        // merge new acceptor group IDs
+        const two_p_set& updates = acceptorGroupIdSet.updatesFrom(twoPSet);
+        if (updates.empty())
+	        return;
+
+        for (const std::string& acceptorGroupId : updates.getObserved()) {
+            acceptorGroupIds.emplace_back(acceptorGroupId);
+            //TODO if leader, attempt to win matchmakers with new configuration
+        }
+        for (const std::string& acceptorGroupId : updates.getRemoved()) {
+            acceptorGroupIds.erase(std::remove(acceptorGroupIds.begin(), acceptorGroupIds.end(), acceptorGroupId), acceptorGroupIds.end());
+        }
+        acceptorGroupIdSet.merge(updates);
+
+        if (acceptorGroupIds.size() >= numAcceptorGroups)
+	        annaClient->unsubscribeFrom(config::KEY_ACCEPTOR_GROUPS);
+    }
 }
 
 void proposer::listenToBatcher(const Batch& payload) {

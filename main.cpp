@@ -10,6 +10,11 @@ paxos::paxos(const int delay, const int numClients, const int numBatchers, const
 
 	zmqNetwork = new network();
 
+	annaClient = new anna(zmqNetwork, {}, [&](const std::string& key, const two_p_set& twoPSet, const time_t now) {
+		batchers->connectToNewMembers(twoPSet, now);
+    });
+	annaClient->subscribeTo(config::KEY_BATCHERS);
+
 	batcherHeartbeat = new heartbeat_component(zmqNetwork);
 	batchers = new client_component(zmqNetwork, config::BATCHER_PORT_FOR_CLIENTS, Batcher,
 						   [&](const std::string& address, const time_t now) {
@@ -23,7 +28,6 @@ paxos::paxos(const int delay, const int numClients, const int numBatchers, const
 		LOG("Batcher {} heartbeated", address);
 		batcherHeartbeat->addHeartbeat(address, now);
 	});
-	batchers->connectToNewMembers({{"13.57.245.102", "54.183.214.9"},{}}, 0); //TODO add new members with anna
 
 	unbatchers = new server_component(zmqNetwork, config::CLIENT_PORT_FOR_UNBATCHERS, Unbatcher,
 							 [](const std::string& address, const time_t now) {
@@ -46,11 +50,6 @@ paxos::paxos(const int delay, const int numClients, const int numBatchers, const
 	}, delay, false);
 
 	zmqNetwork->poll();
-
-//    annaClient = anna::readWritable({}, [&](const std::string& key, const two_p_set& twoPSet) {
-//        batchers.connectAndMaybeListen(twoPSet);
-//    });
-//	annaClient->subscribeTo(config::KEY_BATCHERS);
 }
 
 void paxos::startCluster() {

@@ -7,6 +7,14 @@
 batcher::batcher() {
 	zmqNetwork = new network();
 
+    annaClient = new anna(zmqNetwork, {{config::KEY_BATCHERS, config::IP_ADDRESS}},
+                    [&](const std::string& key, const two_p_set& twoPSet, const time_t now) {
+    	proposers->connectToNewMembers(twoPSet, now);
+    	if (proposers->numConnections() == config::F + 1) //heard from all proposers, don't expect change
+		    annaClient->unsubscribeFrom(config::KEY_PROPOSERS);
+    });
+	annaClient->subscribeTo(config::KEY_PROPOSERS);
+
 	proposers = new client_component(zmqNetwork, config::PROPOSER_PORT_FOR_BATCHERS, Proposer,
 							[](const std::string& address, const time_t now) {
 		BENCHMARK_LOG("Batcher connected to proposer at {}", address);
@@ -15,7 +23,6 @@ batcher::batcher() {
 	}, [](const std::string& address, const std::string& payload, const time_t now) {
 		LOG("ERROR: Proposer {} sent payload --{}-- to batcher", address, payload);
 	});
-	proposers->connectToNewMembers({{"54.219.37.153", "13.52.215.70"},{}}, 0); //TODO add new members with anna
 
 	clients = new server_component(zmqNetwork, config::BATCHER_PORT_FOR_CLIENTS, Client,
 						  [&](const std::string& address, const time_t now) {
@@ -39,14 +46,6 @@ batcher::batcher() {
 	}, config::BATCHER_TIMEOUT_SEC, true);
 
 	zmqNetwork->poll();
-
-//    annaClient = anna::readWritable({{config::KEY_BATCHERS, config::IP_ADDRESS}},
-//                    [&](const std::string& key, const two_p_set& twoPSet) {
-//    	proposers.connectAndMaybeListen(twoPSet);
-//    	if (proposers.twoPsetThresholdMet())
-//		    annaClient->unsubscribeFrom(config::KEY_PROPOSERS);
-//    });
-//	annaClient->subscribeTo(config::KEY_PROPOSERS);
 }
 
 void batcher::sendBatch() {

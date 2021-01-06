@@ -18,7 +18,7 @@ class unbatcher {
 public:
     explicit unbatcher();
 private:
-	anna* annaWriteOnlyClient;
+	anna* annaClient;
 	network* zmqNetwork;
 	client_component* clients;
 	server_component* proxyLeaders;

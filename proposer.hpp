@@ -54,7 +54,7 @@ private:
     std::vector<std::string> acceptorGroupIds = {};
     int nextAcceptorGroup = 0;
 
-    void listenToAnna(const std::string& key, const two_p_set& twoPSet);
+    void listenToAnna(const std::string& key, const two_p_set& twoPSet, time_t now);
     void listenToBatcher(const Batch& payload);
     void listenToProxyLeader(const ProxyLeaderToProposer& payload);
     void listenToProposer(const Ballot& leaderBallot);

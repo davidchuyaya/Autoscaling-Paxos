@@ -84,9 +84,41 @@ Batch message::createBatchMessage(const std::string& ipAddress, const std::strin
 	return batch;
 }
 
-Ballot message::createIamLeader(int id, int ballotNum) {
-	Ballot ballot;
-	ballot.set_id(id);
-	ballot.set_ballotnum(ballotNum);
-	return ballot;
+KeyRequest message::createAnnaPutRequest(const std::string& prefixedKey, const std::string& payload) {
+	KeyRequest request;
+	request.set_request_id(std::to_string(uuid::generate()));
+	request.set_response_address("tcp://" + config::IP_ADDRESS + ":" + std::to_string(config::ANNA_RESPONSE_PORT));
+	request.set_type(RequestType::PUT);
+
+	KeyTuple* tuple = request.add_tuples();
+	tuple->set_key(prefixedKey);
+	tuple->set_lattice_type(SET);
+	tuple->set_payload(payload);
+	return request;
+}
+
+KeyRequest message::createAnnaGetRequest(const std::string& prefixedKey) {
+	KeyRequest request;
+	request.set_request_id(std::to_string(uuid::generate()));
+	request.set_response_address("tcp://" + config::IP_ADDRESS + ":" + std::to_string(config::ANNA_RESPONSE_PORT));
+	request.set_type(RequestType::GET);
+
+	KeyTuple* tuple = request.add_tuples();
+	tuple->set_key(prefixedKey);
+	return request;
+}
+
+KeyAddressRequest message::createAnnaKeyAddressRequest(const std::string& prefixedKey) {
+	KeyAddressRequest request;
+	request.set_request_id(std::to_string(uuid::generate()));
+	request.set_response_address("tcp://" + config::IP_ADDRESS + ":" +
+		std::to_string(config::ANNA_KEY_ADDRESS_PORT));
+	request.add_keys(prefixedKey);
+	return request;
+}
+
+SetValue message::createAnnaSet(const std::unordered_set<std::string>& set) {
+	SetValue setValue;
+	*setValue.mutable_values() = {set.begin(), set.end()};
+	return setValue;
 }

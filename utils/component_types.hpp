@@ -7,7 +7,8 @@
 
 
 enum ComponentType {
-	Client, Batcher, Proposer, ProxyLeader, Acceptor, Unbatcher, Matchmaker
+	Client, Batcher, Proposer, ProxyLeader, Acceptor, Unbatcher, Matchmaker,
+	AnnaKeyAddress, AnnaResponse
 };
 
 

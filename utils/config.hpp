@@ -33,7 +33,8 @@ namespace config {
     const static int UNBATCHER_PORT_FOR_PROXY_LEADERS = 14000;
     const static int MATCHMAKER_PORT_FOR_PROPOSERS = 15000;
     const static int PROMETHEUS_PORT = 16000;
-    const static int SERVER_MAX_CONNECTIONS = 200;
+    const static int ANNA_KEY_ADDRESS_PORT = 17000;
+    const static int ANNA_RESPONSE_PORT = 17100;
     const static int ZMQ_NUM_IO_THREADS = 6; //8 - 1 prometheus thread - 1 main thread
 
     const static inline std::string ENV_IP_NAME = "IP";
@@ -55,7 +56,6 @@ namespace config {
 	const static inline std::string AWS_AVAILABILITY_ZONE = std::getenv(ENV_AWS_AVAILABILITY_ZONE_NAME.c_str());
 	const static inline std::string AWS_AMI = std::getenv(ENV_AWS_AMI_NAME.c_str());
 	const static inline std::string AWS_S3_BUCKET = std::getenv(ENV_AWS_S3_BUCKET_NAME.c_str());
-
 
 	const static int ZMQ_POLL_TIMEOUT_SEC = 5;
     const static int HEARTBEAT_TIMEOUT_SEC = 20; // this - HEARTBEAT_SLEEP_SEC = time allowed between message send & receive

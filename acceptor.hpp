@@ -19,7 +19,7 @@ class acceptor {
 public:
     explicit acceptor(std::string&& acceptorGroupId);
 private:
-	anna* annaWriteOnlyClient;
+	anna* annaClient;
 	network *zmqNetwork;
 	server_component* proxyLeaders;
 

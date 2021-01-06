@@ -5,8 +5,10 @@
 #include "unbatcher.hpp"
 
 unbatcher::unbatcher() {
-//	annaWriteOnlyClient = anna::writeOnly({{config::KEY_UNBATCHERS, config::IP_ADDRESS}});
 	zmqNetwork = new network();
+
+	annaClient = new anna(zmqNetwork, {{config::KEY_UNBATCHERS, config::IP_ADDRESS}},
+	                               [](const std::string& key, const two_p_set& twoPSet, const time_t now){});
 
 	clients = new client_component(zmqNetwork, config::CLIENT_PORT_FOR_UNBATCHERS, Client,
 	                           [](const std::string& address, const time_t now) {

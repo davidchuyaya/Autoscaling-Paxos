@@ -37,8 +37,9 @@ private:
     std::unordered_map<int, int> approvedCommanders; //key = message ID
     std::unordered_map<std::string, client_component*> acceptorGroups; //key = acceptor group ID
     std::unordered_set<std::string> connectedAcceptorGroups;
+    two_p_set acceptorGroupIdSet;
 
-    void listenToAnna(const std::string& key, const two_p_set& twoPSet);
+    void listenToAnna(const std::string& key, const two_p_set& twoPSet, time_t now);
     void processNewAcceptorGroup(const std::string& acceptorGroupId);
     void listenToProposer(const ProposerToAcceptor& payload, const std::string& ipAddress);
     void listenToAcceptor(const AcceptorToProxyLeader& payload);

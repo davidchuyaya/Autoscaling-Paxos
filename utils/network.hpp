@@ -29,6 +29,9 @@ public:
 	static socketInfo clientSocket(zmq::context_t& context, const ComponentType type, const std::string& senderAddress){
 		return socketInfo(context, ZMQ_DEALER, type, false, senderAddress);
 	}
+	static socketInfo customSocket(zmq::context_t& context, const int socketType, const ComponentType type) {
+		return socketInfo(context, socketType, type, false);
+	}
 private:
 	socketInfo(zmq::context_t& context, int socketType, const ComponentType type, const bool isServer,
 			std::string senderAddress = "") :
@@ -37,14 +40,16 @@ private:
 
 class network {
 public:
-	using timer = std::function<void(const time_t time)>;
+	using timer = std::function<void(const time_t now)>;
 	using messageHandler = std::function<void(const std::string& ipAddress, const std::string& payload,
-			const time_t time)>;
+			const time_t now)>;
 
     network();
     [[noreturn]] void poll();
 	std::shared_ptr<socketInfo> startServerAtPort(int port, ComponentType clientType);
 	std::shared_ptr<socketInfo> connectToAddress(const std::string& address, int port, ComponentType serverType);
+	std::shared_ptr<socketInfo> startAnnaReader(int port, ComponentType readerType);
+	std::shared_ptr<socketInfo> startAnnaWriter(const std::string& address);
 	void connectExistingSocketToAddress(const std::shared_ptr<socketInfo>& client, const std::string& address);
     void sendToServer(zmq::socket_t& socket, const std::string& payload);
 	void sendToClient(zmq::socket_t& socket, const std::string& clientAddress, const std::string& payload);

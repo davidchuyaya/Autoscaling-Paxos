@@ -58,6 +58,24 @@ std::shared_ptr<socketInfo> network::connectToAddress(const std::string& address
 	return client;
 }
 
+std::shared_ptr<socketInfo> network::startAnnaReader(int port, const ComponentType readerType) {
+	auto reader = sockets.emplace_back(std::make_shared<socketInfo>(
+			socketInfo::customSocket(context, ZMQ_PULL, readerType)));
+	reader->socket.setsockopt(ZMQ_LINGER, 0); //don't queue messages to closed sockets
+	reader->socket.bind("tcp://*:" + std::to_string(port));
+	pollItems.emplace_back(zmq::pollitem_t{static_cast<void*>(reader->socket), 0, ZMQ_POLLIN, 0});
+	return reader;
+}
+
+std::shared_ptr<socketInfo> network::startAnnaWriter(const std::string& address) {
+	//socketInfo type doesn't matter; we don't poll
+	auto writer = sockets.emplace_back(std::make_shared<socketInfo>(
+			socketInfo::customSocket(context, ZMQ_PUSH, AnnaResponse)));
+	writer->socket.setsockopt(ZMQ_LINGER, 0); //don't queue messages to closed sockets
+	writer->socket.connect(address);
+	return writer;
+}
+
 void network::connectExistingSocketToAddress(const std::shared_ptr<socketInfo>& client, const std::string& address) {
 	client->socket.connect("tcp://" + address);
 }

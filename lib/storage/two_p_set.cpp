@@ -4,11 +4,11 @@
 
 #include "two_p_set.hpp"
 
+#include <utility>
+
 two_p_set::two_p_set() : observed(), removed() {}
-two_p_set::two_p_set(std::unordered_set<std::string>&& observed, std::unordered_set<std::string>&& removed) :
-        observed(observed), removed(removed) {}
-two_p_set::two_p_set(const SetLattice<std::string>& observed, const SetLattice<std::string>& removed) :
-        observed(observed.reveal()), removed(removed.reveal()) {}
+two_p_set::two_p_set(std::unordered_set<std::string> observed, std::unordered_set<std::string>  removed) :
+        observed(std::move(observed)), removed(std::move(removed)) {}
 
 void two_p_set::add(const std::string& s) {
     observed.insert(s);
@@ -23,24 +23,22 @@ void two_p_set::merge(const two_p_set& other) {
     removed.insert(other.removed.begin(), other.removed.end());
 }
 
-std::string two_p_set::mergeAndUnprefixKey(std::string key, const SetLattice<std::string>& set) {
-    const std::unordered_set<std::string>& revealed = set.reveal();
-
+std::string two_p_set::mergeAndUnprefixKey(std::string key, const std::unordered_set<std::string>& set) {
     auto observedPrefixPos = key.find(config::KEY_OBSERVED_PREFIX);
     if (observedPrefixPos != std::string::npos) {
-        observed.insert(revealed.begin(), revealed.end());
+        observed.insert(set.begin(), set.end());
         return key.erase(observedPrefixPos, config::KEY_OBSERVED_PREFIX.size());
     }
     else {
         auto removedPrefixPos = key.find(config::KEY_REMOVED_PREFIX);
-        removed.insert(revealed.begin(), revealed.end());
+        removed.insert(set.begin(), set.end());
         return key.erase(removedPrefixPos, config::KEY_REMOVED_PREFIX.size());
     }
 }
 
 two_p_set two_p_set::updatesFrom(const two_p_set& other) const {
-    std::unordered_set<std::string> outputObserved = {};
-    std::unordered_set<std::string> outputRemoved = {};
+    std::unordered_set<std::string> outputObserved;
+    std::unordered_set<std::string> outputRemoved;
 	for (const std::string& s : other.observed)
 		if (observed.find(s) == observed.end())
 			outputObserved.insert(s);
