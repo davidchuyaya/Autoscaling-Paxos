@@ -3,7 +3,7 @@ A Paxos protocol that is capable of scaling dynamically.
 Checkout our paper (work in progress) on [Overleaf](https://www.overleaf.com/read/bvnnzjbpxybc)!
 
 ## Before we begin
-Our code is meant to run on AWS EC2 and contact an Anna cluster that is also running on EC2. Decide which AWS region you'd like to run things in. We'll use `<your AWS region>` throughout to refer to the it. We tested in us-west-1.
+Our code is meant to run on AWS EC2 and contact an Anna cluster that is also running on EC2. Decide which AWS region you'd like to run things in. We'll use `<your AWS region>` throughout to refer to the it. Additionally, pick an AWS Availability Zone within that region, and replace any mentions of `<your AWS Availability Zone>` with it. We tested in region `us-west-1`, availability zone `us-west-1b`.
 
 The following scripts were tested on **Ubuntu 18.04 x86**, with cmake/make optimized to use at least 4 cores. You should have an AWS account and plenty of money in it to spare (but the cost will be proportional to the throughput!).
 
@@ -129,6 +129,7 @@ The executables will not run without the correct environment variables. Before y
 ```shell
 export ANNA_ROUTING=<your Anna ELB address>
 export AWS_REGION=<your AWS region>
+export AWS_AVAILABILITY_ZONE=<your AWS availability zone>
 export AWS_AMI=<your AMI>
 export AWS_S3_BUCKET=<your executable S3 bucket>
 export IP=$(curl http://169.254.169.254/latest/meta-data/public-ipv4)
@@ -137,7 +138,7 @@ export BATCH_SIZE=40
 ```
 The following parameters can be configured:
 - `BATCH_SIZE`: Larger batch sizes increase throughput but increase latency if there are not enough clients.
-- `ANNA_KEY_PREFIX`: An arbitrary string prepended to the front of keys stored in Anna. This **MUST** be changed between executions; alternatively Anna should be restarted, such that routing tables store up-to-date information.
+- `ANNA_KEY_PREFIX`: An arbitrary string prepended to the front of keys stored in Anna. This **MUST** be changed between executions; alternatively, Anna should be restarted, such that routing tables store up-to-date information.
 
 ## Setting up Anna on EC2
 [Anna](https://github.com/hydro-project/anna) is a low-latency, eventually consistent, auto-scaling KVS acting as our system's router. Some Anna code is imported as a submodule from the [repo here](https://github.com/hydro-project/common).
@@ -212,13 +213,13 @@ aws iam create-service-linked-role --aws-service-name "elasticloadbalancing.amaz
 ssh-keygen -t rsa -N '' -f ~/.ssh/id_rsa <<< y
 ```
 
-Change Anna's script to launch in your region of choice. Note that by default, Anna launches in the region `us-east-1` with the availability zone `us-east-1a`. My script changes that to the region `us-west-1` with the availability zone `us-west-1b`. 
+Change Anna's script to launch in your region of choice. Note that by default, Anna launches in the region `us-east-1` with the availability zone `us-east-1a`. My script changes uses the region `us-west-1` with the availability zone `us-west-1b`. Replace `<your AWS region>` and `<your AWS Availability Zone>` with values from earlier.
 ```shell script
 cd $HYDRO_HOME/cluster
 
 # Change us-east-1 to us-west-1
-grep -rl us-east-1 . | xargs sed -i 's/us-east-1/us-west-1/g'
-grep -rl us-west-1a . | xargs sed -i 's/us-west-1a/us-west-1b/g'
+grep -rl us-east-1 . | xargs sed -i 's/us-east-1/<your AWS region>/g'
+grep -rl us-west-1a . | xargs sed -i 's/<your AWS region>a/<your AWS Availability Zone>/g'
 
 # Rerun every time if you exit & login again to this EC2 instances
 export HYDRO_HOME=~/hydro-project
@@ -258,6 +259,41 @@ scripts/install_protobuf.sh
 Continue with the instructions above to create your custom AMI. Make sure to change **Shutdown behavior** to **Terminate**.
 Record your custom AMI address. We will refer to it as `<your AMI>` from now on.
 
+## Metrics
+We'll use Prometheus + Grafana to scrape metrics from each of our nodes. Launch a Ubuntu EC2 node in the same region, then run the following to install both and launch Grafana:
+```shell
+wget -q -O - https://packages.grafana.com/gpg.key | sudo apt-key add -
+echo "deb https://packages.grafana.com/oss/deb stable main" | sudo tee -a /etc/apt/sources.list.d/grafana.list
+sudo apt-get update
+sudo apt-get install -y prometheus apt-transport-https software-properties-common wget grafana
+
+sudo service grafana-server start
+```
+Prometheus needs to be reconfigured to find the EC2 nodes on-the-fly. Replace `/etc/prometheus/prometheus.yml` with the following, substituting values as necessary:
+```yaml
+global:
+  scrape_interval: 5s
+  evaluation_interval: 5s
+
+scrape_configs:
+  - job_name: 'paxos'
+    ec2_sd_configs:
+      - region: us-west-1
+        access_key: <AWS_ACCESS_KEY_ID>
+        secret_key: <AWS_SECRET_ACCESS_KEY>
+        port: 16000
+        # how often we check for new nodes
+        refresh_interval: 5s
+    relabel_configs:
+      # Only monitor instances with our AMI
+      - source_labels: [__meta_ec2_ami]
+        regex: <your AMI>
+        action: keep
+      # Use the instance ID as the instance label
+      - source_labels: [__meta_ec2_instance_id]
+        target_label: instance
+```
+Then run `sudo systemctl restart prometheus` for the configuration to go live.
 
 TODO
 

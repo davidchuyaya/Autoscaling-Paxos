@@ -1,19 +1,5 @@
 syntax = "proto3";
 
-message WhoIsThis {
-    enum Sender {
-        null = 0; //this value is not to be used. Protobuf will ignore this entire message if the only value (sender) is 0.
-        client = 1;
-        batcher = 2;
-        proposer = 3;
-        proxyLeader = 4;
-        acceptor = 5;
-        unbatcher = 6;
-    }
-
-    Sender sender = 1;
-}
-
 /**
 Data structures
  */
@@ -29,9 +15,6 @@ message PValue {
 message Batch {
     string client = 1;
     string request = 2;
-}
-message Heartbeat {
-    bool dummy = 1; //must have at least 1 value for message to send
 }
 
 /**
@@ -50,7 +33,6 @@ message ProposerToAcceptor {
     int32 slot = 5;
     string client = 6;
     string payload = 7;
-    string ipAddress = 8;
 }
 
 message AcceptorToProxyLeader {
@@ -81,17 +63,5 @@ message ProxyLeaderToProposer {
     int32 slot = 5;
     map<int32, string> committedLog = 6;
     map<int32, PValue> uncommittedLog = 7;
-}
-
-message ProposerToProposer {
-    bool iAmLeader = 1;
-}
-
-message ClientToBatcher {
-    string ipAddress = 1;
-    string request = 2;
-}
-
-message UnbatcherToClient {
-    string request = 1;
+    repeated string connectedAcceptorGroupIds = 8;
 }

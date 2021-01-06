@@ -5,53 +5,30 @@
 #ifndef AUTOSCALING_PAXOS_BATCHER_HPP
 #define AUTOSCALING_PAXOS_BATCHER_HPP
 
-#include <shared_mutex>
-#include <vector>
-#include <thread>
 #include <string>
 #include <unordered_map>
 #include <unistd.h>
-#include <google/protobuf/message.h>
-
-#include "utils/config.hpp"
 #include "models/message.hpp"
+#include "models/server_component.hpp"
+#include "models/client_component.hpp"
+#include "utils/config.hpp"
 #include "utils/network.hpp"
-#include "utils/heartbeater.hpp"
 #include "message.pb.h"
 #include "lib/storage/anna.hpp"
 #include "lib/storage/two_p_set.hpp"
-#include "models/threshold_component.hpp"
 
 class batcher {
 public:
     explicit batcher();
 private:
     anna* annaClient;
+    network* zmqNetwork;
+	client_component* proposers;
+	server_component* clients;
 
-    std::shared_mutex payloadsMutex;
     std::unordered_map<std::string, std::string> clientToPayloads = {};
     int numPayloads = 0;
 
-	//ReceiveMessage type doesn't matter, since we don't receive any messages from the proposer
-    threshold_component<Batch, Heartbeat> proposers;
-
-    std::shared_mutex clientMutex;
-    std::vector<int> clientSockets = {};
-
-    /**
-     * Starts the server the clients connect to.
-     * @note Runs forever.
-     *
-     */
-    [[noreturn]] void startServer();
-    /**
-     * Listens to the clients.
-     * @note Runs forever.
-     *
-     * @param client_address Address of the client
-     */
-    void listenToClient(const ClientToBatcher& payload);
-    [[noreturn]] void checkLaggingBatches();
     void sendBatch();
 };
 

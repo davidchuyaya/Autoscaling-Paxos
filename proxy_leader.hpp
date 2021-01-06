@@ -7,17 +7,15 @@
 
 #include <string>
 #include <unordered_map>
-#include <shared_mutex>
-#include <condition_variable>
+#include <unordered_set>
 #include <vector>
-#include <thread>
 #include <message.pb.h>
 #include "utils/config.hpp"
 #include "utils/network.hpp"
 #include "models/message.hpp"
 #include "models/log.hpp"
 #include "models/heartbeat_component.hpp"
-#include "utils/heartbeater.hpp"
+#include "models/client_component.hpp"
 #include "lib/storage/anna.hpp"
 
 class proxy_leader {
@@ -25,28 +23,25 @@ public:
     explicit proxy_leader();
 private:
     anna* annaClient;
+	network* zmqNetwork;
+	client_component* proposers;
+	heartbeat_component* unbatcherHeartbeat;
+	client_component* unbatchers;
 
-    std::shared_mutex sentMessagesMutex;
-    std::unordered_map<int, ProposerToAcceptor> sentMessages = {}; //key = message ID
+    struct sentMetadata {
+    	ProposerToAcceptor value;
+    	std::string proposerAddress;
+    };
+    std::unordered_map<int, sentMetadata> sentMessages; //key = message ID
+    std::unordered_map<int, Log::acceptorGroupLog> unmergedLogs; //key = message ID
+    std::unordered_map<int, int> approvedCommanders; //key = message ID
+    std::unordered_map<std::string, client_component*> acceptorGroups; //key = acceptor group ID
+    std::unordered_set<std::string> connectedAcceptorGroups;
+    two_p_set acceptorGroupIdSet;
 
-    std::shared_mutex unmergedLogsMutex;
-    std::unordered_map<int, Log::acceptorGroupLog> unmergedLogs = {}; //key = message ID
-
-    std::shared_mutex approvedCommandersMutex;
-    std::unordered_map<int, int> approvedCommanders = {}; //key = message ID
-
-    threshold_component<ProxyLeaderToProposer, ProposerToAcceptor> proposers;
-
-    std::shared_mutex acceptorMutex;
-	//key = acceptor group ID
-    std::unordered_map<std::string, threshold_component<ProposerToAcceptor, AcceptorToProxyLeader>*> acceptorGroupSockets = {};
-
-    heartbeat_component<Batch, Heartbeat> unbatchers;
-
-    void listenToAnna(const std::string& key, const two_p_set& twoPSet);
+    void listenToAnna(const std::string& key, const two_p_set& twoPSet, time_t now);
     void processNewAcceptorGroup(const std::string& acceptorGroupId);
-    void processAcceptors(const std::string& acceptorGroupId, const two_p_set& twoPSet);
-    void listenToProposer(const ProposerToAcceptor& payload);
+    void listenToProposer(const ProposerToAcceptor& payload, const std::string& ipAddress);
     void listenToAcceptor(const AcceptorToProxyLeader& payload);
 
     /**
@@ -65,7 +60,6 @@ private:
      * @param payload
      */
     void handleP2B(const AcceptorToProxyLeader& payload);
-	bool knowOfAcceptorGroup(const std::string& acceptorGroupId);
 };
 
 

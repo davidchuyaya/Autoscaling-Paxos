@@ -1,67 +1,55 @@
 
 #include "main.hpp"
 
-paxos::paxos(const int numClients, const int numBatchers, const int numProxyLeaders, const int numAcceptorGroups,
-			 const int numUnbatchers) : isBenchmark(numClients != 0), numClients(numClients),
-			 numBatchers(numBatchers), numProxyLeaders(numProxyLeaders), numAcceptorGroups(numAcceptorGroups),
-			 numUnbatchers(numUnbatchers),
-		batchers(config::F+1, config::BATCHER_PORT, WhoIsThis_Sender_client,
-			    [&](const int socket, const Heartbeat& payload) {
-			 	batchers.addHeartbeat(socket);
-		}) {
-    LOG("F: {}\n", config::F);
-    std::thread server([&] {startServer(); });
-    annaClient = anna::readWritable({}, [&](const std::string& key, const two_p_set& twoPSet) {
-        batchers.connectAndMaybeListen(twoPSet);
+paxos::paxos(const int delay, const int numClients, const int numBatchers, const int numProxyLeaders,
+			 const int numAcceptorGroups, const int numUnbatchers) :
+		shouldStartCluster(numBatchers != 0), numBatchers(numBatchers),
+		numProxyLeaders(numProxyLeaders), numAcceptorGroups(numAcceptorGroups), numUnbatchers(numUnbatchers) {
+	if (shouldStartCluster)
+		startCluster();
+
+	zmqNetwork = new network();
+
+	annaClient = new anna(zmqNetwork, {}, [&](const std::string& key, const two_p_set& twoPSet, const time_t now) {
+		batchers->connectToNewMembers(twoPSet, now);
     });
 	annaClient->subscribeTo(config::KEY_BATCHERS);
 
-    if (!isBenchmark)
-	    readInput();
-    else
-	    benchmark();
-    server.join();
-}
+	batcherHeartbeat = new heartbeat_component(zmqNetwork);
+	batchers = new client_component(zmqNetwork, config::BATCHER_PORT_FOR_CLIENTS, Batcher,
+						   [&](const std::string& address, const time_t now) {
+		BENCHMARK_LOG("Client connected to batcher at {}", address);
+		batcherHeartbeat->addConnection(address, now);
+	},
+	[&](const std::string& address, const time_t now) {
+		BENCHMARK_LOG("Client disconnected from batcher at {}", address);
+		batcherHeartbeat->removeConnection(address);
+	}, [&](const std::string& address, const std::string& payload, const time_t now) {
+		LOG("Batcher {} heartbeated", address);
+		batcherHeartbeat->addHeartbeat(address, now);
+	});
 
-[[noreturn]]
-void paxos::startServer() {
-    network::startServerAtPort<UnbatcherToClient>(config::CLIENT_PORT,
-       [](const int socket) {
-            BENCHMARK_LOG("Main connected to unbatcher\n");
-    }, [&](const int socket, const UnbatcherToClient& payload) {
-	    LOG("--Acked: {}--\n", payload.request());
+	unbatchers = new server_component(zmqNetwork, config::CLIENT_PORT_FOR_UNBATCHERS, Unbatcher,
+							 [](const std::string& address, const time_t now) {
+		BENCHMARK_LOG("Unbatcher from {} connected to client", address);
+	},[&](const std::string& address, const std::string& payload, const time_t now) {
+		LOG("--Acked: {}--", payload);
+		//send another message back immediately
+		batchers->sendToIp(batcherHeartbeat->nextAddress(), payload);
+	});
 
-	    if (isBenchmark) //send another message back immediately
-		    batchers.send(message::createClientRequest(config::IP_ADDRESS, payload.request()));
-	    else
-		    readInput();
-    });
-}
+	//send messages to batchers after delay
+	zmqNetwork->addTimer([&, numClients](const time_t t) {
+		LOG("Num batchers at start of benchmark: {}", batchers->numConnections());
+		BENCHMARK_LOG("Begin benchmark");
+		for (int client = 0; client < numClients; client++) {
+			//payload = client ID
+			const std::string& payload = std::to_string(client);
+			batchers->sendToIp(batcherHeartbeat->nextAddress(), payload);
+		}
+	}, delay, false);
 
-void paxos::readInput() {
-    printf("You may input...\n");
-    std::string input;
-    std::cin >> input;
-    batchers.send(message::createClientRequest(config::IP_ADDRESS, input));
-    TIME();
-    printf("Waiting for ACK, do not input...\n");
-}
-
-void paxos::benchmark() {
-	if (numBatchers > 0) {
-		printf("Starting cluster, you should wait until a leader has been elected before starting...\n");
-		startCluster();
-	}
-
-	printf("Enter any key to start benchmarking...\n");
-	std::string input;
-	std::cin >> input;
-
-	for (int client = 0; client < numClients; client++) {
-		//payload = client ID
-		const std::string& payload = std::to_string(client);
-		batchers.send(message::createClientRequest(config::IP_ADDRESS, payload));
-	}
+	zmqNetwork->poll();
 }
 
 void paxos::startCluster() {
@@ -76,29 +64,24 @@ void paxos::startCluster() {
 }
 
 int main(const int argc, const char** argv) {
-    if (argc != 1 && argc != 2 && argc != 6) {
-        printf("Usage for interactive mode: ./Autoscaling_Paxos\n");
-	    printf("Usage for benchmark mode without starting a new cluster: ./Autoscaling_Paxos <NUM CLIENTS>\n");
-        printf("Usage for benchmark mode: ./Autoscaling_Paxos <NUM CLIENTS> <NUM BATCHERS> <NUM PROXY LEADERS> <NUM ACCEPTOR GROUPS> <NUM UNBATCHERS>\n");
+    if (argc != 3 && argc != 7) {
+	    printf("Usage without starting a new cluster: ./Autoscaling_Paxos <NUM CLIENTS> <SECONDS BEFORE STARTING>\n");
+        printf("Usage: ./Autoscaling_Paxos <NUM CLIENTS> <SECONDS BEFORE STARTING> <NUM BATCHERS> <NUM PROXY LEADERS> <NUM ACCEPTOR GROUPS> <NUM UNBATCHERS>\n");
         exit(0);
     }
 
 	INIT_LOGGER();
-	network::ignoreClosedSocket();
 
-    if (argc == 1)
-    	paxos p {};
-    else {
-	    const int numClients = std::stoi(argv[1]);
-	    if (argc == 2) {
-		    paxos p {numClients};
-	    }
-	    else {
-		    const int numBatchers = std::stoi(argv[2]);
-		    const int numProxyLeaders = std::stoi(argv[3]);
-		    const int numAcceptorGroups = std::stoi(argv[4]);
-		    const int numUnbatchers = std::stoi(argv[5]);
-		    paxos p {numClients, numBatchers, numProxyLeaders, numAcceptorGroups, numUnbatchers};
-	    }
-    }
+	const int numClients = std::stoi(argv[1]);
+	const int delay = std::stoi(argv[2]);
+	if (argc == 3) {
+		paxos p {delay, numClients};
+	}
+	else {
+		const int numBatchers = std::stoi(argv[3]);
+		const int numProxyLeaders = std::stoi(argv[4]);
+		const int numAcceptorGroups = std::stoi(argv[5]);
+		const int numUnbatchers = std::stoi(argv[6]);
+		paxos p {delay, numClients, numBatchers, numProxyLeaders, numAcceptorGroups, numUnbatchers};
+	}
 }

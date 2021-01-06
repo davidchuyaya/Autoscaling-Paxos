@@ -9,22 +9,18 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
-#include <thread>
+#include <queue>
 #include <algorithm>
 #include <functional>
-#include <shared_mutex>
-#include <atomic>
-#include <condition_variable>
-#include <queue>
-#include <google/protobuf/message.h>
-
+#include "message.pb.h"
 #include "utils/network.hpp"
 #include "utils/config.hpp"
+#include "utils/metrics.hpp"
 #include "models/message.hpp"
-#include "message.pb.h"
 #include "models/log.hpp"
+#include "models/client_component.hpp"
+#include "models/server_component.hpp"
 #include "models/heartbeat_component.hpp"
-#include "models/threshold_component.hpp"
 #include "lib/storage/anna.hpp"
 
 class proposer {
@@ -33,47 +29,35 @@ public:
 private:
     const int id; // 0 indexed, no gaps
     const int numAcceptorGroups;
+
+    std::shared_ptr<metrics::variables> metricsVars;
     anna* annaClient;
+	network* zmqNetwork;
+	client_component* proposers;
+	heartbeat_component* proxyLeaderHeartbeat;
+	server_component* proxyLeaders;
+	server_component* batchers;
 
-    std::shared_mutex ballotMutex;
-    int ballotNum = 0; // must be at least 1 the first time it is sent
-
-    std::atomic<bool> isLeader = false;
-    std::shared_mutex heartbeatMutex;
+	int ballotNum = 0; // must be at least 1 the first time it is sent
+	Ballot ballot;
+    bool isLeader = false;
     time_t lastLeaderHeartbeat = 0;
 
-    std::shared_mutex remainingAcceptorGroupsForScoutsMutex;
     std::unordered_set<std::string> remainingAcceptorGroupsForScouts = {};
 
-    std::shared_mutex logMutex;
     std::queue<int> logHoles = {};
     int nextSlot = 0;
-
-    std::shared_mutex acceptorGroupLogsMutex;
     std::vector<Log::stringLog> acceptorGroupCommittedLogs = {};
     std::unordered_map<std::string, Log::pValueLog> acceptorGroupUncommittedLogs = {}; //key = acceptor group ID
 
-    threshold_component<ProposerToProposer, ProposerToProposer> proposers;
-
     two_p_set acceptorGroupIdSet;
-
-    std::shared_mutex acceptorMutex;
-    std::condition_variable_any acceptorCV;
     std::vector<std::string> acceptorGroupIds = {};
     int nextAcceptorGroup = 0;
 
-    heartbeat_component<ProposerToAcceptor, ProxyLeaderToProposer> proxyLeaders;
-
-    /**
-     * If isLeader = true, periodically tell other proposers.
-     */
-    [[noreturn]] void leaderLoop();
-
-    void listenToAnna(const std::string& key, const two_p_set& twoPSet);
-    [[noreturn]] void startServer();
+    void listenToAnna(const std::string& key, const two_p_set& twoPSet, time_t now);
     void listenToBatcher(const Batch& payload);
-    void listenToProxyLeader(int socket, const ProxyLeaderToProposer& payload);
-    void listenToProposer();
+    void listenToProxyLeader(const ProxyLeaderToProposer& payload);
+    void listenToProposer(const Ballot& leaderBallot);
 
     /**
      * Broadcast p1a to acceptors to become the leader.

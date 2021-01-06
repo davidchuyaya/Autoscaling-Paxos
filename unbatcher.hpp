@@ -5,32 +5,25 @@
 #ifndef AUTOSCALING_PAXOS_UNBATCHER_HPP
 #define AUTOSCALING_PAXOS_UNBATCHER_HPP
 
-#include <shared_mutex>
 #include <string>
 #include <vector>
-#include <thread>
 #include <unordered_map>
 #include <message.pb.h>
-
 #include "utils/network.hpp"
-#include "utils/heartbeater.hpp"
+#include "models/client_component.hpp"
+#include "models/server_component.hpp"
 #include "lib/storage/anna.hpp"
 
 class unbatcher {
 public:
     explicit unbatcher();
 private:
-	anna* annaWriteOnlyClient;
+	anna* annaClient;
+	network* zmqNetwork;
+	client_component* clients;
+	server_component* proxyLeaders;
 
-    std::shared_mutex ipToSocketMutex;
-    std::unordered_map<std::string, int> ipToSocket = {};
-
-    std::shared_mutex proxyLeaderMutex;
-    std::vector<int> proxyLeaders;
-
-    [[noreturn]] void startServer();
-    int connectToClient(const std::string& ipAddress);
-
+    void listenToProxyLeaders(const Batch& batch);
 };
 
 

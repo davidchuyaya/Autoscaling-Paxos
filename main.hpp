@@ -5,30 +5,25 @@
 #ifndef C__PAXOS_MAIN_HPP
 #define C__PAXOS_MAIN_HPP
 
-#include <iostream>
-#include <thread>
-#include <shared_mutex>
-#include <condition_variable>
 #include <string>
-#include <numeric>
-#include <chrono>
 #include <vector>
 #include <unordered_map>
-#include <optional>
-
+#include "models/server_component.hpp"
+#include "models/client_component.hpp"
+#include "models/heartbeat_component.hpp"
 #include "utils/config.hpp"
-#include "acceptor.hpp"
-#include "batcher.hpp"
-#include "proposer.hpp"
+#include "utils/network.hpp"
+#include "utils/uuid.hpp"
+#include "utils/metrics.hpp"
 #include "aws/scaling.hpp"
 
 class paxos {
 public:
-    explicit paxos(int numClients = 0, int numBatchers = 0, int numProxyLeaders = 0, int numAcceptorGroups = 0,
+	[[noreturn]]
+	explicit paxos(int delay, int numClients, int numBatchers = 0, int numProxyLeaders = 0, int numAcceptorGroups = 0,
 				   int numUnbatchers = 0);
 private:
-	const bool isBenchmark;
-	const int numClients;
+	const bool shouldStartCluster;
 	const int numBatchers;
 	const int numProxyLeaders;
 	const int numAcceptorGroups;
@@ -40,12 +35,11 @@ private:
 	std::vector<string> instanceIdsOfUnbatchers;
 
 	anna* annaClient;
-    heartbeat_component<ClientToBatcher, Heartbeat> batchers;
+	network* zmqNetwork;
+	heartbeat_component* batcherHeartbeat;
+	client_component* batchers;
+	server_component* unbatchers;
 
-    [[noreturn]] void startServer();
-    void readInput();
-
-	void benchmark();
 	void startCluster();
 };
 

@@ -9,19 +9,17 @@
 #include <unordered_set>
 #include <algorithm>
 #include <sstream>
-#include "lattices/core_lattices.hpp"
 #include "../../utils/config.hpp"
 
 class two_p_set {
 public:
     two_p_set();
-    two_p_set(std::unordered_set<std::string>&& observed, std::unordered_set<std::string>&& removed);
-    two_p_set(const SetLattice<std::string>& observed, const SetLattice<std::string>& removed);
+    two_p_set(std::unordered_set<std::string> observed, std::unordered_set<std::string> removed);
 
     void add(const std::string& s);
     void remove(const std::string& s);
     void merge(const two_p_set& other);
-    std::string mergeAndUnprefixKey(std::string key, const SetLattice<std::string>& set);
+    std::string mergeAndUnprefixKey(std::string key, const std::unordered_set<std::string>& set);
     [[nodiscard]] two_p_set updatesFrom(const two_p_set& other) const;
     [[nodiscard]] const std::unordered_set<std::string>& getObserved() const;
     [[nodiscard]] const std::unordered_set<std::string>& getRemoved() const;

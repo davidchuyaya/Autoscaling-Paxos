@@ -4,19 +4,11 @@
 
 #include "message.hpp"
 
-WhoIsThis message::createWhoIsThis(const WhoIsThis_Sender& sender) {
-    WhoIsThis whoIsThis;
-    whoIsThis.set_sender(sender);
-    return whoIsThis;
-}
-
-ProposerToAcceptor message::createP1A(const int id, const int ballotNum, const std::string& acceptorGroupId,
-									  const std::string& ipAddress) {
+ProposerToAcceptor message::createP1A(const int id, const int ballotNum, const std::string& acceptorGroupId) {
     ProposerToAcceptor p1a;
     p1a.set_messageid(uuid::generate());
     p1a.set_type(ProposerToAcceptor_Type_p1a);
     p1a.set_acceptorgroupid(acceptorGroupId);
-	p1a.set_ipaddress(ipAddress);
     Ballot* ballot = p1a.mutable_ballot();
     ballot->set_id(id);
     ballot->set_ballotnum(ballotNum);
@@ -36,8 +28,7 @@ message::createP1B(const int messageId, const std::string& acceptorGroupId, cons
 }
 
 ProposerToAcceptor message::createP2A(const int id, const int ballotNum, const int slot, const std::string& client,
-									  const std::string& payload, const std::string& acceptorGroupId,
-									  const std::string& ipAddress) {
+									  const std::string& payload, const std::string& acceptorGroupId) {
     ProposerToAcceptor p2a;
     p2a.set_messageid(uuid::generate());
     p2a.set_type(ProposerToAcceptor_Type_p2a);
@@ -48,7 +39,6 @@ ProposerToAcceptor message::createP2A(const int id, const int ballotNum, const i
     p2a.set_client(client);
     p2a.set_payload(payload);
     p2a.set_acceptorgroupid(acceptorGroupId);
-	p2a.set_ipaddress(ipAddress);
     return p2a;
 }
 
@@ -87,31 +77,6 @@ ProxyLeaderToProposer message::createProxyP2B(const int messageId, const std::st
     return p2b;
 }
 
-ProxyLeaderToProposer message::createProxyLeaderHeartbeat() {
-    ProxyLeaderToProposer heartbeat;
-    heartbeat.set_type(ProxyLeaderToProposer_Type_heartbeat);
-    return heartbeat;
-}
-
-Heartbeat message::createGenericHeartbeat() {
-	Heartbeat heartbeat;
-	heartbeat.set_dummy(true); //must have at least 1 value for message to send
-	return heartbeat;
-}
-
-ProposerToProposer message::createIamLeader() {
-    ProposerToProposer iAmLeader;
-    iAmLeader.set_iamleader(true);
-    return iAmLeader;
-}
-
-ClientToBatcher message::createClientRequest(const std::string& ipAddress, const std::string& payload) {
-    ClientToBatcher clientToBatcher;
-    clientToBatcher.set_ipaddress(ipAddress);
-    clientToBatcher.set_request(payload);
-    return clientToBatcher;
-}
-
 Batch message::createBatchMessage(const std::string& ipAddress, const std::string& requests) {
 	Batch batch;
 	batch.set_client(ipAddress);
@@ -119,8 +84,41 @@ Batch message::createBatchMessage(const std::string& ipAddress, const std::strin
 	return batch;
 }
 
-UnbatcherToClient message::createUnbatcherToClientAck(const std::string& request) {
-	UnbatcherToClient unbatcherToClient;
-	unbatcherToClient.set_request(request);
-	return unbatcherToClient;
+KeyRequest message::createAnnaPutRequest(const std::string& prefixedKey, const std::string& payload) {
+	KeyRequest request;
+	request.set_request_id(std::to_string(uuid::generate()));
+	request.set_response_address("tcp://" + config::IP_ADDRESS + ":" + std::to_string(config::ANNA_RESPONSE_PORT));
+	request.set_type(RequestType::PUT);
+
+	KeyTuple* tuple = request.add_tuples();
+	tuple->set_key(prefixedKey);
+	tuple->set_lattice_type(SET);
+	tuple->set_payload(payload);
+	return request;
+}
+
+KeyRequest message::createAnnaGetRequest(const std::string& prefixedKey) {
+	KeyRequest request;
+	request.set_request_id(std::to_string(uuid::generate()));
+	request.set_response_address("tcp://" + config::IP_ADDRESS + ":" + std::to_string(config::ANNA_RESPONSE_PORT));
+	request.set_type(RequestType::GET);
+
+	KeyTuple* tuple = request.add_tuples();
+	tuple->set_key(prefixedKey);
+	return request;
+}
+
+KeyAddressRequest message::createAnnaKeyAddressRequest(const std::string& prefixedKey) {
+	KeyAddressRequest request;
+	request.set_request_id(std::to_string(uuid::generate()));
+	request.set_response_address("tcp://" + config::IP_ADDRESS + ":" +
+		std::to_string(config::ANNA_KEY_ADDRESS_PORT));
+	request.add_keys(prefixedKey);
+	return request;
+}
+
+SetValue message::createAnnaSet(const std::unordered_set<std::string>& set) {
+	SetValue setValue;
+	*setValue.mutable_values() = {set.begin(), set.end()};
+	return setValue;
 }
