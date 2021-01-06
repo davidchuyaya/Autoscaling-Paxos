@@ -53,9 +53,8 @@ void anna::startKeyAddressRequestListener() {
 			if (socketForAddress.find(address) == socketForAddress.end())
 				socketForAddress[address] = zmqNetwork->startAnnaWriter(address);
 			//send pending writes
-			const std::string& pendingWrite = pendingWrites[key];
-			if (!pendingWrite.empty()) {
-				tryRequest(message::createAnnaPutRequest(key, payload));
+			if (pendingWrites.find(key) != pendingWrites.end()) {
+				tryRequest(message::createAnnaPutRequest(key, pendingWrites[key]));
 				pendingWrites.erase(key);
 			}
 		}
@@ -103,10 +102,9 @@ void anna::startRequestListener() {
 
 void anna::tryRequest(const KeyRequest& request) {
 	const std::string& key = request.tuples(0).key();
-	const std::string& address = addressForKey[key];
 
 	//if we haven't fetched the address for this key yet, fetch & queue
-	if (address.empty() && pendingKeyAddresses.find(key) == pendingKeyAddresses.end()) {
+	if (addressForKey.find(key) == addressForKey.end() && pendingKeyAddresses.find(key) == pendingKeyAddresses.end()) {
 		LOG("Anna queueing request to {}", key);
 		const std::string& payload = request.tuples(0).payload();
 		if (request.type() == PUT) //GETs are not queued; they're subscriptions, so requests are sent periodically
@@ -117,7 +115,7 @@ void anna::tryRequest(const KeyRequest& request) {
 	}
 
 	//TODO set address cache?
-	zmqNetwork->sendToServer(socketForAddress[address]->socket, request.SerializeAsString());
+	zmqNetwork->sendToServer(socketForAddress[addressForKey[key]]->socket, request.SerializeAsString());
 }
 
 void anna::tryKeyAddressRequest(const KeyAddressRequest& request) {
