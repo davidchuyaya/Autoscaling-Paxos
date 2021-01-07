@@ -136,7 +136,8 @@ void anna::putLattice(const std::string& prefixedKey, const std::unordered_set<s
 }
 
 void anna::subscribeTo(const std::string& key) {
-	respondedToSubscribedKey[config::KEY_OBSERVED_PREFIX + key] = true;
+	bool sent = tryRequest(message::createAnnaGetRequest(key));
+	respondedToSubscribedKey[key] = !sent;
 //	respondedToSubscribedKey[config::KEY_REMOVED_PREFIX + key] = true; TODO reenable subscription to removed sets?
 }
 

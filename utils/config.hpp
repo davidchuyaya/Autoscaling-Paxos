@@ -58,12 +58,12 @@ namespace config {
 	const static inline std::string AWS_S3_BUCKET = std::getenv(ENV_AWS_S3_BUCKET_NAME.c_str());
 
 	const static int ZMQ_POLL_TIMEOUT_SEC = 5;
-    const static int HEARTBEAT_TIMEOUT_SEC = 20; // this - HEARTBEAT_SLEEP_SEC = time allowed between message send & receive
-    const static int HEARTBEAT_SLEEP_SEC = 5;
+    const static int HEARTBEAT_TIMEOUT_SEC = 60; // this - HEARTBEAT_SLEEP_SEC = time allowed between message send & receive
+    const static int HEARTBEAT_SLEEP_SEC = 30;
     const static int BATCHER_TIMEOUT_SEC = 5;
     const static int CLIENT_TIMEOUT_SEC = 1;
     const static int ID_SCOUT_DELAY_MULTIPLIER = 5; // this * proposer ID = number of seconds to delay before sending scouts
-    const static int ANNA_RECHECK_SEC = 3; // how often we send a new request to Anna & how often we check for updates
+    const static int ANNA_RECHECK_SEC = 10; // how often we send a new request to Anna & how often we check for updates
 
     const static inline std::string KEY_OBSERVED_PREFIX = ANNA_KEY_PREFIX + "observed";
     const static inline std::string KEY_REMOVED_PREFIX = ANNA_KEY_PREFIX + "removed";
