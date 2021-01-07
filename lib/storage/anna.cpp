@@ -105,7 +105,9 @@ bool anna::tryRequest(const KeyRequest& request) {
 	const std::string& key = request.tuples(0).key();
 
 	//if we haven't fetched the address for this key yet, fetch & queue
-	if (addressForKey.find(key) == addressForKey.end() && pendingKeyAddresses.find(key) == pendingKeyAddresses.end()) {
+	if (addressForKey.find(key) == addressForKey.end()) {
+		if (pendingKeyAddresses.find(key) != pendingKeyAddresses.end()) //already queued
+			return false;
 		LOG("Anna queueing request to {}", key);
 		if (request.type() == PUT) //GETs are not queued; they're subscriptions, so requests are sent periodically
 			pendingWrites[key] = request;
