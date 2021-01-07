@@ -85,10 +85,11 @@ void anna::startRequestListener() {
 				respondedToSubscribedKey[prefixedKey] = true;
 				if (response.error() != NO_ERROR) //wait for subscription loop to resend GET request
 					return;
-				if (lastPayloadForKey[prefixedKey] == payload) //cache subscription results, only process on change
-					return;
-				lastPayloadForKey[prefixedKey] = payload;
 				for (const KeyTuple& keyTuple : response.tuples()) {
+					if (lastPayloadForKey[prefixedKey] == keyTuple.payload()) //cache subscription results, only process on change
+						return;
+					lastPayloadForKey[prefixedKey] = keyTuple.payload();
+
 					SetValue setValue;
 					setValue.ParseFromString(keyTuple.payload());
 					std::unordered_set<std::string> payloadSet (setValue.values().begin(), setValue.values().end());
