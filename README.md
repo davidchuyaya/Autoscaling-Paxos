@@ -287,10 +287,8 @@ scrape_configs:
         # how often we check for new nodes
         refresh_interval: 5s
     relabel_configs:
-      # Only monitor instances with our AMI
-      - source_labels: [__meta_ec2_ami]
-        regex: <your AMI>
-        action: keep
+      - source_labels: [__meta_ec2_tag_Name]
+        target_label: name
       # Use the instance ID as the instance label
       - source_labels: [__meta_ec2_instance_id]
         target_label: instance
