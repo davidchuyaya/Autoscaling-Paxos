@@ -7,26 +7,28 @@
 #include <utility>
 
 anna::anna(network* zmqNetwork, const std::unordered_map<std::string, std::string>& keyValues,
-		   const annaListener& listener) : zmqNetwork(zmqNetwork), listener(listener) {
+		   const annaListener& listener, bool writeOnly) : zmqNetwork(zmqNetwork), listener(listener) {
 	LOG("Anna key prefix: {}", config::ANNA_KEY_PREFIX);
 
 	startKeyAddressRequestListener();
-	startRequestListener();
 	zmqNetwork->startAnnaReader(config::ANNA_KEY_ADDRESS_PORT, AnnaKeyAddress);
-	zmqNetwork->startAnnaReader(config::ANNA_RESPONSE_PORT, AnnaResponse);
+	if (!writeOnly) {
+		startRequestListener();
+		zmqNetwork->startAnnaReader(config::ANNA_RESPONSE_PORT, AnnaResponse);
+
+		//resend subscriptions for keys we heard back from
+		zmqNetwork->addTimer([&](const time_t now) {
+			for (auto& [key, responded] : respondedToSubscribedKey) {
+				if (responded) {
+					LOG("Resending anna GET request for key {}", key);
+					bool sent = tryRequest(message::createAnnaGetRequest(key));
+					respondedToSubscribedKey[key] = !sent; //if message was just sent, then Anna has not responded to it yet
+				}
+			}
+		}, 0, config::ANNA_RECHECK_SEC, true); //check immediately at time 0
+	}
 	writeKeyAddressSocket = zmqNetwork->startAnnaWriter(
 			"tcp://" + config::ANNA_ROUTING_ADDRESS + ":" + std::to_string(kKeyAddressPort));
-
-	//resend subscriptions for keys we heard back from
-	zmqNetwork->addTimer([&](const time_t now) {
-		for (auto& [key, responded] : respondedToSubscribedKey) {
-			if (responded) {
-				LOG("Resending anna GET request for key {}", key);
-				bool sent = tryRequest(message::createAnnaGetRequest(key));
-				respondedToSubscribedKey[key] = !sent; //if message was just sent, then Anna has not responded to it yet
-			}
-		}
-	}, 0, config::ANNA_RECHECK_SEC, true); //check immediately at time 0
 
 	//write all keys
 	for (const auto&[key, value] : keyValues)
@@ -83,6 +85,9 @@ void anna::startRequestListener() {
 				respondedToSubscribedKey[prefixedKey] = true;
 				if (response.error() != NO_ERROR) //wait for subscription loop to resend GET request
 					return;
+				if (lastPayloadForKey[prefixedKey] == payload) //cache subscription results, only process on change
+					return;
+				lastPayloadForKey[prefixedKey] = payload;
 				for (const KeyTuple& keyTuple : response.tuples()) {
 					SetValue setValue;
 					setValue.ParseFromString(keyTuple.payload());
@@ -116,7 +121,6 @@ bool anna::tryRequest(const KeyRequest& request) {
 		return false;
 	}
 
-	//TODO set address cache?
 	zmqNetwork->sendToServer(socketForAddress[addressForKey[key]]->socket, request.SerializeAsString());
 	return true;
 }

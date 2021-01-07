@@ -10,7 +10,7 @@ paxos::paxos(const int delay, const int numClients, const int numBatchers, const
 
 	zmqNetwork = new network();
 
-	annaClient = new anna(zmqNetwork, {}, [&](const std::string& key, const two_p_set& twoPSet, const time_t now) {
+	annaClient = anna::readWritable(zmqNetwork, {}, [&](const std::string& key, const two_p_set& twoPSet, const time_t now) {
 		batchers->connectToNewMembers(twoPSet, now);
     });
 	annaClient->subscribeTo(config::KEY_BATCHERS);

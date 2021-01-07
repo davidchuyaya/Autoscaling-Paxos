@@ -7,7 +7,7 @@
 batcher::batcher() {
 	zmqNetwork = new network();
 
-    annaClient = new anna(zmqNetwork, {{config::KEY_BATCHERS, config::IP_ADDRESS}},
+    annaClient = anna::readWritable(zmqNetwork, {{config::KEY_BATCHERS, config::IP_ADDRESS}},
                     [&](const std::string& key, const two_p_set& twoPSet, const time_t now) {
     	proposers->connectToNewMembers(twoPSet, now);
     	if (proposers->numConnections() == config::F + 1) //heard from all proposers, don't expect change

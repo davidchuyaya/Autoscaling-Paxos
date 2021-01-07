@@ -21,8 +21,13 @@ class anna {
 public:
 	using annaListener = std::function<void(const std::string& key, const two_p_set& twoPSet, const time_t now)>;
 
-	anna(network* zmqNetwork, const std::unordered_map<std::string, std::string>& keyValues,
-	     const annaListener& listener);
+	static anna* writeOnly(network* zmqNetwork, const std::unordered_map<std::string, std::string>& keyValues) {
+		return new anna(zmqNetwork, keyValues, [](const std::string& key, const two_p_set& twoPSet, const time_t now) {}, true);
+	}
+	static anna* readWritable(network* zmqNetwork, const std::unordered_map<std::string, std::string>& keyValues,
+	                      const annaListener& listener) {
+		return new anna(zmqNetwork, keyValues, listener, false);
+	}
 	void putSingletonSet(const std::string& key, const std::string& value);
 	void removeSingletonSet(const std::string& key, const std::string& value);
     void subscribeTo(const std::string& key);
@@ -36,8 +41,11 @@ private:
 	std::unordered_map<std::string, std::shared_ptr<socketInfo>> socketForAddress; //address, socket
 	std::unordered_set<std::string> pendingKeyAddresses; //key
 	std::unordered_map<std::string, KeyRequest> pendingWrites; //key, value
-	std::unordered_map<std::string, bool> respondedToSubscribedKey = {}; //key, responded
+	std::unordered_map<std::string, bool> respondedToSubscribedKey; //key, responded
+	std::unordered_map<std::string, std::string> lastPayloadForKey; //key, payload string
 
+	anna(network* zmqNetwork, const std::unordered_map<std::string, std::string>& keyValues,
+	     const annaListener& listener, bool writeOnly);
 	void startKeyAddressRequestListener();
 	void startRequestListener();
     void putLattice(const std::string& prefixedKey, const std::unordered_set<std::string>& lattice);

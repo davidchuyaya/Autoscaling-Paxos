@@ -7,7 +7,7 @@
 proxy_leader::proxy_leader() {
 	zmqNetwork = new network();
 
-	annaClient = new anna(zmqNetwork, {{config::KEY_PROXY_LEADERS, config::IP_ADDRESS}},
+	annaClient = anna::readWritable(zmqNetwork, {{config::KEY_PROXY_LEADERS, config::IP_ADDRESS}},
 					   [&](const std::string& key, const two_p_set& twoPSet, const time_t now) {
 		listenToAnna(key, twoPSet, now);
 	});

@@ -7,10 +7,10 @@
 acceptor::acceptor(std::string&& acceptorGroupId) :acceptorGroupId(acceptorGroupId) {
 	zmqNetwork = new network();
 
-	annaClient = new anna(zmqNetwork, {
+	annaClient = anna::writeOnly(zmqNetwork, {
 			{config::KEY_ACCEPTOR_GROUPS, acceptorGroupId},
 			{acceptorGroupId, config::IP_ADDRESS}
-	}, [](const std::string& key, const two_p_set& twoPSet, const time_t now){});
+	});
 
 	proxyLeaders = new server_component(zmqNetwork, config::ACCEPTOR_PORT_FOR_PROXY_LEADERS, ProxyLeader,
 	                              [](const std::string& address, const time_t now) {
