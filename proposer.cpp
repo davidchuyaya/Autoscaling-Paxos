@@ -23,7 +23,7 @@ proposer::proposer(const int id, const int numAcceptorGroups) : id(id), numAccep
 	}, [&](const std::string& address, const std::string& payload, const time_t now) {
 		Ballot leaderBallot;
 		leaderBallot.ParseFromString(payload);
-		listenToProposer(leaderBallot);
+		listenToProposer(leaderBallot, now);
 	});
 	//we don't talk to other proposers through the server port
 	zmqNetwork->startServerAtPort(config::PROPOSER_PORT_FOR_PROPOSERS, Proposer);
@@ -129,10 +129,10 @@ void proposer::listenToProxyLeader(const ProxyLeaderToProposer& payload) {
     }
 }
 
-void proposer::listenToProposer(const Ballot& leaderBallot) {
+void proposer::listenToProposer(const Ballot& leaderBallot, const time_t now) {
 	if (Log::isBallotGreaterThan(ballot, leaderBallot))
 		return;
-    time(&lastLeaderHeartbeat); // store the time we received the heartbeat
+    lastLeaderHeartbeat = now; // store the time we received the heartbeat
 	LOG("Received leader heartbeat for time: {}", std::asctime(std::localtime(&lastLeaderHeartbeat)));
 	noLongerLeader();
 }
@@ -209,6 +209,7 @@ void proposer::handleP2B(const ProxyLeaderToProposer& message) {
 
 void proposer::noLongerLeader() {
     isLeader = false;
+    ballot.Clear();
     acceptorGroupCommittedLogs.clear();
     acceptorGroupUncommittedLogs.clear();
     remainingAcceptorGroupsForScouts.clear();

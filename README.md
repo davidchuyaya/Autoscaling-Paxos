@@ -34,11 +34,7 @@ Note: Running the executables at this point won't do anything, since Anna is not
 Follow the [instructions here](https://github.com/hydro-project/anna/blob/master/docs/building-anna.md) and the [instructions here](https://github.com/hydro-project/anna/blob/master/docs/local-mode.md) to run Anna locally, just to get a taste of what it does. Maybe it'll help you debug.
 
 ## AWS Setup
-These steps can be run on your local computer. Remember to [install the AWS cli](https://docs.aws.amazon.com/cli/latest/userguide/install-cliv2.html), then login by running
-```shell
-aws configure
-```
-and entering the access key ID and secret key from earlier.
+These steps can be run on your local computer. Remember to [install the AWS cli](https://docs.aws.amazon.com/cli/latest/userguide/install-cliv2.html).
 
 ### Create an AWS user
 Head to the [AWS IAM Console](https://console.aws.amazon.com/iam/home?region=us-west-1#/users) to create a new user with root access. Root access is not *necessary*, but we'll be doing a lot with this user so I didn't narrow down what permissions are actually needed. As such, leaking your user info (in a `git commit`, for example) is a bad idea.
@@ -46,7 +42,11 @@ Head to the [AWS IAM Console](https://console.aws.amazon.com/iam/home?region=us-
 1. Give it **Programmatic access**.
 2. Click **Attach existing policies directly**, and give it **Administrator access**.
 
-Finish creating the user, and write down the **access key ID** and the **secret key**.
+Finish creating the user, and write down the **access key ID** and the **secret key**. Now you can login by running
+```shell
+aws configure
+```
+and entering the access key ID and secret key.
 
 #### Create a security group with all ports opened
 To communicate with Anna, the EC2 nodes that we'll run on need to have some incoming/outgoing ports enabled. For simplicity, I'm going to enable all ports.
@@ -280,7 +280,7 @@ global:
 scrape_configs:
   - job_name: 'paxos'
     ec2_sd_configs:
-      - region: us-west-1
+      - region: <your AWS region>
         access_key: <AWS_ACCESS_KEY_ID>
         secret_key: <AWS_SECRET_ACCESS_KEY>
         port: 16000

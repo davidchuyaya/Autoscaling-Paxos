@@ -58,7 +58,7 @@ namespace config {
 	const static inline std::string AWS_S3_BUCKET = std::getenv(ENV_AWS_S3_BUCKET_NAME.c_str());
 
 	const static int ZMQ_POLL_TIMEOUT_SEC = 5;
-    const static int HEARTBEAT_TIMEOUT_SEC = 20; // this - HEARTBEAT_SLEEP_SEC = time allowed between message send & receive
+    const static int HEARTBEAT_TIMEOUT_SEC = 30; // this - HEARTBEAT_SLEEP_SEC = time allowed between message send & receive
     const static int HEARTBEAT_SLEEP_SEC = 5;
     const static int BATCHER_TIMEOUT_SEC = 5;
     const static int CLIENT_TIMEOUT_SEC = 1;
