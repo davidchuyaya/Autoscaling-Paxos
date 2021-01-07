@@ -20,6 +20,7 @@ paxos::paxos(const int delay, const int numClients, const int numBatchers, const
 						   [&](const std::string& address, const time_t now) {
 		BENCHMARK_LOG("Client connected to batcher at {}", address);
 		batcherHeartbeat->addConnection(address, now);
+	    batchers->sendToIp(address, ""); //send batcher empty message so it knows to start heartbeating
 	},
 	[&](const std::string& address, const time_t now) {
 		BENCHMARK_LOG("Client disconnected from batcher at {}", address);

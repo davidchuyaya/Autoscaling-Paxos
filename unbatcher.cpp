@@ -22,8 +22,9 @@ unbatcher::unbatcher() {
 	proxyLeaders = new server_component(zmqNetwork, config::UNBATCHER_PORT_FOR_PROXY_LEADERS, ProxyLeader,
 	                              [&](const std::string& address, const time_t now) {
 		BENCHMARK_LOG("Proxy leader from {} connected to unbatcher", address);
-		proxyLeaders->sendToIp(address, ""); //send first heartbeat
 	}, [&](const std::string& address, const std::string& payload, const time_t now) {
+		if (payload.empty())
+			return;
 		Batch batch;
 		batch.ParseFromString(payload);
 		listenToProxyLeaders(batch);

@@ -33,6 +33,7 @@ proxy_leader::proxy_leader() {
 	                           [&](const std::string& address, const time_t now) {
 		BENCHMARK_LOG("Proxy leader connected to unbatcher at {}", address);
 		unbatcherHeartbeat->addConnection(address, now);
+		unbatchers->sendToIp(address, ""); //send unbatcher empty message so it knows to start heartbeating
 	},[&](const std::string& address, const time_t now) {
 		BENCHMARK_LOG("Proxy leader disconnected from unbatcher at {}", address);
 		unbatcherHeartbeat->removeConnection(address);

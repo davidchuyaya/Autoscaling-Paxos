@@ -43,6 +43,7 @@ void client_component::sendToIp(const std::string& ipAddress, const std::string&
 }
 
 void client_component::broadcast(const std::string& payload) {
+	LOG("Broadcasting payload: {}", payload);
 	for (const auto& [ipAddress, socket] : sockets)
 		zmqNetwork->sendToServer(socket->socket, payload);
 }

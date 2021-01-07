@@ -7,6 +7,7 @@
 heartbeat_component::heartbeat_component(network* zmqNetwork) : zmqNetwork(zmqNetwork) {}
 
 void heartbeat_component::addHeartbeat(const std::string& ipAddress, const time_t now) {
+	LOG("Added heartbeat from {}", ipAddress);
 	heartbeats[ipAddress] = now;
 }
 

@@ -27,8 +27,10 @@ batcher::batcher() {
 	clients = new server_component(zmqNetwork, config::BATCHER_PORT_FOR_CLIENTS, Client,
 						  [&](const std::string& address, const time_t now) {
 		BENCHMARK_LOG("Client from {} connected to batcher", address);
-		clients->sendToIp(address, ""); //send first heartbeat
 	}, [&](const std::string& address, const std::string& payload, const time_t now) {
+		if (payload.empty())
+			return;
+
 		LOG("Received --{}-- from client {}", payload, address);
 		TIME();
 		clientToPayloads[address] += payload + config::REQUEST_DELIMITER;
