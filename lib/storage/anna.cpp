@@ -26,7 +26,7 @@ anna::anna(network* zmqNetwork, const std::unordered_map<std::string, std::strin
 				respondedToSubscribedKey[key] = !sent; //if message was just sent, then Anna has not responded to it yet
 			}
 		}
-	}, config::ANNA_RECHECK_SEC, true);
+	}, 0, config::ANNA_RECHECK_SEC, true); //check immediately at time 0
 
 	//write all keys
 	for (const auto&[key, value] : keyValues)
@@ -136,8 +136,7 @@ void anna::putLattice(const std::string& prefixedKey, const std::unordered_set<s
 }
 
 void anna::subscribeTo(const std::string& key) {
-	bool sent = tryRequest(message::createAnnaGetRequest(config::KEY_OBSERVED_PREFIX + key));
-	respondedToSubscribedKey[config::KEY_OBSERVED_PREFIX + key] = !sent;
+	respondedToSubscribedKey[config::KEY_OBSERVED_PREFIX + key] = true;
 //	respondedToSubscribedKey[config::KEY_REMOVED_PREFIX + key] = true; TODO reenable subscription to removed sets?
 }
 
