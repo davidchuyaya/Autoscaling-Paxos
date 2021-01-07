@@ -20,14 +20,14 @@ void network::poll() {
 				std::shared_ptr<socketInfo> receiver = sockets[i];
 
 				if (receiver->isServer) {
-					while (receiver->socket.recv(&message, ZMQ_DONTWAIT) > 0) {  //servers will receive the sender's address first
+					while (receiver->socket.recv(&message, ZMQ_DONTWAIT)) {  //servers will receive the sender's address first
 						std::string senderAddress = zmqMessageToString(message);
 						receiver->socket.recv(&message);
 						handlers[receiver->type](senderAddress, zmqMessageToString(message), now);
 					}
 				}
 				else {
-					while (receiver->socket.recv(&message, ZMQ_DONTWAIT) > 0)
+					while (receiver->socket.recv(&message, ZMQ_DONTWAIT))
 						handlers[receiver->type](receiver->senderAddress, zmqMessageToString(message), now);
 				}
 			}
@@ -69,8 +69,7 @@ std::shared_ptr<socketInfo> network::startAnnaReader(int port, const ComponentTy
 
 std::shared_ptr<socketInfo> network::startAnnaWriter(const std::string& address) {
 	//socketInfo type doesn't matter; we don't poll
-	auto writer = sockets.emplace_back(std::make_shared<socketInfo>(
-			socketInfo::customSocket(context, ZMQ_PUSH, AnnaResponse)));
+	auto writer = std::make_shared<socketInfo>(socketInfo::customSocket(context, ZMQ_PUSH, AnnaResponse));
 	writer->socket.setsockopt(ZMQ_LINGER, 0); //don't queue messages to closed sockets
 	writer->socket.connect(address);
 	return writer;

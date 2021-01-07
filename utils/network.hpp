@@ -49,7 +49,7 @@ public:
 	std::shared_ptr<socketInfo> startServerAtPort(int port, ComponentType clientType);
 	std::shared_ptr<socketInfo> connectToAddress(const std::string& address, int port, ComponentType serverType);
 	std::shared_ptr<socketInfo> startAnnaReader(int port, ComponentType readerType);
-	std::shared_ptr<socketInfo> startAnnaWriter(const std::string& address);
+	[[nodiscard]] std::shared_ptr<socketInfo> startAnnaWriter(const std::string& address);
 	void connectExistingSocketToAddress(const std::shared_ptr<socketInfo>& client, const std::string& address);
     void sendToServer(zmq::socket_t& socket, const std::string& payload);
 	void sendToClient(zmq::socket_t& socket, const std::string& clientAddress, const std::string& payload);
