@@ -35,13 +35,13 @@ private:
 	std::unordered_map<std::string, std::string> addressForKey; //key, address
 	std::unordered_map<std::string, std::shared_ptr<socketInfo>> socketForAddress; //address, socket
 	std::unordered_set<std::string> pendingKeyAddresses; //key
-	std::unordered_map<std::string, std::string> pendingWrites; //key, value
+	std::unordered_map<std::string, KeyRequest> pendingWrites; //key, value
 	std::unordered_map<std::string, bool> respondedToSubscribedKey = {}; //key, responded
 
 	void startKeyAddressRequestListener();
 	void startRequestListener();
     void putLattice(const std::string& prefixedKey, const std::unordered_set<std::string>& lattice);
-    void tryRequest(const KeyRequest& request);
+    bool tryRequest(const KeyRequest& request);
 	void tryKeyAddressRequest(const KeyAddressRequest& request);
 };
 
