@@ -35,7 +35,7 @@ namespace config {
     const static int PROMETHEUS_PORT = 16000;
     const static int ANNA_KEY_ADDRESS_PORT = 17000;
     const static int ANNA_RESPONSE_PORT = 17100;
-    const static int ZMQ_NUM_IO_THREADS = 6; //8 - 1 prometheus thread - 1 main thread
+    const static int ZMQ_NUM_IO_THREADS = 5; //8 - 2 prometheus threads - 1 main thread
 
     const static inline std::string ENV_IP_NAME = "IP";
     const static inline std::string ENV_PRIVATE_IP_NAME = "PRIVATE_IP";
