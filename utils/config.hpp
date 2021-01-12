@@ -13,7 +13,7 @@
 #define INIT_LOGGER() spdlog::basic_logger_mt("paxos_log", "log.txt");spdlog::get("paxos_log")->flush_on(spdlog::level::info)
 #define BENCHMARK_LOG(...) spdlog::get("paxos_log")->info(__VA_ARGS__) //some logging is always on for benchmarks
 
-//#define DEBUG
+#define DEBUG
 #ifdef DEBUG
 #   define LOG(...) BENCHMARK_LOG(__VA_ARGS__)
 #   define TIME() LOG("Micro: {}\n", std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now().time_since_epoch()).count())

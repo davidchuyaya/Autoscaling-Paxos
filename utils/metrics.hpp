@@ -15,10 +15,14 @@
 
 namespace metrics {
 	enum Counter {
-		NumProcessedMessages
+		NumProcessedMessages,
+		NumSentMockMessages,
+		NumReceivedMockMessages
 	};
 	const static std::unordered_map<Counter, std::string> counterNames = {
-			{NumProcessedMessages, "num_processed_messages"}
+			{NumProcessedMessages, "num_processed_messages"},
+			{NumSentMockMessages, "num_sent_mock_messages"},
+			{NumReceivedMockMessages, "num_received_mock_messages"}
 	};
 	enum Gauge {
 
