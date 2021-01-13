@@ -184,6 +184,7 @@ void mock::genericReceiver(const ComponentType type, const int port, const bool 
 
 void mock::customSender(ComponentType type, int port, const std::function<std::string()>& generateMessage) {
 	extraSocket = zmqNetwork->connectToAddress(serverAddress, port, type);
+	BENCHMARK_LOG("Begin sending...");
 	while (true) { //bombard the network lol
 		zmqNetwork->sendToServer(extraSocket->socket, generateMessage());
 		incrementMetricsCounter();

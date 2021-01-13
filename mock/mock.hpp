@@ -33,7 +33,7 @@ private:
 	anna* annaClient;
 
 	const bool isSender;
-	const std::string& serverAddress;
+	const std::string serverAddress;
 	std::string clientAddress;
 	int counter; //used as message payload to generate unique messages
 	std::shared_ptr<socketInfo> extraSocket; //used to keep a reference to a socket in lambdas. Careful when using
