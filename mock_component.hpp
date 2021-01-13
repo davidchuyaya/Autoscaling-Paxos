@@ -9,6 +9,7 @@
 #include <cstdlib>
 #include <string>
 #include "mock/mock.hpp"
+#include "utils/config.hpp"
 
 class mock_component {
 public:

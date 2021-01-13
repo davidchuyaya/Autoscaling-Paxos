@@ -29,13 +29,16 @@ mock_component::mock_component(const int argc, const char**argv) {
 		mockComponent->batcher();
 	}
 	else if (component == "proposer") {
-		if (argc == 2)
+		if (argc == 2) {
 			mockComponent = new mock(false);
-		else if (argc == 3)
+			mockComponent->proposer();
+		}
+		else if (argc == 3) {
 			mockComponent = new mock(true); //no server address, just acceptorGroupId
+			mockComponent->proposer(argv[2]);
+		}
 		else
 			printUsage();
-		mockComponent->proposer(argv[2]);
 	}
 	else if (component == "proxy_leader") {
 		printUsage(argc < 3);
@@ -97,5 +100,6 @@ void mock_component::printUsage(const bool ifThisIsTrue) {
 }
 
 int main(const int argc, const char** argv) {
+	INIT_LOGGER();
 	mock_component m(argc, argv);
 }

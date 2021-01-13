@@ -7,7 +7,7 @@
 mock::mock(const bool isSender, const std::string& serverAddress) : isSender(isSender), serverAddress(serverAddress) {
 	metricsVars = metrics::createMetricsVars({metrics::Counter::NumSentMockMessages,
 	                                          metrics::Counter::NumReceivedMockMessages}, {}, {}, {});
-
+	printf("Server address: %s\n", serverAddress.c_str());
 	zmqNetwork = new network();
 }
 
@@ -32,13 +32,12 @@ void mock::proposer(const std::string& acceptorGroupId) {
 
 	if (isSender) {
 		//note: can't use customSender(), since we are the server
-		std::shared_ptr<socketInfo> receiverSocket = zmqNetwork->startServerAtPort(config::PROPOSER_PORT_FOR_PROXY_LEADERS,
-		                                                                           ProxyLeader);
+		extraSocket = zmqNetwork->startServerAtPort(config::PROPOSER_PORT_FOR_PROXY_LEADERS,ProxyLeader);
 
-		zmqNetwork->addHandler(ProxyLeader, [&, acceptorGroupId, receiverSocket]
+		zmqNetwork->addHandler(ProxyLeader, [&, acceptorGroupId]
 			(const std::string& address, const std::string& payload, const time_t now) {
 			while (true) { //bombard the network lol
-				zmqNetwork->sendToClient(receiverSocket->socket, address, generateP2A(acceptorGroupId));
+				zmqNetwork->sendToClient(extraSocket->socket, address, generateP2A(acceptorGroupId));
 				incrementMetricsCounter();
 			}
 		});
@@ -56,12 +55,12 @@ void mock::proxyLeaderForProposer(const std::string& acceptorGroupId) {
 	}
 
 	//proposer will not write unless enough acceptor groups exist
+	printf("Acceptor group ID: %s\n", acceptorGroupId.c_str());
 	annaClient = anna::writeOnly(zmqNetwork, {{config::KEY_ACCEPTOR_GROUPS, acceptorGroupId}});
 
 	//note: can't use customReceiver(), since we are not the server
-	std::shared_ptr<socketInfo> receiverSocket = zmqNetwork->connectToAddress(serverAddress,
-																		   config::PROPOSER_PORT_FOR_PROXY_LEADERS, Proposer);
-	zmqNetwork->addHandler(Proposer, [&, receiverSocket]
+	extraSocket = zmqNetwork->connectToAddress(serverAddress, config::PROPOSER_PORT_FOR_PROXY_LEADERS, Proposer);
+	zmqNetwork->addHandler(Proposer, [&]
 			(const std::string& address, const std::string& payload, const time_t now) {
 		ProposerToAcceptor proposerToAcceptor;
 		proposerToAcceptor.ParseFromString(payload);
@@ -69,7 +68,8 @@ void mock::proxyLeaderForProposer(const std::string& acceptorGroupId) {
 		switch (proposerToAcceptor.type()) {
 			case ProposerToAcceptor_Type_p1a: {
 				//proposer wins immediately, existing log is empty
-				zmqNetwork->sendToServer(receiverSocket->socket, message::createP1B(proposerToAcceptor.messageid(),
+				BENCHMARK_LOG("Proposer won mock phase 1");
+				zmqNetwork->sendToServer(extraSocket->socket, message::createP1B(proposerToAcceptor.messageid(),
 																		proposerToAcceptor.acceptorgroupid(),
 																		proposerToAcceptor.ballot(), {}).SerializeAsString());
 				break;
@@ -82,9 +82,9 @@ void mock::proxyLeaderForProposer(const std::string& acceptorGroupId) {
 		}
 	});
 
-	zmqNetwork->addTimer([&, receiverSocket](const time_t now) { //heartbeat
-		if (!clientAddress.empty())
-			zmqNetwork->sendToServer(receiverSocket->socket, "");
+	zmqNetwork->addTimer([&](const time_t now) { //heartbeat
+		LOG("Sending heartbeat");
+		zmqNetwork->sendToServer(extraSocket->socket, "");
 	}, config::HEARTBEAT_SLEEP_SEC, true);
 
 	zmqNetwork->poll();
@@ -92,22 +92,21 @@ void mock::proxyLeaderForProposer(const std::string& acceptorGroupId) {
 
 void mock::proxyLeaderForAcceptor() {
 	//can't use customSender() or customReceiver(), since we're both
-	std::shared_ptr<socketInfo> receiverSocket = zmqNetwork->connectToAddress(serverAddress,
-																		   config::ACCEPTOR_PORT_FOR_PROXY_LEADERS, Acceptor);
-	zmqNetwork->addHandler(Acceptor, [&, receiverSocket]
+	extraSocket = zmqNetwork->connectToAddress(serverAddress, config::ACCEPTOR_PORT_FOR_PROXY_LEADERS, Acceptor);
+	zmqNetwork->addHandler(Acceptor, [&]
 			(const std::string& address, const std::string& payload, const time_t now) {
 		metricsVars->counters[metrics::Counter::NumReceivedMockMessages]->Increment();
 
 		//resend, increase load exponentially
 		for (int i = 0; i < 2; ++i) {
-			zmqNetwork->sendToServer(receiverSocket->socket, generateP2A());
+			zmqNetwork->sendToServer(extraSocket->socket, generateP2A());
 			metricsVars->counters[metrics::Counter::NumSentMockMessages]->Increment();
 		}
 	});
 
 	//send initial load
 	for (int i = 0; i < 5000; ++i) {
-		zmqNetwork->sendToServer(receiverSocket->socket, generateP2A());
+		zmqNetwork->sendToServer(extraSocket->socket, generateP2A());
 		metricsVars->counters[metrics::Counter::NumSentMockMessages]->Increment();
 	}
 
@@ -133,7 +132,7 @@ void mock::acceptor(const std::string& acceptorGroupId) {
 
 	//acceptors only talk to proxy leaders
 	customReceiver(ProxyLeader, config::ACCEPTOR_PORT_FOR_PROXY_LEADERS, false, [&](const std::string& ipAddress,
-			const std::string& payload, const time_t now, const std::shared_ptr<socketInfo>& receiverSocket){
+			const std::string& payload, const time_t now){
 		ProposerToAcceptor proposerToAcceptor;
 		proposerToAcceptor.ParseFromString(payload);
 
@@ -144,7 +143,7 @@ void mock::acceptor(const std::string& acceptorGroupId) {
 			}
 			case ProposerToAcceptor_Type_p2a: {
 				//value immediately accepted for slot
-				zmqNetwork->sendToClient(receiverSocket->socket, ipAddress,
+				zmqNetwork->sendToClient(extraSocket->socket, ipAddress,
 							 message::createP2B(proposerToAcceptor.messageid(), proposerToAcceptor.acceptorgroupid(),
 						   proposerToAcceptor.ballot(), proposerToAcceptor.slot()).SerializeAsString());
 				break;
@@ -178,34 +177,34 @@ void mock::genericSender(const ComponentType type, const int port) {
 }
 
 void mock::genericReceiver(const ComponentType type, const int port, const bool heartbeat) {
-	customReceiver(type, port, heartbeat, [&](const std::string& ipAddress, const std::string& payload, const time_t now,
-			const std::shared_ptr<socketInfo>& receiverSocket){
+	customReceiver(type, port, heartbeat, [&](const std::string& ipAddress, const std::string& payload, const time_t now){
 		incrementMetricsCounter(); //do nothing
 	});
 }
 
 void mock::customSender(ComponentType type, int port, const std::function<std::string()>& generateMessage) {
-	std::shared_ptr<socketInfo> senderSocket = zmqNetwork->connectToAddress(serverAddress, port, type);
+	extraSocket = zmqNetwork->connectToAddress(serverAddress, port, type);
 	while (true) { //bombard the network lol
-		zmqNetwork->sendToServer(senderSocket->socket, generateMessage());
+		zmqNetwork->sendToServer(extraSocket->socket, generateMessage());
 		incrementMetricsCounter();
 	}
 }
 
-void mock::customReceiver(ComponentType type, int port, bool heartbeat, const std::function<void(const std::string& ipAddress,
-		const std::string& payload, const time_t now, const std::shared_ptr<socketInfo>& receiverSocket)>& onReceive) {
-	std::shared_ptr<socketInfo> receiverSocket = zmqNetwork->startServerAtPort(port, type);
+void mock::customReceiver(ComponentType type, int port, bool heartbeat, const network::messageHandler& onReceive) {
+	extraSocket = zmqNetwork->startServerAtPort(port, type);
 
-	zmqNetwork->addHandler(type, [&, receiverSocket](const std::string& address, const std::string& payload, const time_t now) {
+	zmqNetwork->addHandler(type, [&](const std::string& address, const std::string& payload, const time_t now) {
 		if (clientAddress.empty())
 			clientAddress = address;
-		onReceive(address, payload, now, receiverSocket);
+		onReceive(address, payload, now);
 	});
 
 	if (heartbeat) {
-		zmqNetwork->addTimer([&, receiverSocket](const time_t now) {
-			if (!clientAddress.empty())
-				zmqNetwork->sendToClient(receiverSocket->socket, clientAddress, "");
+		zmqNetwork->addTimer([&](const time_t now) {
+			if (!clientAddress.empty()) {
+				LOG("Sending heartbeat");
+				zmqNetwork->sendToClient(extraSocket->socket, clientAddress, "");
+			}
 		}, config::HEARTBEAT_SLEEP_SEC, true);
 	}
 

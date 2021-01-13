@@ -36,15 +36,14 @@ private:
 	const std::string& serverAddress;
 	std::string clientAddress;
 	int counter; //used as message payload to generate unique messages
+	std::shared_ptr<socketInfo> extraSocket; //used to keep a reference to a socket in lambdas. Careful when using
 
 	void incrementMetricsCounter();
 
 	[[noreturn]] void genericSender(ComponentType type, int port);
 	[[noreturn]] void genericReceiver(ComponentType type, int port, bool heartbeat);
 	[[noreturn]] void customSender(ComponentType type, int port, const std::function<std::string()>& generateMessage);
-	[[noreturn]] void customReceiver(ComponentType type, int port, bool heartbeat,
-								  const std::function<void(const std::string& ipAddress, const std::string& payload,
-								  		const time_t now, const std::shared_ptr<socketInfo>& receiverSocket)>& onReceive);
+	[[noreturn]] void customReceiver(ComponentType type, int port, bool heartbeat, const network::messageHandler& onReceive);
 	std::string generateBatch(const std::string& ip = "u.nu/davidchu"); //default to my personal website
 	std::string generateP2A(const std::string& acceptorGroupId = "coolAcceptorGroupId");
 };
