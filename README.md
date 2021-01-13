@@ -137,9 +137,11 @@ export PRIVATE_IP=$(curl http://169.254.169.254/latest/meta-data/local-ipv4)
 export IP=$(curl http://169.254.169.254/latest/meta-data/public-ipv4)
 export ANNA_KEY_PREFIX=1
 export BATCH_SIZE=40
+export MAX_READS_PER_SOCKET_PER_POLL=5000
 ```
 The following parameters can be configured:
 - `BATCH_SIZE`: Larger batch sizes increase throughput but increase latency if there are not enough clients.
+- `MAX_READS_PER_SOCKET_PER_POLL`: The maximum number of reads that can occur per socket per poll. A larger number means fewer polls and higher performance, but runs the risk of starving other sockets if traffic is too high.
 - `ANNA_KEY_PREFIX`: An arbitrary string prepended to the front of keys stored in Anna. This **MUST** be changed between executions; alternatively, Anna should be restarted, such that routing tables store up-to-date information.
 
 ## Setting up Anna on EC2

@@ -19,16 +19,21 @@ void network::poll() {
 			if (pollItems[i].revents & ZMQ_POLLIN) {
 				std::shared_ptr<socketInfo> receiver = sockets[i];
 
+				int numReads = 0;
 				if (receiver->isServer) {
-					while (receiver->socket.recv(&message, ZMQ_DONTWAIT)) {  //servers will receive the sender's address first
+					//servers will receive the sender's address first
+					while (numReads < config::ZMQ_MAX_READS_PER_SOCKET_PER_POLL && receiver->socket.recv(&message, ZMQ_DONTWAIT)) {
 						std::string senderAddress = zmqMessageToString(message);
 						receiver->socket.recv(&message);
 						handlers[receiver->type](senderAddress, zmqMessageToString(message), now);
+						numReads += 1;
 					}
 				}
 				else {
-					while (receiver->socket.recv(&message, ZMQ_DONTWAIT))
+					while (numReads < config::ZMQ_MAX_READS_PER_SOCKET_PER_POLL && receiver->socket.recv(&message, ZMQ_DONTWAIT)) {
 						handlers[receiver->type](receiver->senderAddress, zmqMessageToString(message), now);
+						numReads += 1;
+					}
 				}
 			}
 		}
