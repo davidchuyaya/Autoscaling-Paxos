@@ -113,7 +113,7 @@ void mock::proxyLeaderForAcceptor() {
 	zmqNetwork->poll();
 }
 
-void mock::proxyLeaderForUnbatcher(const string& destAddress) {
+void mock::proxyLeaderForUnbatcher(const std::string& destAddress) {
 	if (!isSender) {
 		printf("Mock proxy leader cannot be receiver of unbatcher\n");
 		exit(0);
