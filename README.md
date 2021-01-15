@@ -297,5 +297,76 @@ scrape_configs:
 ```
 Then run `sudo systemctl restart prometheus` for the configuration to go live.
 
+## Finding the max throughputs of components
+To autoscale, we need to know "how much to scale". Evaluating the maximum throughput of each component will help us determine how much of that component we need, given a throughput. For example, if I knew that each proxy leader supported 100k messages per second, then given a total incoming workload of 1 million messages per second, I'd need 10 proxy leaders.
+
+`mock_component` exists to evaluate the maximum throughput of each individual component; it will **input** as many messages as possible into the given component and log (with Prometheus) the number of messages **outputted**. In other words, each component is tested by sandwiching it between 2 `mock_component`s.
+
+Remember to start up Prometheus & Grafana before you begin so you can see the throughput in real-time.
+
+Below are specifics about how to test each component. Note that each command is meant to be run on a **different** machine; otherwise they'll compete for compute resources. You should also change the `ANNA_KEY_PREFIX` env var between runs so the program doesn't look at the wrong IP addresses.
+
+#### Batcher
+```shell
+./mock_component client <BATCHER_ADDRESS>
+./batcher
+/mock_component proposer
+```
+Launch order:
+1. Mock proposer - this way it can broadcast its address to Anna, which the batcher connects to
+2. Batcher
+3. Mock client - the batcher is the server, so the client is launched after it
+
+#### Proposer
+```shell
+./mock_component batcher <PROPOSER_ADDRESS>
+./proposer 1 1
+./mock_component proxy_leader proposer <PROPOSER_ADDRESS> <ACCEPTOR_GROUP_ID>
+```
+Replace `<PROPOSER_ADDRESS>` with the IP address of the proposer. Replace `<ACCEPTOR_GROUP_ID>` with whatever value you desire.
+
+Launch order:
+1. Mock proxy leader - this way it broadcasts the acceptor group ID to Anna
+2. Proposer. **Note**: Give it ~20 seconds to read the acceptor group ID from Anna, then win leader election
+3. Mock batcher
+
+#### Proxy leader
+```shell
+./mock_component proposer <ACCEPTOR_GROUP_ID>
+./proxy_leader
+./mock_component acceptor <ACCEPTOR_GROUP_ID> #launch 2f+1 acceptors
+./mock_component unbatcher
+```
+Replace `<ACCEPTOR_GROUP_ID>` with whatever value you desire.
+
+Launch order:
+1. Mock acceptors, mock unbatcher - they broadcast their IPs to Anna
+2. Proxy leader
+3. Mock proposer
+
+#### Acceptor
+```shell
+./mock_component proxy_leader acceptor <ACCEPTOR_ADDRESS>
+./acceptor <ACCEPTOR_GROUP_ID>
+```
+Replace `<ACCEPTOR_GROUP_ID>` with whatever value you desire. Replace `<ACCEPTOR_ADDRESS>` with the IP address of the acceptor.
+
+Launch order:
+1. Acceptor
+2. Mock proxy leader
+
+#### Unbatcher
+```shell
+./mock_component proxy_leader unbatcher <UNBATCHER_ADDRESS> <CLIENT_ADDRESS>
+./unbatcher
+./mock_component client
+```
+Replace `<UNBATCHER_ADDRESS>` with the IP address of the unbatcher, and `<CLIENT_ADDRESS>` with the IP address of the client.
+
+Launch order:
+1. Mock client
+2. Unbatcher
+3. Mock proxy leader
+
 TODO
 
