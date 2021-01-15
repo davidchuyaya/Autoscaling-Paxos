@@ -74,7 +74,7 @@ void proxy_leader::listenToAnna(const std::string& key, const two_p_set& twoPSet
 }
 
 void proxy_leader::processNewAcceptorGroup(const std::string& acceptorGroupId) {
-	BENCHMARK_LOG("New acceptor group from proposer: {}", acceptorGroupId);
+	BENCHMARK_LOG("New acceptor group: {}", acceptorGroupId);
 	acceptorGroups[acceptorGroupId] =
 			new client_component(zmqNetwork, config::ACCEPTOR_PORT_FOR_PROXY_LEADERS, Acceptor,
 						[&, acceptorGroupId](const std::string& address, const time_t now) {

@@ -13,7 +13,7 @@
 #define INIT_LOGGER() spdlog::basic_logger_mt("paxos_log", "log.txt");spdlog::get("paxos_log")->flush_on(spdlog::level::info)
 #define BENCHMARK_LOG(...) spdlog::get("paxos_log")->info(__VA_ARGS__) //some logging is always on for benchmarks
 
-//#define DEBUG
+#define DEBUG
 #ifdef DEBUG
 #   define LOG(...) BENCHMARK_LOG(__VA_ARGS__)
 #   define TIME() LOG("Micro: {}\n", std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now().time_since_epoch()).count())
@@ -42,6 +42,7 @@ namespace config {
 	const static inline std::string ENV_ANNA_ROUTING_NAME = "ANNA_ROUTING";
 	const static inline std::string ENV_ANNA_KEY_PREFIX_NAME = "ANNA_KEY_PREFIX";
 	const static inline std::string ENV_BATCH_SIZE_NAME = "BATCH_SIZE";
+	const static inline std::string ENV_MAX_READS_PER_SOCKET_PER_POLL_NAME = "MAX_READS_PER_SOCKET_PER_POLL";
 	const static inline std::string ENV_AWS_REGION_NAME = "AWS_REGION";
 	const static inline std::string ENV_AWS_AVAILABILITY_ZONE_NAME = "AWS_AVAILABILITY_ZONE";
 	const static inline std::string ENV_AWS_AMI_NAME = "AWS_AMI";
@@ -52,6 +53,7 @@ namespace config {
 	const static inline std::string ANNA_ROUTING_ADDRESS = std::getenv(ENV_ANNA_ROUTING_NAME.c_str());
     const static inline std::string ANNA_KEY_PREFIX = std::getenv(ENV_ANNA_KEY_PREFIX_NAME.c_str());
 	const static int BATCH_SIZE = std::stoi(std::getenv(ENV_BATCH_SIZE_NAME.c_str()));
+	const static int ZMQ_MAX_READS_PER_SOCKET_PER_POLL = std::stoi(std::getenv(ENV_MAX_READS_PER_SOCKET_PER_POLL_NAME.c_str()));
 	const static inline std::string AWS_REGION = std::getenv(ENV_AWS_REGION_NAME.c_str());
 	const static inline std::string AWS_AVAILABILITY_ZONE = std::getenv(ENV_AWS_AVAILABILITY_ZONE_NAME.c_str());
 	const static inline std::string AWS_AMI = std::getenv(ENV_AWS_AMI_NAME.c_str());

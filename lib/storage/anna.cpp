@@ -114,7 +114,7 @@ bool anna::tryRequest(const KeyRequest& request) {
 	if (addressForKey.find(key) == addressForKey.end()) {
 		if (pendingKeyAddresses.find(key) != pendingKeyAddresses.end()) //already queued
 			return false;
-		LOG("Anna queueing request to {}", key);
+		LOG("Anna queueing request to {}, request {}", key, request.ShortDebugString());
 		if (request.type() == PUT) //GETs are not queued; they're subscriptions, so requests are sent periodically
 			pendingWrites[key] = request;
 		pendingKeyAddresses.emplace(key);

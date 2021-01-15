@@ -45,6 +45,7 @@ std::vector<std::string> scaling::startInstance(const std::string& executable, c
 	         << "export " << config::ENV_IP_NAME << "=$(curl http://169.254.169.254/latest/meta-data/public-ipv4)\n"
 	         << "export " << config::ENV_ANNA_KEY_PREFIX_NAME << "=" << config::ANNA_KEY_PREFIX << "\n"
 	         << "export " << config::ENV_BATCH_SIZE_NAME << "=" << config::BATCH_SIZE << "\n"
+	         << "export " << config::ENV_MAX_READS_PER_SOCKET_PER_POLL_NAME << "=" << config::ZMQ_MAX_READS_PER_SOCKET_PER_POLL << "\n"
 			 << "export " << config::ENV_AWS_REGION_NAME << "=" << config::AWS_REGION << "\n"
 			 << "export " << config::ENV_AWS_AVAILABILITY_ZONE_NAME << "=" << config::AWS_AVAILABILITY_ZONE << "\n"
 			 << "export " << config::ENV_AWS_AMI_NAME << "=" << config::AWS_AMI << "\n"
