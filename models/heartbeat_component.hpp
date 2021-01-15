@@ -27,7 +27,7 @@ private:
 	std::vector<std::string> fastComponents;
 	std::vector<std::string> slowComponents;
     int next = 0;
-    void checkHeartbeat(time_t now, const std::string& ipAddress);
+    void checkHeartbeat(time_t now);
 };
 
 

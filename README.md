@@ -341,7 +341,7 @@ Replace `<ACCEPTOR_GROUP_ID>` with whatever value you desire.
 
 Launch order:
 1. Mock acceptors, mock unbatcher - they broadcast their IPs to Anna
-2. Proxy leader
+2. Proxy leader. **Note**: Give it ~20 seconds to read acceptor group ID & connect to each acceptor
 3. Mock proposer
 
 #### Acceptor

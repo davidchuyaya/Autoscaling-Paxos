@@ -4,7 +4,11 @@
 
 #include "heartbeat_component.hpp"
 
-heartbeat_component::heartbeat_component(network* zmqNetwork) : zmqNetwork(zmqNetwork) {}
+heartbeat_component::heartbeat_component(network* zmqNetwork) : zmqNetwork(zmqNetwork) {
+	zmqNetwork->addTimer([&](const time_t now) {
+		checkHeartbeat(now);
+	}, config::HEARTBEAT_TIMEOUT_SEC, true);
+}
 
 void heartbeat_component::addHeartbeat(const std::string& ipAddress, const time_t now) {
 	LOG("Added heartbeat from {}", ipAddress);
@@ -13,9 +17,6 @@ void heartbeat_component::addHeartbeat(const std::string& ipAddress, const time_
 
 void heartbeat_component::addConnection(const std::string& ipAddress, const time_t now) {
 	fastComponents.emplace_back(ipAddress);
-	zmqNetwork->addTimer([&, ipAddress](const time_t now) {
-		checkHeartbeat(now, ipAddress);
-	}, now, config::HEARTBEAT_TIMEOUT_SEC, true);
 	addHeartbeat(ipAddress, now);
 }
 
@@ -38,24 +39,29 @@ std::string heartbeat_component::nextAddress() {
 	return "";
 }
 
-void heartbeat_component::checkHeartbeat(const time_t now, const std::string& ipAddress) {
-	auto iterator = fastComponents.begin();
-	auto positionInFastComponents = std::find(fastComponents.begin(), fastComponents.end(), ipAddress);
-
-	if (positionInFastComponents != fastComponents.end()) { //this is a fast component
+void heartbeat_component::checkHeartbeat(const time_t now) {
+	auto iterator = this->fastComponents.begin();
+	while (iterator != this->fastComponents.end()) {
+		const std::string ipAddress = *iterator;
 		if (difftime(now, heartbeats[ipAddress]) > config::HEARTBEAT_TIMEOUT_SEC) {
-			LOG("Node at {} failed to heartbeat\n", ipAddress);
+			LOG("Node at {} failed to heartbeat", ipAddress);
 			slowComponents.emplace_back(ipAddress);
-			fastComponents.erase(positionInFastComponents);
+			iterator = this->fastComponents.erase(iterator);
 		}
+		else
+			++iterator;
 	}
-	else { //this is a slow component
+
+	//if a node has a heartbeat, move it into the fast list
+	iterator = slowComponents.begin();
+	while (iterator != slowComponents.end()) {
+		const std::string ipAddress = *iterator;
 		if (difftime(now, heartbeats[ipAddress]) < config::HEARTBEAT_TIMEOUT_SEC) {
-			LOG("Node at {} is fast again\n", ipAddress);
-			auto positionInSlowComponents = std::find(slowComponents.begin(),
-			                                          slowComponents.end(), ipAddress);
-			fastComponents.emplace_back(ipAddress);
-			slowComponents.erase(positionInSlowComponents);
+			LOG("Node at {} is fast again", ipAddress);
+			this->fastComponents.emplace_back(ipAddress);
+			iterator = slowComponents.erase(iterator);
 		}
+		else
+			++iterator;
 	}
 }
