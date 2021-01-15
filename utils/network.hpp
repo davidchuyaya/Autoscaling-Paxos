@@ -80,6 +80,7 @@ private:
 	std::unordered_map<ComponentType, messageHandler> handlers;
 	std::priority_queue<timerInfo, std::vector<timerInfo>, timerInfoComparator> timers;
 
+	void setSocketOpt(const std::shared_ptr<socketInfo>& socketInfo);
 	zmq::message_t stringToZmqMessage(const std::string& s);
 	void removeClosedSockets();
 	void checkTimers(time_t now);

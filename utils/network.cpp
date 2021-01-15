@@ -47,7 +47,7 @@ void network::poll() {
 std::shared_ptr<socketInfo> network::startServerAtPort(int port, const ComponentType clientType) {
 	auto server = sockets.emplace_back(std::make_shared<socketInfo>(
 			socketInfo::serverSocket(context, clientType)));
-	server->socket.setsockopt(ZMQ_LINGER, 0); //don't queue messages to closed sockets
+	setSocketOpt(server);
 	server->socket.bind("tcp://*:" + std::to_string(port));
 	pollItems.emplace_back(zmq::pollitem_t{static_cast<void*>(server->socket), 0, ZMQ_POLLIN, 0});
 	return server;
@@ -57,7 +57,7 @@ std::shared_ptr<socketInfo> network::connectToAddress(const std::string& address
 	auto client = sockets.emplace_back(std::make_shared<socketInfo>(
 			socketInfo::clientSocket(context, serverType, address)));
 	client->socket.setsockopt(ZMQ_IDENTITY, config::IP_ADDRESS.c_str(), config::IP_ADDRESS.size()); //send router our IP
-	client->socket.setsockopt(ZMQ_LINGER, 0);
+	setSocketOpt(client);
 	client->socket.connect("tcp://" + address + ":" + std::to_string(port));
 	pollItems.emplace_back(zmq::pollitem_t{static_cast<void*>(client->socket), 0, ZMQ_POLLIN, 0});
 	return client;
@@ -66,7 +66,7 @@ std::shared_ptr<socketInfo> network::connectToAddress(const std::string& address
 std::shared_ptr<socketInfo> network::startAnnaReader(int port, const ComponentType readerType) {
 	auto reader = sockets.emplace_back(std::make_shared<socketInfo>(
 			socketInfo::customSocket(context, ZMQ_PULL, readerType)));
-	reader->socket.setsockopt(ZMQ_LINGER, 0); //don't queue messages to closed sockets
+	setSocketOpt(reader);
 	reader->socket.bind("tcp://*:" + std::to_string(port));
 	pollItems.emplace_back(zmq::pollitem_t{static_cast<void*>(reader->socket), 0, ZMQ_POLLIN, 0});
 	return reader;
@@ -75,9 +75,15 @@ std::shared_ptr<socketInfo> network::startAnnaReader(int port, const ComponentTy
 std::shared_ptr<socketInfo> network::startAnnaWriter(const std::string& address) {
 	//socketInfo type doesn't matter; we don't poll
 	auto writer = std::make_shared<socketInfo>(socketInfo::customSocket(context, ZMQ_PUSH, AnnaResponse));
-	writer->socket.setsockopt(ZMQ_LINGER, 0); //don't queue messages to closed sockets
+	setSocketOpt(writer);
 	writer->socket.connect(address);
 	return writer;
+}
+
+void network::setSocketOpt(const std::shared_ptr<socketInfo>& socketInfo) {
+	socketInfo->socket.setsockopt(ZMQ_LINGER, 0); //don't queue messages to closed sockets
+	socketInfo->socket.setsockopt(ZMQ_SNDHWM, 0); //no limit on # of queued messages
+	socketInfo->socket.setsockopt(ZMQ_RCVHWM, 0);
 }
 
 void network::connectExistingSocketToAddress(const std::shared_ptr<socketInfo>& client, const std::string& address) {
