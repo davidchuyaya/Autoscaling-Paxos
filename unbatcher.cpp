@@ -5,6 +5,8 @@
 #include "unbatcher.hpp"
 
 unbatcher::unbatcher() {
+	metricsVars = metrics::createMetricsVars({ metrics::NumIncomingMessages, metrics::NumOutgoingMessages},{},{},{});
+
 	zmqNetwork = new network();
 
 	annaClient = anna::writeOnly(zmqNetwork, {{config::KEY_UNBATCHERS, config::IP_ADDRESS}});
@@ -36,6 +38,7 @@ unbatcher::unbatcher() {
 void unbatcher::listenToProxyLeaders(const Batch& batch) {
 	LOG("Unbatcher received payload: {}", batch.ShortDebugString());
 	TIME();
+	metricsVars->counters[metrics::NumIncomingMessages]->Increment();
 
 	if (!clients->isConnected(batch.client())) {
 		clients->connectToNewMembers({{batch.client()},{}}, 0);
@@ -48,6 +51,7 @@ void unbatcher::listenToProxyLeaders(const Batch& batch) {
 	while (std::getline(stream, request, config::REQUEST_DELIMITER[0])) {
 		LOG("Sending split request: {}", request);
 		clients->sendToIp(batch.client(), request);
+		metricsVars->counters[metrics::NumOutgoingMessages]->Increment();
 	}
 
 	TIME();

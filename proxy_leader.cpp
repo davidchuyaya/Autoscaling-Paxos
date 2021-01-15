@@ -5,6 +5,10 @@
 #include "proxy_leader.hpp"
 
 proxy_leader::proxy_leader() {
+	metricsVars = metrics::createMetricsVars({metrics::NumIncomingMessages, metrics::NumOutgoingMessages,
+										   metrics::P1A, metrics::P1BPreempted, metrics::P1BSuccess, metrics::P2BPreempted},
+										  {},{},{});
+
 	zmqNetwork = new network();
 
 	annaClient = anna::readWritable(zmqNetwork, {{config::KEY_PROXY_LEADERS, config::IP_ADDRESS}},
@@ -104,6 +108,15 @@ void proxy_leader::listenToProposer(const ProposerToAcceptor& payload, const std
 	}
 
 	TIME();
+	switch (payload.type()) {
+		case ProposerToAcceptor_Type_p1a:
+			metricsVars->counters[metrics::P1A]->Increment();
+			break;
+		case ProposerToAcceptor_Type_p2a:
+			metricsVars->counters[metrics::NumIncomingMessages]->Increment();
+			break;
+		default: {}
+	}
     sentMessages[payload.messageid()] = sentMetadata{payload, ipAddress}; // keep track
 	acceptorGroups[payload.acceptorgroupid()]->broadcast(payload.SerializeAsString());
 	TIME();
@@ -131,6 +144,7 @@ void proxy_leader::handleP1B(const AcceptorToProxyLeader& payload) {
     if (Log::isBallotGreaterThan(payload.ballot(), sentValue.value.ballot())) {
         //yikes, the proposer got preempted
 	    BENCHMARK_LOG("P1B preempted for proposer {}", payload.ballot().id());
+	    metricsVars->counters[metrics::P1BPreempted]->Increment();
         const ProxyLeaderToProposer& messageToProposer = message::createProxyP1B(payload.messageid(),
                                                                                  payload.acceptorgroupid(),
                                                                                  payload.ballot(), {}, {});
@@ -145,7 +159,8 @@ void proxy_leader::handleP1B(const AcceptorToProxyLeader& payload) {
         if (unmergedLogs[payload.messageid()].size() >= config::F + 1) {
             //we have f+1 good logs, merge them & tell the proposer
 	        BENCHMARK_LOG("P1B approved for proposer {}", payload.ballot().id());
-            const auto&[committedLog, uncommittedLog] = Log::mergeLogsOfAcceptorGroup(unmergedLogs[payload.messageid()]);
+	        metricsVars->counters[metrics::P1BSuccess]->Increment();
+	        const auto&[committedLog, uncommittedLog] = Log::mergeLogsOfAcceptorGroup(unmergedLogs[payload.messageid()]);
             const ProxyLeaderToProposer& messageToProposer = message::createProxyP1B(payload.messageid(),
 																					 payload.acceptorgroupid(),
                                                                                      payload.ballot(),
@@ -165,6 +180,7 @@ void proxy_leader::handleP2B(const AcceptorToProxyLeader& payload) {
     if (Log::isBallotGreaterThan(payload.ballot(), sentValue.value.ballot())) {
         //yikes, the proposer got preempted
 	    LOG("P2B preempted for proposer: {}, slot: {}", payload.ballot().id(), payload.slot());
+	    metricsVars->counters[metrics::P2BPreempted]->Increment();
         const ProxyLeaderToProposer& messageToProposer = message::createProxyP2B(payload.messageid(),
 																				 payload.acceptorgroupid(),
                                                                                 payload.ballot(), payload.slot());
@@ -179,6 +195,7 @@ void proxy_leader::handleP2B(const AcceptorToProxyLeader& payload) {
         if (approvedCommanders[payload.messageid()] >= config::F + 1) {
             //we have f+1 approved commanders, tell the unbatcher. No need to tell proposer
 	        LOG("P2B approved for proposer: {}, slot: {}", payload.ballot().id(), payload.slot());
+	        metricsVars->counters[metrics::NumOutgoingMessages]->Increment();
 	        unbatchers->sendToIp(unbatcherHeartbeat->nextAddress(),
 							 message::createBatchMessage(sentValue.value.client(), sentValue.value.payload())
 							 .SerializeAsString());

@@ -10,6 +10,7 @@
 #include <unordered_map>
 #include <message.pb.h>
 #include "utils/network.hpp"
+#include "utils/metrics.hpp"
 #include "models/client_component.hpp"
 #include "models/server_component.hpp"
 #include "lib/storage/anna.hpp"
@@ -18,6 +19,7 @@ class unbatcher {
 public:
     explicit unbatcher();
 private:
+	std::shared_ptr<metrics::variables> metricsVars;
 	anna* annaClient;
 	network* zmqNetwork;
 	client_component* clients;

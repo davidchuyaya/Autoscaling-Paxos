@@ -4,7 +4,8 @@
 #include "proposer.hpp"
 
 proposer::proposer(const int id, const int numAcceptorGroups) : id(id), numAcceptorGroups(numAcceptorGroups) {
-	metricsVars = metrics::createMetricsVars({metrics::NumProcessedMessages},{},{},{});
+	metricsVars = metrics::createMetricsVars({metrics::NumProcessedMessages, metrics::P1A, metrics::P1BPreempted,
+										   metrics::P1BSuccess, metrics::P2BPreempted, metrics::LeaderHeartbeatReceived},{},{},{});
 
 	zmqNetwork = new network();
 
@@ -130,6 +131,7 @@ void proposer::listenToProxyLeader(const ProxyLeaderToProposer& payload) {
 }
 
 void proposer::listenToProposer(const Ballot& leaderBallot, const time_t now) {
+	metricsVars->counters[metrics::LeaderHeartbeatReceived]->Increment();
 	if (Log::isBallotGreaterThan(ballot, leaderBallot))
 		return;
     lastLeaderHeartbeat = now; // store the time we received the heartbeat
@@ -148,6 +150,7 @@ void proposer::sendScouts() {
     ballotNum += 1;
     currentBallotNum = ballotNum;
     BENCHMARK_LOG("P1A blasting out: id = {}, ballotNum = {}", id, currentBallotNum);
+    metricsVars->counters[metrics::P1A]->Increment();
 
     for (const std::string& acceptorGroupId : acceptorGroupIds) {
         remainingAcceptorGroupsForScouts.emplace(acceptorGroupId);
@@ -163,6 +166,7 @@ void proposer::handleP1B(const ProxyLeaderToProposer& message) {
         // store the largest ballot we last saw so we can immediately catch up
         ballotNum = message.ballot().ballotnum();
         noLongerLeader();
+        metricsVars->counters[metrics::P1BPreempted]->Increment();
         return;
     }
 
@@ -176,7 +180,8 @@ void proposer::handleP1B(const ProxyLeaderToProposer& message) {
 
     //leader election complete
     isLeader = true;
-    LOG("I am leader!");
+    BENCHMARK_LOG("I am leader!");
+    metricsVars->counters[metrics::P1BSuccess]->Increment();
 	ballot = message.ballot();
     proposers->broadcast(ballot.SerializeAsString());
 
@@ -202,9 +207,11 @@ void proposer::mergeLogs() {
 }
 
 void proposer::handleP2B(const ProxyLeaderToProposer& message) {
-    LOG("Received p2b: {}", message.ShortDebugString());
-    if (message.ballot().id() != id) //yikes, we got preempted
-        noLongerLeader();
+	BENCHMARK_LOG("Received p2b: {}", message.ShortDebugString());
+    if (message.ballot().id() != id) { //yikes, we got preempted
+	    noLongerLeader();
+	    metricsVars->counters[metrics::P2BPreempted]->Increment();
+    }
 }
 
 void proposer::noLongerLeader() {

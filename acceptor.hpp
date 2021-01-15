@@ -9,6 +9,7 @@
 #include <vector>
 #include "utils/config.hpp"
 #include "utils/network.hpp"
+#include "utils/metrics.hpp"
 #include "models/log.hpp"
 #include "models/message.hpp"
 #include "models/server_component.hpp"
@@ -19,6 +20,7 @@ class acceptor {
 public:
     explicit acceptor(std::string&& acceptorGroupId);
 private:
+	std::shared_ptr<metrics::variables> metricsVars;
 	anna* annaClient;
 	network *zmqNetwork;
 	server_component* proxyLeaders;

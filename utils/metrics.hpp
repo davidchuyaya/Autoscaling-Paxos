@@ -17,12 +17,26 @@ namespace metrics {
 	enum Counter {
 		NumProcessedMessages,
 		NumSentMockMessages,
-		NumReceivedMockMessages
+		NumReceivedMockMessages,
+		NumIncomingMessages,
+		NumOutgoingMessages,
+		P1A,
+		P1BSuccess,
+		P1BPreempted,
+		P2BPreempted,
+		LeaderHeartbeatReceived
 	};
 	const static std::unordered_map<Counter, std::string> counterNames = {
 			{NumProcessedMessages, "num_processed_messages"},
 			{NumSentMockMessages, "num_sent_mock_messages"},
-			{NumReceivedMockMessages, "num_received_mock_messages"}
+			{NumReceivedMockMessages, "num_received_mock_messages"},
+			{NumIncomingMessages, "num_incoming_messages"},
+			{NumOutgoingMessages, "num_outgoing_messages"},
+			{P1A, "p1a"},
+			{P1BSuccess, "p1b_success"},
+			{P1BPreempted, "p1b_preempted"},
+			{P2BPreempted, "p2b_preempted"},
+			{LeaderHeartbeatReceived, "leader_heartbeat_received"}
 	};
 	enum Gauge {
 

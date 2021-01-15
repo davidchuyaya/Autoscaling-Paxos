@@ -13,6 +13,7 @@
 #include "models/client_component.hpp"
 #include "utils/config.hpp"
 #include "utils/network.hpp"
+#include "utils/metrics.hpp"
 #include "message.pb.h"
 #include "lib/storage/anna.hpp"
 #include "lib/storage/two_p_set.hpp"
@@ -21,6 +22,7 @@ class batcher {
 public:
     explicit batcher();
 private:
+	std::shared_ptr<metrics::variables> metricsVars;
     anna* annaClient;
     network* zmqNetwork;
 	client_component* proposers;

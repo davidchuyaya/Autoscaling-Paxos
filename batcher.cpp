@@ -5,6 +5,8 @@
 #include "batcher.hpp"
 
 batcher::batcher() {
+	metricsVars = metrics::createMetricsVars({metrics::NumIncomingMessages, metrics::NumOutgoingMessages},{},{},{});
+
 	zmqNetwork = new network();
 
     annaClient = anna::readWritable(zmqNetwork, {{config::KEY_BATCHERS, config::IP_ADDRESS}},
@@ -33,6 +35,7 @@ batcher::batcher() {
 
 		LOG("Received --{}-- from client {}", payload, address);
 		TIME();
+		metricsVars->counters[metrics::NumIncomingMessages]->Increment();
 		clientToPayloads[address] += payload + config::REQUEST_DELIMITER;
 		numPayloads += 1;
 		if (numPayloads >= config::BATCH_SIZE)
@@ -54,6 +57,7 @@ void batcher::sendBatch() {
 	LOG("Sending batch");
 	for (const auto&[client, payloads] : clientToPayloads)
 		proposers->broadcast(message::createBatchMessage(client, payloads).SerializeAsString());
+	metricsVars->counters[metrics::NumOutgoingMessages]->Increment(clientToPayloads.size());
 	TIME();
 	clientToPayloads.clear();
 	numPayloads = 0;

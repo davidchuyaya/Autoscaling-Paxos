@@ -5,6 +5,9 @@
 #include "acceptor.hpp"
 
 acceptor::acceptor(std::string&& acceptorGroupId) :acceptorGroupId(acceptorGroupId) {
+	metricsVars = metrics::createMetricsVars({ metrics::NumProcessedMessages, metrics::P1BPreempted,
+											metrics::P1BSuccess, metrics::P2BPreempted},{},{},{});
+
 	zmqNetwork = new network();
 
 	annaClient = anna::writeOnly(zmqNetwork, {
@@ -30,8 +33,13 @@ void acceptor::listenToProxyLeaders(const std::string& ipAddress, const Proposer
         case ProposerToAcceptor_Type_p1a: {
             BENCHMARK_LOG("Received p1a: {}, highestBallot: {}", payload.ShortDebugString(),
 						  highestBallot.ShortDebugString());
-            if (Log::isBallotGreaterThan(payload.ballot(), highestBallot))
-                highestBallot = payload.ballot();
+            if (Log::isBallotGreaterThan(payload.ballot(), highestBallot)) {
+	            highestBallot = payload.ballot();
+	            metricsVars->counters[metrics::P1BSuccess]->Increment();
+            }
+            else {
+	            metricsVars->counters[metrics::P1BPreempted]->Increment();
+            }
 	        reply = message::createP1B(payload.messageid(), acceptorGroupId, highestBallot, log).SerializeAsString();
             break;
         }
@@ -45,6 +53,10 @@ void acceptor::listenToProxyLeaders(const std::string& ipAddress, const Proposer
                 *pValue.mutable_ballot() = payload.ballot();
                 log[payload.slot()] = pValue;
                 highestBallot = payload.ballot();
+	            metricsVars->counters[metrics::NumProcessedMessages]->Increment();
+            }
+            else {
+	            metricsVars->counters[metrics::P2BPreempted]->Increment();
             }
             reply = message::createP2B(payload.messageid(), acceptorGroupId, highestBallot, payload.slot())
             		.SerializeAsString();

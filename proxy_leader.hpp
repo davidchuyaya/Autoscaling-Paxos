@@ -12,6 +12,7 @@
 #include <message.pb.h>
 #include "utils/config.hpp"
 #include "utils/network.hpp"
+#include "utils/metrics.hpp"
 #include "models/message.hpp"
 #include "models/log.hpp"
 #include "models/heartbeat_component.hpp"
@@ -22,7 +23,8 @@ class proxy_leader {
 public:
     explicit proxy_leader();
 private:
-    anna* annaClient;
+	std::shared_ptr<metrics::variables> metricsVars;
+	anna* annaClient;
 	network* zmqNetwork;
 	client_component* proposers;
 	heartbeat_component* unbatcherHeartbeat;
