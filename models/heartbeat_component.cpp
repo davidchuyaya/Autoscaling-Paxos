@@ -28,13 +28,21 @@ void heartbeat_component::removeConnection(const std::string& ipAddress) {
 
 std::string heartbeat_component::nextAddress() {
 	//prioritize sending to fast proxy leaders
+	next += 1;
+	int modNext = next / config::ZMQ_MAX_READS_PER_SOCKET_PER_POLL; //usually use same component = faster, somehow
 	if (!fastComponents.empty()) {
-		next = (next + 1) % fastComponents.size();
-		return fastComponents[next];
+		if (modNext >= fastComponents.size()) {
+			modNext = 0;
+			next = 0;
+		}
+		return fastComponents[modNext];
 	}
 	if (!slowComponents.empty()) {
-		next = (next + 1) % slowComponents.size();
-		return slowComponents[next];
+		if (modNext >= slowComponents.size()) {
+			modNext = 0;
+			next = 0;
+		}
+		return slowComponents[modNext];
 	}
 	return "";
 }
