@@ -169,6 +169,10 @@ void proposer::handleP1B(const ProxyLeaderToProposer& message) {
         metricsVars->counters[metrics::P1BPreempted]->Increment();
         return;
     }
+    if (message.ballot().ballotnum() != ballotNum)
+    	return; //old p1b
+    if (remainingAcceptorGroupsForScouts.empty())
+    	return; //extra p1b when we're not waiting for one
 
     acceptorGroupCommittedLogs.emplace_back(message.committedlog().begin(), message.committedlog().end());
     acceptorGroupUncommittedLogs[message.acceptorgroupid()] =
