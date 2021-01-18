@@ -8,13 +8,15 @@ server_component::server_component(network* zmqNetwork, int port, const Componen
                                    const onConnectHandler& onConnect,
                                    const network::messageHandler& listener)
                                    : component(zmqNetwork), onConnect(onConnect), listener(listener) {
-	zmqNetwork->addHandler(type,[&](const std::string& address, const std::string& payload, const time_t now) {
-		if (!isConnected(address)) {
-			//new connection
-			clientAddresses.emplace(address);
-			this->onConnect(address, now); //store functions into variables so they can still be used when stack frame is cleared
+	zmqNetwork->addHandler(type,[&](const network::addressPayloadsMap& addressToPayload, const time_t now) {
+		for (const auto&[address, payloads] : addressToPayload) {
+			if (!isConnected(address)) {
+				//new connection
+				clientAddresses.emplace(address);
+				this->onConnect(address, now); //store functions into variables so they can still be used when stack frame is cleared
+			}
 		}
-		this->listener(address, payload, now);
+		this->listener(addressToPayload, now);
 	});
 	serverSocket = zmqNetwork->startServerAtPort(port, type);
 }

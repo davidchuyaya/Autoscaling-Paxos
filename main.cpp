@@ -10,7 +10,8 @@ paxos::paxos(const int delay, const int numClients, const int numBatchers, const
 
 	zmqNetwork = new network();
 
-	annaClient = anna::readWritable(zmqNetwork, {}, [&](const std::string& key, const two_p_set& twoPSet, const time_t now) {
+	annaClient = anna::readWritable(zmqNetwork, {},
+								 [&](const std::string& key, const two_p_set& twoPSet, const time_t now) {
 		batchers->connectToNewMembers(twoPSet, now);
     });
 	annaClient->subscribeTo(config::KEY_BATCHERS);
@@ -25,18 +26,24 @@ paxos::paxos(const int delay, const int numClients, const int numBatchers, const
 	[&](const std::string& address, const time_t now) {
 		BENCHMARK_LOG("Client disconnected from batcher at {}", address);
 		batcherHeartbeat->removeConnection(address);
-	}, [&](const std::string& address, const std::string& payload, const time_t now) {
-		LOG("Batcher {} heartbeated", address);
-		batcherHeartbeat->addHeartbeat(address, now);
+	}, [&](const network::addressPayloadsMap& addressToPayloads, const time_t now) {
+		for (const auto&[address, payloads] : addressToPayloads) {
+			LOG("Batcher {} heartbeated", address);
+			batcherHeartbeat->addHeartbeat(address, now);
+		}
 	});
 
 	unbatchers = new server_component(zmqNetwork, config::CLIENT_PORT_FOR_UNBATCHERS, Unbatcher,
 							 [](const std::string& address, const time_t now) {
 		BENCHMARK_LOG("Unbatcher from {} connected to client", address);
-	},[&](const std::string& address, const std::string& payload, const time_t now) {
-		LOG("--Acked: {}--", payload);
-		//send another message back immediately
-		batchers->sendToIp(batcherHeartbeat->nextAddress(), payload);
+	},[&](const network::addressPayloadsMap& addressToPayloads, const time_t now) {
+		for (const auto&[address, payloads] : addressToPayloads) {
+			for (const std::string& payload : payloads) {
+				LOG("--Acked: {}--", payload);
+				//send another message back immediately
+				batchers->sendToIp(batcherHeartbeat->nextAddress(), payload);
+			}
+		}
 	});
 
 	//send messages to batchers after delay

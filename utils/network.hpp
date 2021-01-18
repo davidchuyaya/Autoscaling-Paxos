@@ -41,8 +41,8 @@ private:
 class network {
 public:
 	using timer = std::function<void(const time_t now)>;
-	using messageHandler = std::function<void(const std::string& ipAddress, const std::string& payload,
-			const time_t now)>;
+	using addressPayloadsMap = std::unordered_map<std::string, std::vector<std::string>>;
+	using messageHandler = std::function<void(const addressPayloadsMap& addressToPayloads, const time_t now)>;
 
     network();
     [[noreturn]] void poll();

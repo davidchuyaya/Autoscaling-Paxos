@@ -43,8 +43,8 @@ private:
 
     void listenToAnna(const std::string& key, const two_p_set& twoPSet, time_t now);
     void processNewAcceptorGroup(const std::string& acceptorGroupId);
-    void listenToProposer(const ProposerToAcceptor& payload, const std::string& ipAddress);
-    void listenToAcceptor(const AcceptorToProxyLeader& payload);
+    void listenToProposer(const network::addressPayloadsMap& addressToPayloads);
+    void listenToAcceptor(const network::addressPayloadsMap& addressToPayloads);
 
     /**
      * Handle a p1b from an acceptor group.

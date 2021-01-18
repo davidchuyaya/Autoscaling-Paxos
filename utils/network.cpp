@@ -9,6 +9,7 @@ network::network(): context(config::ZMQ_NUM_IO_THREADS) {}
 void network::poll() {
 	time_t now;
 	zmq::message_t message;
+	addressPayloadsMap addressToPayload(config::ZMQ_MAX_READS_PER_SOCKET_PER_POLL);
 
 	while (true) {
 		zmq::poll(pollItems.data(), pollItems.size(), config::ZMQ_POLL_TIMEOUT_SEC);
@@ -22,19 +23,23 @@ void network::poll() {
 				int numReads = 0;
 				if (receiver->isServer) {
 					//servers will receive the sender's address first
-					while (numReads < config::ZMQ_MAX_READS_PER_SOCKET_PER_POLL && receiver->socket.recv(&message, ZMQ_DONTWAIT)) {
+					while (numReads < config::ZMQ_MAX_READS_PER_SOCKET_PER_POLL &&
+							receiver->socket.recv(&message, ZMQ_DONTWAIT)) {
 						std::string senderAddress = zmqMessageToString(message);
 						receiver->socket.recv(&message);
-						handlers[receiver->type](senderAddress, zmqMessageToString(message), now);
+						addressToPayload[senderAddress].emplace_back(zmqMessageToString(message));
 						numReads += 1;
 					}
 				}
 				else {
-					while (numReads < config::ZMQ_MAX_READS_PER_SOCKET_PER_POLL && receiver->socket.recv(&message, ZMQ_DONTWAIT)) {
-						handlers[receiver->type](receiver->senderAddress, zmqMessageToString(message), now);
+					while (numReads < config::ZMQ_MAX_READS_PER_SOCKET_PER_POLL &&
+							receiver->socket.recv(&message, ZMQ_DONTWAIT)) {
+						addressToPayload[receiver->senderAddress].emplace_back(zmqMessageToString(message));
 						numReads += 1;
 					}
 				}
+				if (numReads > 0)
+					handlers[receiver->type](addressToPayload, now);
 			}
 		}
 

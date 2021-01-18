@@ -22,10 +22,8 @@ proposer::proposer(const int id, const int numAcceptorGroups) : id(id), numAccep
 		BENCHMARK_LOG("Proposer connected to proposer at {}", address);
 	},[](const std::string& address, const time_t now) {
 		BENCHMARK_LOG("ERROR??: Proposer disconnected from proposer at {}", address);
-	}, [&](const std::string& address, const std::string& payload, const time_t now) {
-		Ballot leaderBallot;
-		leaderBallot.ParseFromString(payload);
-		listenToProposer(leaderBallot, now);
+	}, [&](const network::addressPayloadsMap& addressToPayloads, const time_t now) {
+		listenToProposer(addressToPayloads, now);
 	});
 	//we don't talk to other proposers through the server port
 	zmqNetwork->startServerAtPort(config::PROPOSER_PORT_FOR_PROPOSERS, Proposer);
@@ -35,22 +33,15 @@ proposer::proposer(const int id, const int numAcceptorGroups) : id(id), numAccep
 	                              [&](const std::string& address, const time_t now) {
 		BENCHMARK_LOG("Proxy leader from {} connected to proposer", address);
 		proxyLeaderHeartbeat->addConnection(address, now);
-	}, [&](const std::string& address, const std::string& payload, const time_t now) {
-		proxyLeaderHeartbeat->addHeartbeat(address, now);
-		if (payload.empty()) //just a heartbeat
-			return;
-		ProxyLeaderToProposer proxyLeaderToProposer;
-		proxyLeaderToProposer.ParseFromString(payload);
-		listenToProxyLeader(proxyLeaderToProposer);
+	}, [&](const network::addressPayloadsMap& addressToPayloads, const time_t now) {
+		listenToProxyLeader(addressToPayloads, now);
 	});
 
 	batchers = new server_component(zmqNetwork, config::PROPOSER_PORT_FOR_BATCHERS, Batcher,
 						   [](const std::string& address, const time_t now) {
 		BENCHMARK_LOG("Batcher from {} connected to proposer", address);
-	}, [&](const std::string& address, const std::string& payload, const time_t now) {
-		Batch batch;
-		batch.ParseFromString(payload);
-		listenToBatcher(batch);
+	}, [&](const network::addressPayloadsMap& addressToPayloads, const time_t now) {
+		listenToBatcher(addressToPayloads);
 	});
 
 	//leader loop
@@ -96,48 +87,76 @@ void proposer::listenToAnna(const std::string& key, const two_p_set& twoPSet, co
     }
 }
 
-void proposer::listenToBatcher(const Batch& payload) {
-    LOG("Received batch request: {}", payload.ShortDebugString());
-    if (!isLeader)
-        return;
-
-    metricsVars->counters[metrics::NumProcessedMessages]->Increment();
-
-	TIME();
-    int slot;
-    if (logHoles.empty()) {
-        slot = nextSlot;
-        nextSlot += 1;
-    }
-    else {
-        slot = logHoles.front();
-        logHoles.pop();
-    }
-    proxyLeaders->sendToIp(proxyLeaderHeartbeat->nextAddress(),
-						  message::createP2A(id, ballotNum, slot, payload.client(), payload.request(),
-						   fetchNextAcceptorGroupId()).SerializeAsString());
-	TIME();
-}
-
-void proposer::listenToProxyLeader(const ProxyLeaderToProposer& payload) {
-    switch (payload.type()) {
-        case ProxyLeaderToProposer_Type_p1b:
-            handleP1B(payload);
-            break;
-        case ProxyLeaderToProposer_Type_p2b:
-            handleP2B(payload);
-            break;
-        default: {}
-    }
-}
-
-void proposer::listenToProposer(const Ballot& leaderBallot, const time_t now) {
-	metricsVars->counters[metrics::LeaderHeartbeatReceived]->Increment();
-	if (Log::isBallotGreaterThan(ballot, leaderBallot))
+void proposer::listenToBatcher(const network::addressPayloadsMap& addressToPayloads) {
+	if (!isLeader)
 		return;
-    lastLeaderHeartbeat = now; // store the time we received the heartbeat
-	LOG("Received leader heartbeat for time: {}", std::asctime(std::localtime(&lastLeaderHeartbeat)));
-	noLongerLeader();
+
+	Batch batch;
+	for (const auto&[address, payloads] : addressToPayloads) {
+		metricsVars->counters[metrics::NumProcessedMessages]->Increment(payloads.size());
+
+		for (const std::string& payload : payloads) {
+			batch.ParseFromString(payload);
+			LOG("Received batch request: {}", batch.ShortDebugString());
+
+			TIME();
+			int slot;
+			if (logHoles.empty()) {
+				slot = nextSlot;
+				nextSlot += 1;
+			}
+			else {
+				slot = logHoles.front();
+				logHoles.pop();
+			}
+			proxyLeaders->sendToIp(proxyLeaderHeartbeat->nextAddress(),
+			                       message::createP2A(id, ballotNum, slot, batch.client(), batch.request(),
+			                                          fetchNextAcceptorGroupId()).SerializeAsString());
+			TIME();
+			batch.Clear();
+		}
+	}
+}
+
+void proposer::listenToProxyLeader(const network::addressPayloadsMap& addressToPayloads, const time_t now) {
+	ProxyLeaderToProposer proxyLeaderToProposer;
+	for (const auto&[address, payloads] : addressToPayloads) {
+		proxyLeaderHeartbeat->addHeartbeat(address, now);
+		for (const std::string& payload : payloads) {
+			if (payload.empty()) //just a heartbeat
+				continue;
+
+			proxyLeaderToProposer.ParseFromString(payload);
+
+			switch (proxyLeaderToProposer.type()) {
+				case ProxyLeaderToProposer_Type_p1b:
+					handleP1B(proxyLeaderToProposer);
+					break;
+				case ProxyLeaderToProposer_Type_p2b:
+					handleP2B(proxyLeaderToProposer);
+					break;
+				default: {}
+			}
+
+			proxyLeaderToProposer.Clear();
+		}
+	}
+}
+
+void proposer::listenToProposer(const network::addressPayloadsMap& addressToPayloads, const time_t now) {
+	Ballot leaderBallot;
+	for (const auto&[address, payloads] : addressToPayloads) {
+		metricsVars->counters[metrics::LeaderHeartbeatReceived]->Increment(payloads.size());
+		for (const std::string& payload : payloads) {
+			leaderBallot.ParseFromString(payload);
+			if (Log::isBallotGreaterThan(ballot, leaderBallot))
+				continue;
+			lastLeaderHeartbeat = now; // store the time we received the heartbeat
+			LOG("Received leader heartbeat for time: {}", std::asctime(std::localtime(&lastLeaderHeartbeat)));
+			noLongerLeader();
+			leaderBallot.Clear();
+		}
+	}
 }
 
 void proposer::sendScouts() {

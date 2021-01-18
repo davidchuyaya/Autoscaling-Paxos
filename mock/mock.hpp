@@ -39,7 +39,7 @@ private:
 	int counter; //used as message payload to generate unique messages
 	std::shared_ptr<socketInfo> extraSocket; //used to keep a reference to a socket in lambdas. Careful when using
 
-	void incrementMetricsCounter();
+	void incrementMetricsCounter(int plus = 1);
 
 	[[noreturn]] void genericSender(ComponentType type, int port);
 	[[noreturn]] void genericReceiver(ComponentType type, int port, bool heartbeat);

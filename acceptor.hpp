@@ -33,7 +33,7 @@ private:
      * Process p1a and p2a messages from proxy leaders.
      * @param socket Socket ID of proxy leader
      */
-    void listenToProxyLeaders(const std::string& ipAddress, const ProposerToAcceptor& payload);
+    void listenToProxyLeaders(const network::addressPayloadsMap& addressToPayloads);
 };
 
 #endif //C__PAXOS_ACCEPTOR_HPP

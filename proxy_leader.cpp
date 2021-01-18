@@ -25,10 +25,8 @@ proxy_leader::proxy_leader() {
 		proposers->sendToIp(address, ""); //send first heartbeat
 	},[](const std::string& address, const time_t now) {
 		BENCHMARK_LOG("ERROR??: Proposer disconnected from proposer at {}", address);
-	}, [&](const std::string& address, const std::string& payload, const time_t now) {
-		ProposerToAcceptor proposerToAcceptor;
-		proposerToAcceptor.ParseFromString(payload);
-		listenToProposer(proposerToAcceptor, address);
+	}, [&](const network::addressPayloadsMap& addressToPayloads, const time_t now) {
+		listenToProposer(addressToPayloads);
 	});
 	proposers->startHeartbeater();
 
@@ -41,8 +39,9 @@ proxy_leader::proxy_leader() {
 	},[&](const std::string& address, const time_t now) {
 		BENCHMARK_LOG("Proxy leader disconnected from unbatcher at {}", address);
 		unbatcherHeartbeat->removeConnection(address);
-	}, [&](const std::string& address, const std::string& payload, const time_t now) {
-		unbatcherHeartbeat->addHeartbeat(address, now);
+	}, [&](const network::addressPayloadsMap& addressToPayloads, const time_t now) {
+		for (const auto&[address, payloads] : addressToPayloads)
+			unbatcherHeartbeat->addHeartbeat(address, now);
 	});
 
 	zmqNetwork->poll();
@@ -91,49 +90,63 @@ void proxy_leader::processNewAcceptorGroup(const std::string& acceptorGroupId) {
 				}
 			}, [](const std::string& address, const time_t now) {
 				BENCHMARK_LOG("ERROR??: Proxy leader disconnected from acceptor at {}", address);
-			}, [&](const std::string& address, const std::string& payload, const time_t now) {
-				AcceptorToProxyLeader acceptorToProxyLeader;
-				acceptorToProxyLeader.ParseFromString(payload);
-				listenToAcceptor(acceptorToProxyLeader);
+			}, [&](const network::addressPayloadsMap& addressToPayloads, const time_t now) {
+				listenToAcceptor(addressToPayloads);
 			});
 
 	annaClient->subscribeTo(acceptorGroupId); //find the IP addresses of acceptors in this group
 }
 
-void proxy_leader::listenToProposer(const ProposerToAcceptor& payload, const std::string& ipAddress) {
-	LOG("Received from proposer: {}", payload.ShortDebugString());
-	if (connectedAcceptorGroups.find(payload.acceptorgroupid()) == connectedAcceptorGroups.end()) {
-		BENCHMARK_LOG("Dropping message from proposer to acceptor group {}", payload.acceptorgroupid());
-		return;
-	}
+void proxy_leader::listenToProposer(const network::addressPayloadsMap& addressToPayloads) {
+	ProposerToAcceptor proposerToAcceptor;
+	for (const auto&[address, payloads] : addressToPayloads) {
+		for (const std::string& payload : payloads) {
+			proposerToAcceptor.ParseFromString(payload);
 
-	TIME();
-	switch (payload.type()) {
-		case ProposerToAcceptor_Type_p1a:
-			metricsVars->counters[metrics::P1A]->Increment();
-			break;
-		case ProposerToAcceptor_Type_p2a:
-			metricsVars->counters[metrics::NumIncomingMessages]->Increment();
-			break;
-		default: {}
+			LOG("Received from proposer: {}", proposerToAcceptor.ShortDebugString());
+			if (connectedAcceptorGroups.find(proposerToAcceptor.acceptorgroupid()) == connectedAcceptorGroups.end()) {
+				BENCHMARK_LOG("Dropping message from proposer to acceptor group {}", proposerToAcceptor.acceptorgroupid());
+				continue;
+			}
+
+			TIME();
+			switch (proposerToAcceptor.type()) {
+				case ProposerToAcceptor_Type_p1a:
+					metricsVars->counters[metrics::P1A]->Increment();
+					break;
+				case ProposerToAcceptor_Type_p2a:
+					metricsVars->counters[metrics::NumIncomingMessages]->Increment();
+					break;
+				default: {}
+			}
+			sentMessages[proposerToAcceptor.messageid()] = sentMetadata{proposerToAcceptor, address}; // keep track
+			acceptorGroups[proposerToAcceptor.acceptorgroupid()]->broadcast(payload);
+			TIME();
+
+			proposerToAcceptor.Clear();
+		}
 	}
-    sentMessages[payload.messageid()] = sentMetadata{payload, ipAddress}; // keep track
-	acceptorGroups[payload.acceptorgroupid()]->broadcast(payload.SerializeAsString());
-	TIME();
 }
 
-void proxy_leader::listenToAcceptor(const AcceptorToProxyLeader& payload) {
-    LOG("Received from acceptors: {}", payload.ShortDebugString());
+void proxy_leader::listenToAcceptor(const network::addressPayloadsMap& addressToPayloads) {
+	AcceptorToProxyLeader acceptorToProxyLeader;
+	for (const auto&[address, payloads] : addressToPayloads) {
+		for (const std::string& payload : payloads) {
+			acceptorToProxyLeader.ParseFromString(payload);
+			LOG("Received from acceptors: {}", acceptorToProxyLeader.ShortDebugString());
 
-    switch (payload.type()) {
-        case AcceptorToProxyLeader_Type_p1b:
-            handleP1B(payload);
-            break;
-        case AcceptorToProxyLeader_Type_p2b:
-            handleP2B(payload);
-            break;
-        default: {}
-    }
+			switch (acceptorToProxyLeader.type()) {
+				case AcceptorToProxyLeader_Type_p1b:
+					handleP1B(acceptorToProxyLeader);
+					break;
+				case AcceptorToProxyLeader_Type_p2b:
+					handleP2B(acceptorToProxyLeader);
+					break;
+				default: {}
+			}
+			acceptorToProxyLeader.Clear();
+		}
+	}
 }
 
 void proxy_leader::handleP1B(const AcceptorToProxyLeader& payload) {

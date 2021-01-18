@@ -34,6 +34,8 @@ private:
     std::unordered_map<std::string, std::string> clientToPayloads = {};
     int numPayloads = 0;
 
+	void listenToProposers(const network::addressPayloadsMap& addressToPayloads);
+	void listenToClients(const network::addressPayloadsMap& addressToPayloads);
     void sendBatch();
 };
 

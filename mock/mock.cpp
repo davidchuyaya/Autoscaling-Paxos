@@ -39,12 +39,14 @@ void mock::proposerForProxyLeader(const std::vector<std::string>& acceptorGroupI
 	extraSocket = zmqNetwork->startServerAtPort(config::PROPOSER_PORT_FOR_PROXY_LEADERS,ProxyLeader);
 
 	zmqNetwork->addHandler(ProxyLeader, [&, acceptorGroupIds]
-			(const std::string& address, const std::string& payload, const time_t now) {
+			(const network::addressPayloadsMap& addressToPayloads, const time_t now) {
 		int next = 0;
-		while (true) { //bombard the network lol
-			next = (next + 1) >= acceptorGroupIds.size() ? 0 : next + 1;
-			zmqNetwork->sendToClient(extraSocket->socket, address, generateP2A(acceptorGroupIds[next]));
-			incrementMetricsCounter();
+		for (const auto&[address, payloads] : addressToPayloads) {
+			while (true) { //bombard the network lol
+				next = (next + 1) >= acceptorGroupIds.size() ? 0 : next + 1;
+				zmqNetwork->sendToClient(extraSocket->socket, address, generateP2A(acceptorGroupIds[next]));
+				incrementMetricsCounter();
+			}
 		}
 	});
 
@@ -60,10 +62,13 @@ void mock::proposerForBatcher(bool isLeader) {
 	//note: can't use customReceiver(), since we need to tell the batcher if we are the leader
 	extraSocket = zmqNetwork->startServerAtPort(config::PROPOSER_PORT_FOR_BATCHERS, Batcher);
 
-	zmqNetwork->addHandler(Batcher, [&](const std::string& address, const std::string& payload, const time_t now) {
-		if (clientAddress.empty())
-			clientAddress = address;
-		incrementMetricsCounter();
+	zmqNetwork->addHandler(Batcher, [&](const network::addressPayloadsMap& addressToPayloads,
+			const time_t now) {
+		for (const auto&[address, payloads] : addressToPayloads) {
+			if (clientAddress.empty())
+				clientAddress = address;
+			incrementMetricsCounter(payloads.size());
+		}
 	});
 
 	if (isLeader) {
@@ -94,24 +99,29 @@ void mock::proxyLeaderForProposer(const std::string& acceptorGroupId) {
 	//note: can't use customReceiver(), since we are not the server
 	extraSocket = zmqNetwork->connectToAddress(serverAddress, config::PROPOSER_PORT_FOR_PROXY_LEADERS, Proposer);
 	zmqNetwork->addHandler(Proposer, [&]
-			(const std::string& address, const std::string& payload, const time_t now) {
+			(const network::addressPayloadsMap& addressToPayloads, const time_t now) {
 		ProposerToAcceptor proposerToAcceptor;
-		proposerToAcceptor.ParseFromString(payload);
 
-		switch (proposerToAcceptor.type()) {
-			case ProposerToAcceptor_Type_p1a: {
-				//proposer wins immediately, existing log is empty
-				BENCHMARK_LOG("Proposer won mock phase 1");
-				zmqNetwork->sendToServer(extraSocket->socket, message::createP1B(proposerToAcceptor.messageid(),
-																		proposerToAcceptor.acceptorgroupid(),
-																		proposerToAcceptor.ballot(), {}).SerializeAsString());
-				break;
+		for (const auto&[address, payloads] : addressToPayloads) {
+			incrementMetricsCounter(payloads.size());
+
+			for (const std::string& payload : payloads) {
+				proposerToAcceptor.ParseFromString(payload);
+
+				switch (proposerToAcceptor.type()) {
+					case ProposerToAcceptor_Type_p1a: {
+						//proposer wins immediately, existing log is empty
+						BENCHMARK_LOG("Proposer won mock phase 1");
+						zmqNetwork->sendToServer(extraSocket->socket, message::createP1B(proposerToAcceptor.messageid(),
+																	   proposerToAcceptor.acceptorgroupid(),
+																	   proposerToAcceptor.ballot(), {}).SerializeAsString());
+						break;
+					}
+					default: {};
+				}
+
+				proposerToAcceptor.Clear();
 			}
-			case ProposerToAcceptor_Type_p2a: {
-				incrementMetricsCounter(); //do nothing
-				break;
-			}
-			default: {};
 		}
 	});
 
@@ -127,21 +137,19 @@ void mock::proxyLeaderForAcceptor() {
 	//can't use customSender() or customReceiver(), since we're both
 	extraSocket = zmqNetwork->connectToAddress(serverAddress, config::ACCEPTOR_PORT_FOR_PROXY_LEADERS, Acceptor);
 	zmqNetwork->addHandler(Acceptor, [&]
-			(const std::string& address, const std::string& payload, const time_t now) {
-		metricsVars->counters[metrics::Counter::NumReceivedMockMessages]->Increment();
-
-		//resend, increase load exponentially
-		for (int i = 0; i < 2; ++i) {
-			zmqNetwork->sendToServer(extraSocket->socket, generateP2A());
-			metricsVars->counters[metrics::Counter::NumSentMockMessages]->Increment();
+			(const network::addressPayloadsMap& addressToPayloads, const time_t now) {
+		for (const auto&[address, payloads] : addressToPayloads) {
+			metricsVars->counters[metrics::Counter::NumReceivedMockMessages]->Increment(payloads.size());
+			for (int i = 0; i < 2 * payloads.size(); ++i) //resend, increase load exponentially
+				zmqNetwork->sendToServer(extraSocket->socket, generateP2A());
+			metricsVars->counters[metrics::Counter::NumSentMockMessages]->Increment(2 * payloads.size());
 		}
 	});
 
 	//send initial load
-	for (int i = 0; i < 5000; ++i) {
+	for (int i = 0; i < 5000; ++i)
 		zmqNetwork->sendToServer(extraSocket->socket, generateP2A());
-		metricsVars->counters[metrics::Counter::NumSentMockMessages]->Increment();
-	}
+	metricsVars->counters[metrics::Counter::NumSentMockMessages]->Increment(5000);
 
 	zmqNetwork->poll();
 }
@@ -164,24 +172,29 @@ void mock::acceptor(const std::string& acceptorGroupId) {
 	});
 
 	//acceptors only talk to proxy leaders
-	customReceiver(ProxyLeader, config::ACCEPTOR_PORT_FOR_PROXY_LEADERS, false, [&](const std::string& ipAddress,
-			const std::string& payload, const time_t now){
+	customReceiver(ProxyLeader, config::ACCEPTOR_PORT_FOR_PROXY_LEADERS, false, [&]
+		(const network::addressPayloadsMap& addressToPayloads, const time_t now){
 		ProposerToAcceptor proposerToAcceptor;
-		proposerToAcceptor.ParseFromString(payload);
+		for (const auto&[address, payloads] : addressToPayloads) {
+			for (const std::string& payload : payloads) {
+				proposerToAcceptor.ParseFromString(payload);
 
-		switch (proposerToAcceptor.type()) {
-			case ProposerToAcceptor_Type_p1a: {
-				printf("Unexpected P1A at mock acceptor\n");
-				return;
+				switch (proposerToAcceptor.type()) {
+					case ProposerToAcceptor_Type_p1a: {
+						printf("Unexpected P1A at mock acceptor\n");
+						return;
+					}
+					case ProposerToAcceptor_Type_p2a: {
+						//value immediately accepted for slot
+						zmqNetwork->sendToClient(extraSocket->socket, address,
+							   message::createP2B(proposerToAcceptor.messageid(), proposerToAcceptor.acceptorgroupid(),
+							 proposerToAcceptor.ballot(), proposerToAcceptor.slot()).SerializeAsString());
+						break;
+					}
+					default: {};
+				}
+				proposerToAcceptor.Clear();
 			}
-			case ProposerToAcceptor_Type_p2a: {
-				//value immediately accepted for slot
-				zmqNetwork->sendToClient(extraSocket->socket, ipAddress,
-							 message::createP2B(proposerToAcceptor.messageid(), proposerToAcceptor.acceptorgroupid(),
-						   proposerToAcceptor.ballot(), proposerToAcceptor.slot()).SerializeAsString());
-				break;
-			}
-			default: {};
 		}
 	});
 }
@@ -195,11 +208,11 @@ void mock::unbatcher() {
 	}
 }
 
-void mock::incrementMetricsCounter() {
+void mock::incrementMetricsCounter(const int plus) {
 	if (isSender)
-		metricsVars->counters[metrics::Counter::NumSentMockMessages]->Increment();
+		metricsVars->counters[metrics::Counter::NumSentMockMessages]->Increment(plus);
 	else
-		metricsVars->counters[metrics::Counter::NumReceivedMockMessages]->Increment();
+		metricsVars->counters[metrics::Counter::NumReceivedMockMessages]->Increment(plus);
 }
 
 void mock::genericSender(const ComponentType type, const int port) {
@@ -210,8 +223,9 @@ void mock::genericSender(const ComponentType type, const int port) {
 }
 
 void mock::genericReceiver(const ComponentType type, const int port, const bool heartbeat) {
-	customReceiver(type, port, heartbeat, [&](const std::string& ipAddress, const std::string& payload, const time_t now){
-		incrementMetricsCounter(); //do nothing
+	customReceiver(type, port, heartbeat, [&](const network::addressPayloadsMap& addressToPayloads, const time_t now){
+		for (const auto&[address, payloads] : addressToPayloads)
+			incrementMetricsCounter(payloads.size()); //do nothing
 	});
 }
 
@@ -227,10 +241,14 @@ void mock::customSender(ComponentType type, int port, const std::function<std::s
 void mock::customReceiver(ComponentType type, int port, bool heartbeat, const network::messageHandler& onReceive) {
 	extraSocket = zmqNetwork->startServerAtPort(port, type);
 
-	zmqNetwork->addHandler(type, [&](const std::string& address, const std::string& payload, const time_t now) {
-		if (clientAddress.empty())
-			clientAddress = address;
-		onReceive(address, payload, now);
+	zmqNetwork->addHandler(type, [&](const network::addressPayloadsMap& addressToPayloads, const time_t now) {
+		for (const auto&[address, payloads] : addressToPayloads) {
+			if (clientAddress.empty())
+				clientAddress = address;
+			for (const std::string& payload : payloads) {
+				onReceive(addressToPayloads, now);
+			}
+		}
 	});
 
 	if (heartbeat) {
