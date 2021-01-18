@@ -82,8 +82,8 @@ std::shared_ptr<socketInfo> network::startAnnaWriter(const std::string& address)
 
 void network::setSocketOpt(const std::shared_ptr<socketInfo>& socketInfo) {
 	socketInfo->socket.setsockopt(ZMQ_LINGER, 0); //don't queue messages to closed sockets
-	socketInfo->socket.setsockopt(ZMQ_SNDHWM, 0); //no limit on # of queued messages
-	socketInfo->socket.setsockopt(ZMQ_RCVHWM, 0);
+//	socketInfo->socket.setsockopt(ZMQ_SNDHWM, 0); //no limit on # of queued messages, but bad for proxy leader...
+//	socketInfo->socket.setsockopt(ZMQ_RCVHWM, 0);
 }
 
 void network::connectExistingSocketToAddress(const std::shared_ptr<socketInfo>& client, const std::string& address) {

@@ -33,9 +33,12 @@ mock_component::mock_component(const int argc, const char**argv) {
 			mockComponent = new mock(false);
 			mockComponent->proposer();
 		}
-		else if (argc == 3) {
+		else if (argc > 2) {
 			mockComponent = new mock(true); //no server address, just acceptorGroupId
-			mockComponent->proposer(argv[2]);
+			std::vector<std::string> acceptorGroupIds;
+			for (int i = 2; i < argc; ++i)
+				acceptorGroupIds.emplace_back(argv[i]);
+			mockComponent->proposer(acceptorGroupIds);
 		}
 		else
 			printUsage();
@@ -88,7 +91,7 @@ void mock_component::printUsage(const bool ifThisIsTrue) {
 	printf("Client receiver: ./mock_component client\n");
 	printf("Batcher sender: ./mock_component batcher <PROPOSER_ADDRESS>\n");
 	printf("Batcher receiver: ./mock_component batcher\n");
-	printf("Proposer sender: ./mock_component proposer <ACCEPTOR_GROUP_ID>\n");
+	printf("Proposer sender: ./mock_component proposer <ACCEPTOR_GROUP_IDS>...\n");
 	printf("Proposer receiver: ./mock_component proposer\n");
 	printf("Proxy leader receiver for proposer, where the proposer expects 1 acceptor group: ./mock_component proxy_leader proposer <PROPOSER_ADDRESS> <ACCEPTOR_GROUP_ID>\n");
 	printf("Proxy leader for acceptor: ./mock_component proxy_leader acceptor <ACCEPTOR_ADDRESS>\n");

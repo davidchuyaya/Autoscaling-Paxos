@@ -27,17 +27,19 @@ void mock::batcher() {
 	}
 }
 
-void mock::proposer(const std::string& acceptorGroupId) {
+void mock::proposer(const std::vector<std::string>& acceptorGroupIds) {
 	annaClient = anna::writeOnly(zmqNetwork, {{config::KEY_PROPOSERS, config::IP_ADDRESS}});
 
 	if (isSender) {
 		//note: can't use customSender(), since we are the server
 		extraSocket = zmqNetwork->startServerAtPort(config::PROPOSER_PORT_FOR_PROXY_LEADERS,ProxyLeader);
 
-		zmqNetwork->addHandler(ProxyLeader, [&, acceptorGroupId]
+		zmqNetwork->addHandler(ProxyLeader, [&, acceptorGroupIds]
 			(const std::string& address, const std::string& payload, const time_t now) {
+			int next = 0;
 			while (true) { //bombard the network lol
-				zmqNetwork->sendToClient(extraSocket->socket, address, generateP2A(acceptorGroupId));
+				next = (next + 1) >= acceptorGroupIds.size() ? 0 : next + 1;
+				zmqNetwork->sendToClient(extraSocket->socket, address, generateP2A(acceptorGroupIds[next]));
 				incrementMetricsCounter();
 			}
 		});
