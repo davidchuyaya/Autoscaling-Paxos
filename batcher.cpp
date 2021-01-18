@@ -22,8 +22,14 @@ batcher::batcher() {
 		BENCHMARK_LOG("Batcher connected to proposer at {}", address);
 	},[](const std::string& address, const time_t now) {
 		BENCHMARK_LOG("ERROR??: Proposer disconnected from batcher at {}", address);
-	}, [](const std::string& address, const std::string& payload, const time_t now) {
-		LOG("ERROR: Proposer {} sent payload --{}-- to batcher", address, payload);
+	}, [&](const std::string& address, const std::string& payload, const time_t now) {
+		//hear new leader from proposer
+		Ballot ballot;
+		ballot.ParseFromString(payload);
+		if (Log::isBallotGreaterThan(ballot, leaderBallot)) {
+			leaderBallot = ballot;
+			leaderIP = address;
+		}
 	});
 
 	clients = new server_component(zmqNetwork, config::BATCHER_PORT_FOR_CLIENTS, Client,
@@ -55,8 +61,12 @@ batcher::batcher() {
 
 void batcher::sendBatch() {
 	LOG("Sending batch");
-	for (const auto&[client, payloads] : clientToPayloads)
-		proposers->broadcast(message::createBatchMessage(client, payloads).SerializeAsString());
+	for (const auto&[client, payloads] : clientToPayloads) {
+		if (leaderIP.empty()) //only send to the leader when one exists
+			proposers->broadcast(message::createBatchMessage(client, payloads).SerializeAsString());
+		else
+			proposers->sendToIp(leaderIP, message::createBatchMessage(client, payloads).SerializeAsString());
+	}
 	metricsVars->counters[metrics::NumOutgoingMessages]->Increment(clientToPayloads.size());
 	TIME();
 	clientToPayloads.clear();

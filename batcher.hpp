@@ -28,6 +28,9 @@ private:
 	client_component* proposers;
 	server_component* clients;
 
+	std::string leaderIP;
+	Ballot leaderBallot;
+
     std::unordered_map<std::string, std::string> clientToPayloads = {};
     int numPayloads = 0;
 

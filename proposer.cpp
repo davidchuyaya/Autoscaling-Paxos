@@ -57,7 +57,7 @@ proposer::proposer(const int id, const int numAcceptorGroups) : id(id), numAccep
 		//send heartbeats
 		if (isLeader) {
 			LOG("I am leader, sending at time: {}", std::asctime(std::localtime(&now)));
-			proposers->broadcast(ballot.SerializeAsString());
+			broadcastIamLeader();
 		}
 		//ID-based timeout so a leader doesn't have much competition
 		else if (difftime(now, lastLeaderHeartbeat) > config::HEARTBEAT_TIMEOUT_SEC + id * config::ID_SCOUT_DELAY_MULTIPLIER) {
@@ -187,7 +187,7 @@ void proposer::handleP1B(const ProxyLeaderToProposer& message) {
     BENCHMARK_LOG("I am leader!");
     metricsVars->counters[metrics::P1BSuccess]->Increment();
 	ballot = message.ballot();
-    proposers->broadcast(ballot.SerializeAsString());
+    broadcastIamLeader();
 
     mergeLogs();
 }
@@ -224,6 +224,12 @@ void proposer::noLongerLeader() {
     acceptorGroupCommittedLogs.clear();
     acceptorGroupUncommittedLogs.clear();
     remainingAcceptorGroupsForScouts.clear();
+}
+
+void proposer::broadcastIamLeader() {
+	const std::string& iAmLeader = ballot.SerializeAsString();
+	proposers->broadcast(iAmLeader);
+	batchers->broadcast(iAmLeader);
 }
 
 const std::string& proposer::fetchNextAcceptorGroupId() {

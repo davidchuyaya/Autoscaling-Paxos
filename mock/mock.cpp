@@ -27,27 +27,58 @@ void mock::batcher() {
 	}
 }
 
-void mock::proposer(const std::vector<std::string>& acceptorGroupIds) {
+void mock::proposerForProxyLeader(const std::vector<std::string>& acceptorGroupIds) {
+	if (!isSender) {
+		printf("Mock proposer cannot be receiver of proxy leader\n");
+		exit(0);
+	}
+
 	annaClient = anna::writeOnly(zmqNetwork, {{config::KEY_PROPOSERS, config::IP_ADDRESS}});
 
-	if (isSender) {
-		//note: can't use customSender(), since we are the server
-		extraSocket = zmqNetwork->startServerAtPort(config::PROPOSER_PORT_FOR_PROXY_LEADERS,ProxyLeader);
+	//note: can't use customSender(), since we are the server
+	extraSocket = zmqNetwork->startServerAtPort(config::PROPOSER_PORT_FOR_PROXY_LEADERS,ProxyLeader);
 
-		zmqNetwork->addHandler(ProxyLeader, [&, acceptorGroupIds]
+	zmqNetwork->addHandler(ProxyLeader, [&, acceptorGroupIds]
 			(const std::string& address, const std::string& payload, const time_t now) {
-			int next = 0;
-			while (true) { //bombard the network lol
-				next = (next + 1) >= acceptorGroupIds.size() ? 0 : next + 1;
-				zmqNetwork->sendToClient(extraSocket->socket, address, generateP2A(acceptorGroupIds[next]));
-				incrementMetricsCounter();
-			}
-		});
+		int next = 0;
+		while (true) { //bombard the network lol
+			next = (next + 1) >= acceptorGroupIds.size() ? 0 : next + 1;
+			zmqNetwork->sendToClient(extraSocket->socket, address, generateP2A(acceptorGroupIds[next]));
+			incrementMetricsCounter();
+		}
+	});
 
-		zmqNetwork->poll();
+	zmqNetwork->poll();
+}
+
+void mock::proposerForBatcher(bool isLeader) {
+	if (isSender) {
+		printf("Mock proposer cannot be sender of batcher\n");
+		exit(0);
 	}
-	else
-		genericReceiver(Batcher, config::PROPOSER_PORT_FOR_BATCHERS, false);
+
+	//note: can't use customReceiver(), since we need to tell the batcher if we are the leader
+	extraSocket = zmqNetwork->startServerAtPort(config::PROPOSER_PORT_FOR_BATCHERS, Batcher);
+
+	zmqNetwork->addHandler(Batcher, [&](const std::string& address, const std::string& payload, const time_t now) {
+		if (clientAddress.empty())
+			clientAddress = address;
+		incrementMetricsCounter();
+	});
+
+	if (isLeader) {
+		zmqNetwork->addTimer([&](const time_t now) {
+			if (!clientAddress.empty()) {
+				LOG("Sending I am leader");
+				Ballot ballot;
+				ballot.set_id(1);
+				ballot.set_ballotnum(1);
+				zmqNetwork->sendToClient(extraSocket->socket, clientAddress, ballot.SerializeAsString());
+			}
+		}, config::HEARTBEAT_SLEEP_SEC, true);
+	}
+
+	zmqNetwork->poll();
 }
 
 void mock::proxyLeaderForProposer(const std::string& acceptorGroupId) {

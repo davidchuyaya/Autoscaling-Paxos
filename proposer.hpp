@@ -89,6 +89,7 @@ private:
      * Reset all values when this proposer learns that it is no longer the leader.
      */
     void noLongerLeader();
+    void broadcastIamLeader();
     /**
      * Increments (round robin) the next acceptor group a payload will be proposed to.
      * @warning Does NOT lock acceptorMutex. The caller MUST lock it.

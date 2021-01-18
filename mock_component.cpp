@@ -29,16 +29,18 @@ mock_component::mock_component(const int argc, const char**argv) {
 		mockComponent->batcher();
 	}
 	else if (component == "proposer") {
-		if (argc == 2) {
+		printUsage(argc < 3);
+		const std::string& connectingTo = argv[2];
+		if (connectingTo == "batcher") {
 			mockComponent = new mock(false);
-			mockComponent->proposer();
+			mockComponent->proposerForBatcher(strcmp(argv[3], "true"));
 		}
-		else if (argc > 2) {
+		else if (connectingTo == "proxy_leader") {
 			mockComponent = new mock(true); //no server address, just acceptorGroupId
 			std::vector<std::string> acceptorGroupIds;
 			for (int i = 2; i < argc; ++i)
 				acceptorGroupIds.emplace_back(argv[i]);
-			mockComponent->proposer(acceptorGroupIds);
+			mockComponent->proposerForProxyLeader(acceptorGroupIds);
 		}
 		else
 			printUsage();
@@ -91,8 +93,8 @@ void mock_component::printUsage(const bool ifThisIsTrue) {
 	printf("Client receiver: ./mock_component client\n");
 	printf("Batcher sender: ./mock_component batcher <PROPOSER_ADDRESS>\n");
 	printf("Batcher receiver: ./mock_component batcher\n");
-	printf("Proposer sender: ./mock_component proposer <ACCEPTOR_GROUP_IDS>...\n");
-	printf("Proposer receiver: ./mock_component proposer\n");
+	printf("Proposer sender: ./mock_component proposer proxy_leader <ACCEPTOR_GROUP_IDS>...\n");
+	printf("Proposer receiver: ./mock_component proposer batcher <IS_LEADER>\n");
 	printf("Proxy leader receiver for proposer, where the proposer expects 1 acceptor group: ./mock_component proxy_leader proposer <PROPOSER_ADDRESS> <ACCEPTOR_GROUP_ID>\n");
 	printf("Proxy leader for acceptor: ./mock_component proxy_leader acceptor <ACCEPTOR_ADDRESS>\n");
 	printf("Proxy leader sender for unbatcher: ./mock_component proxy_leader unbatcher <UNBATCHER_ADDRESS> <CLIENT_ADDRESS>\n");

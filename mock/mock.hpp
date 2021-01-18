@@ -21,7 +21,8 @@ public:
 
 	[[noreturn]] void client();
 	[[noreturn]] void batcher();
-	[[noreturn]] void proposer(const std::vector<std::string>& acceptorGroupIds = {});
+	[[noreturn]] void proposerForBatcher(bool isLeader);
+	[[noreturn]] void proposerForProxyLeader(const std::vector<std::string>& acceptorGroupIds);
 	[[noreturn]] void proxyLeaderForProposer(const std::string& acceptorGroupId);
 	[[noreturn]] void proxyLeaderForAcceptor();
 	[[noreturn]] void proxyLeaderForUnbatcher(const std::string& destAddress);

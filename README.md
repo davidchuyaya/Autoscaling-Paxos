@@ -310,8 +310,10 @@ Below are specifics about how to test each component. Note that each command is 
 ```shell
 ./mock_component client <BATCHER_ADDRESS>
 ./batcher
-/mock_component proposer
+./mock_component proposer <IS_LEADER>
 ```
+Replace `<BATCHER_ADDRESS>` with the IP address of the batcher. Replace `<IS_LEADER>` with `true` for 1 proposer, `false` for the others. The leader should receive all the messages.
+
 Launch order:
 1. Mock proposer - this way it can broadcast its address to Anna, which the batcher connects to
 2. Batcher
@@ -332,12 +334,12 @@ Launch order:
 
 #### Proxy leader
 ```shell
-./mock_component proposer <ACCEPTOR_GROUP_ID>
+./mock_component proposer <ACCEPTOR_GROUP_IDS>...
 ./proxy_leader
-./mock_component acceptor <ACCEPTOR_GROUP_ID> #launch 2f+1 acceptors
+./mock_component acceptor <ACCEPTOR_GROUP_ID> #launch 2f+1 acceptors for each acceptor group
 ./mock_component unbatcher
 ```
-Replace `<ACCEPTOR_GROUP_ID>` with whatever value you desire.
+Replace `<ACCEPTOR_GROUP_IDS>` with whatever value you desire, putting a space between each one.
 
 Launch order:
 1. Mock acceptors, mock unbatcher - they broadcast their IPs to Anna
