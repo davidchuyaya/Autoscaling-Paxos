@@ -5,7 +5,8 @@
 
 proposer::proposer(const int id, const int numAcceptorGroups) : id(id), numAcceptorGroups(numAcceptorGroups) {
 	metricsVars = metrics::createMetricsVars({metrics::NumProcessedMessages, metrics::P1A, metrics::P1BPreempted,
-										   metrics::P1BSuccess, metrics::P2BPreempted, metrics::LeaderHeartbeatReceived},{},{},{});
+										   metrics::P1BSuccess, metrics::P2BPreempted, metrics::LeaderHeartbeatReceived},
+										  {},{},{}, "proposer" + std::to_string(id));
 
 	zmqNetwork = new network();
 

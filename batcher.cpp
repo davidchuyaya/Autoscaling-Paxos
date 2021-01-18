@@ -5,7 +5,8 @@
 #include "batcher.hpp"
 
 batcher::batcher() {
-	metricsVars = metrics::createMetricsVars({metrics::NumIncomingMessages, metrics::NumOutgoingMessages},{},{},{});
+	metricsVars = metrics::createMetricsVars({metrics::NumIncomingMessages, metrics::NumOutgoingMessages},{},{},{},
+										  "batcher");
 
 	zmqNetwork = new network();
 

@@ -6,7 +6,8 @@
 
 acceptor::acceptor(std::string&& acceptorGroupId) :acceptorGroupId(acceptorGroupId) {
 	metricsVars = metrics::createMetricsVars({ metrics::NumProcessedMessages, metrics::P1BPreempted,
-											metrics::P1BSuccess, metrics::P2BPreempted},{},{},{});
+											metrics::P1BSuccess, metrics::P2BPreempted},{},{},{},
+										  "acceptor" + acceptorGroupId);
 
 	zmqNetwork = new network();
 

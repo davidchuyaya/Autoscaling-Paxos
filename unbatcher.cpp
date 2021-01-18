@@ -5,7 +5,8 @@
 #include "unbatcher.hpp"
 
 unbatcher::unbatcher() {
-	metricsVars = metrics::createMetricsVars({ metrics::NumIncomingMessages, metrics::NumOutgoingMessages},{},{},{});
+	metricsVars = metrics::createMetricsVars({ metrics::NumIncomingMessages, metrics::NumOutgoingMessages},{},{},{},
+										  "unbatcher");
 
 	zmqNetwork = new network();
 

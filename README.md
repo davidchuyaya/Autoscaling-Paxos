@@ -289,8 +289,6 @@ scrape_configs:
         # how often we check for new nodes
         refresh_interval: 5s
     relabel_configs:
-      - source_labels: [__meta_ec2_tag_Name]
-        target_label: name
       # Use the instance ID as the instance label
       - source_labels: [__meta_ec2_instance_id]
         target_label: instance
@@ -310,7 +308,7 @@ Below are specifics about how to test each component. Note that each command is 
 ```shell
 ./mock_component client <BATCHER_ADDRESS>
 ./batcher
-./mock_component proposer <IS_LEADER>
+./mock_component proposer batcher <IS_LEADER>
 ```
 Replace `<BATCHER_ADDRESS>` with the IP address of the batcher. Replace `<IS_LEADER>` with `true` for 1 proposer, `false` for the others. The leader should receive all the messages.
 
@@ -334,7 +332,7 @@ Launch order:
 
 #### Proxy leader
 ```shell
-./mock_component proposer <ACCEPTOR_GROUP_IDS>...
+./mock_component proposer proxy_leader <ACCEPTOR_GROUP_IDS>...
 ./proxy_leader
 ./mock_component acceptor <ACCEPTOR_GROUP_ID> #launch 2f+1 acceptors for each acceptor group
 ./mock_component unbatcher

@@ -6,7 +6,7 @@
 
 mock::mock(const bool isSender, const std::string& serverAddress) : isSender(isSender), serverAddress(serverAddress) {
 	metricsVars = metrics::createMetricsVars({metrics::Counter::NumSentMockMessages,
-	                                          metrics::Counter::NumReceivedMockMessages}, {}, {}, {});
+	                                          metrics::Counter::NumReceivedMockMessages}, {}, {}, {}, "mock");
 	printf("Server address: %s\n", serverAddress.c_str());
 	zmqNetwork = new network();
 }

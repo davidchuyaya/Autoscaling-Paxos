@@ -7,7 +7,7 @@
 proxy_leader::proxy_leader() {
 	metricsVars = metrics::createMetricsVars({metrics::NumIncomingMessages, metrics::NumOutgoingMessages,
 										   metrics::P1A, metrics::P1BPreempted, metrics::P1BSuccess, metrics::P2BPreempted},
-										  {},{},{});
+										  {},{},{}, "proxy leader");
 
 	zmqNetwork = new network();
 

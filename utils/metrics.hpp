@@ -60,11 +60,16 @@ namespace metrics {
 	std::shared_ptr<variables> createMetricsVars(const std::unordered_set<Counter>& counters,
 											  const std::unordered_set<Gauge>& gauges,
 											  const std::unordered_set<Histogram>& histograms,
-											  const std::unordered_set<Summary>& summaries);
-	void addCounters(std::shared_ptr<variables> vars, const std::unordered_set<Counter>& counters);
-	void addGauges(std::shared_ptr<variables> vars, const std::unordered_set<Gauge>& gauges);
-	void addHistograms(std::shared_ptr<variables> vars, const std::unordered_set<Histogram>& histograms);
-	void addSummaries(std::shared_ptr<variables> vars, const std::unordered_set<Summary>& summaries);
+											  const std::unordered_set<Summary>& summaries,
+											  const std::string& label);
+	void addCounters(std::shared_ptr<variables> vars, const std::unordered_set<Counter>& counters,
+	                 const std::string& label);
+	void addGauges(std::shared_ptr<variables> vars, const std::unordered_set<Gauge>& gauges,
+	               const std::string& label);
+	void addHistograms(std::shared_ptr<variables> vars, const std::unordered_set<Histogram>& histograms,
+	                   const std::string& label);
+	void addSummaries(std::shared_ptr<variables> vars, const std::unordered_set<Summary>& summaries,
+	                  const std::string& label);
 };
 
 
