@@ -38,8 +38,10 @@ void network::poll() {
 						numReads += 1;
 					}
 				}
-				if (numReads > 0)
+				if (numReads > 0) {
 					handlers[receiver->type](addressToPayload, now);
+					addressToPayload.clear();
+				}
 			}
 		}
 
