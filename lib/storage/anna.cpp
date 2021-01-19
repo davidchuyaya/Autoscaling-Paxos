@@ -36,73 +36,84 @@ anna::anna(network* zmqNetwork, const std::unordered_map<std::string, std::strin
 }
 
 void anna::startKeyAddressRequestListener() {
-	zmqNetwork->addHandler(AnnaKeyAddress, [&](const std::string& ipAddress, const std::string& payload,
+	zmqNetwork->addHandler(AnnaKeyAddress, [&](const network::addressPayloadsMap& addressToPayloads,
 	                                           const time_t time) {
 		KeyAddressResponse response;
-		response.ParseFromString(payload);
-		LOG("Received anna key address: {}", response.ShortDebugString());
-		const std::string& key = response.addresses(0).key();
+		for (const auto&[address, payloads] : addressToPayloads) {
+			for (const std::string& payload : payloads) {
+				response.ParseFromString(payload);
+				LOG("Received anna key address: {}", response.ShortDebugString());
+				const std::string& key = response.addresses(0).key();
 
-		if (response.error() == AnnaError::NO_SERVERS) {
-			BENCHMARK_LOG("No server for Anna key, retrying: {}", key);
-			tryKeyAddressRequest(message::createAnnaKeyAddressRequest(key));
-		}
-		else if (addressForKey.find(key) == addressForKey.end()) {
-			//only store the 1st routing address, since we don't have too much to write
-			const std::string& address = response.addresses(0).ips(0);
-			addressForKey[key] = address;
-			pendingKeyAddresses.erase(key);
-			//create the socket if this is the first time we're seeing this address
-			if (socketForAddress.find(address) == socketForAddress.end())
-				socketForAddress[address] = zmqNetwork->startAnnaWriter(address);
-			//send pending writes
-			if (pendingWrites.find(key) != pendingWrites.end()) {
-				tryRequest(pendingWrites[key]);
-				pendingWrites.erase(key);
+				if (response.error() == AnnaError::NO_SERVERS) {
+					BENCHMARK_LOG("No server for Anna key, retrying: {}", key);
+					tryKeyAddressRequest(message::createAnnaKeyAddressRequest(key));
+				}
+				else if (addressForKey.find(key) == addressForKey.end()) {
+					//only store the 1st routing address, since we don't have too much to write
+					const std::string& routingAddress = response.addresses(0).ips(0);
+					addressForKey[key] = routingAddress;
+					pendingKeyAddresses.erase(key);
+					//create the socket if this is the first time we're seeing this address
+					if (socketForAddress.find(routingAddress) == socketForAddress.end())
+						socketForAddress[routingAddress] = zmqNetwork->startAnnaWriter(routingAddress);
+					//send pending writes
+					if (pendingWrites.find(key) != pendingWrites.end()) {
+						tryRequest(pendingWrites[key]);
+						pendingWrites.erase(key);
+					}
+				}
+				else
+					LOG("Anna key address is a duplicate");
+				response.Clear();
 			}
 		}
-		else
-			LOG("Anna key address is a duplicate");
 	});
 }
 
 void anna::startRequestListener() {
-	zmqNetwork->addHandler(AnnaResponse, [&](const std::string& ipAddress, const std::string& payload,
+	zmqNetwork->addHandler(AnnaResponse, [&](const network::addressPayloadsMap& addressToPayloads,
 	                                         const time_t now) {
 		KeyResponse response;
-		response.ParseFromString(payload);
-		LOG("Received anna response: {}", response.ShortDebugString());
+		for (const auto&[address, payloads] : addressToPayloads) {
+			for (const std::string& payload : payloads) {
+				response.ParseFromString(payload);
+				LOG("Received anna response: {}", response.ShortDebugString());
 
-		const std::string& prefixedKey = response.tuples(0).key();
-		switch (response.type()) {
-			case PUT: {
-				if (response.error() == NO_ERROR) //put succeeded
-					return;
-				BENCHMARK_LOG("ERROR: Anna PUT failed!?");
-				break;
-			}
-			case GET: {
-				respondedToSubscribedKey[prefixedKey] = true;
-				if (response.error() != NO_ERROR) //wait for subscription loop to resend GET request
-					return;
-				for (const KeyTuple& keyTuple : response.tuples()) {
-					if (lastPayloadForKey[prefixedKey] == keyTuple.payload()) //cache subscription results, only process on change
-						return;
-					lastPayloadForKey[prefixedKey] = keyTuple.payload();
+				const std::string& prefixedKey = response.tuples(0).key();
+				switch (response.type()) {
+					case PUT: {
+						if (response.error() != NO_ERROR) //put succeeded
+							BENCHMARK_LOG("ERROR: Anna PUT failed!?");
+						break;
+					}
+					case GET: {
+						respondedToSubscribedKey[prefixedKey] = true;
+						if (response.error() != NO_ERROR) //wait for subscription loop to resend GET request
+							break;
+						for (const KeyTuple& keyTuple : response.tuples()) {
+							//cache subscription results, only process on change
+							if (lastPayloadForKey[prefixedKey] == keyTuple.payload())
+								continue;
+							lastPayloadForKey[prefixedKey] = keyTuple.payload();
 
-					SetValue setValue;
-					setValue.ParseFromString(keyTuple.payload());
-					std::unordered_set<std::string> payloadSet (setValue.values().begin(), setValue.values().end());
+							SetValue setValue;
+							setValue.ParseFromString(keyTuple.payload());
+							std::unordered_set<std::string> payloadSet(setValue.values().begin(),
+							                                           setValue.values().end());
 
-					two_p_set twoPset;
-					std::string key = twoPset.mergeAndUnprefixKey(prefixedKey, payloadSet);
-					if (twoPset.empty())
-						return;
-					listener(key, twoPset, now);
+							two_p_set twoPset;
+							std::string key = twoPset.mergeAndUnprefixKey(prefixedKey, payloadSet);
+							if (twoPset.empty())
+								continue;
+							listener(key, twoPset, now);
+						}
+						break;
+					}
+					default: {}
 				}
-				break;
+				response.Clear();
 			}
-			default: {}
 		}
 	});
 }

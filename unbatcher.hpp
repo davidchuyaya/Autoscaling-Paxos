@@ -25,7 +25,7 @@ private:
 	client_component* clients;
 	server_component* proxyLeaders;
 
-    void listenToProxyLeaders(const Batch& batch);
+    void listenToProxyLeaders(const network::addressPayloadsMap& addressToPayloads);
 };
 
 

@@ -23,11 +23,13 @@ public:
 	void broadcast(const std::string& payload) override;
 	int numConnections() const override;
 	bool isConnected(const std::string& ipAddress) const override;
+	std::unordered_set<std::string>& getAddresses() override;
 private:
 	const int port;
 	const ComponentType type;
 	const onConnectHandler onConnect;
 	const onConnectHandler onDisconnect;
+	std::unordered_set<std::string> clientAddresses;
 	std::unordered_map<std::string, std::shared_ptr<socketInfo>> sockets;
 	two_p_set members;
 };

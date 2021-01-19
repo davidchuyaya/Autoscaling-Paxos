@@ -33,12 +33,12 @@ mock_component::mock_component(const int argc, const char**argv) {
 		const std::string& connectingTo = argv[2];
 		if (connectingTo == "batcher") {
 			mockComponent = new mock(false);
-			mockComponent->proposerForBatcher(strcmp(argv[3], "true"));
+			mockComponent->proposerForBatcher(std::string(argv[3]) == "true");
 		}
 		else if (connectingTo == "proxy_leader") {
 			mockComponent = new mock(true); //no server address, just acceptorGroupId
 			std::vector<std::string> acceptorGroupIds;
-			for (int i = 2; i < argc; ++i)
+			for (int i = 3; i < argc; ++i)
 				acceptorGroupIds.emplace_back(argv[i]);
 			mockComponent->proposerForProxyLeader(acceptorGroupIds);
 		}

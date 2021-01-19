@@ -19,53 +19,60 @@ acceptor::acceptor(std::string&& acceptorGroupId) :acceptorGroupId(acceptorGroup
 	proxyLeaders = new server_component(zmqNetwork, config::ACCEPTOR_PORT_FOR_PROXY_LEADERS, ProxyLeader,
 	                              [](const std::string& address, const time_t now) {
 		BENCHMARK_LOG("Proxy leader from {} connected to acceptor", address);
-	}, [&](const std::string& address, const std::string& payload, const time_t now) {
-		ProposerToAcceptor proposerToAcceptor;
-		proposerToAcceptor.ParseFromString(payload);
-		listenToProxyLeaders(address, proposerToAcceptor);
+	}, [&](const network::addressPayloadsMap& addressToPayloads, const time_t now) {
+		listenToProxyLeaders(addressToPayloads);
 	});
 
 	zmqNetwork->poll();
 }
 
-void acceptor::listenToProxyLeaders(const std::string& ipAddress, const ProposerToAcceptor& payload) {
+void acceptor::listenToProxyLeaders(const network::addressPayloadsMap& addressToPayloads) {
+	ProposerToAcceptor proposerToAcceptor;
 	std::string reply;
-    switch (payload.type()) {
-        case ProposerToAcceptor_Type_p1a: {
-            BENCHMARK_LOG("Received p1a: {}, highestBallot: {}", payload.ShortDebugString(),
-						  highestBallot.ShortDebugString());
-            if (Log::isBallotGreaterThan(payload.ballot(), highestBallot)) {
-	            highestBallot = payload.ballot();
-	            metricsVars->counters[metrics::P1BSuccess]->Increment();
-            }
-            else {
-	            metricsVars->counters[metrics::P1BPreempted]->Increment();
-            }
-	        reply = message::createP1B(payload.messageid(), acceptorGroupId, highestBallot, log).SerializeAsString();
-            break;
-        }
-        case ProposerToAcceptor_Type_p2a:
-            LOG("Received p2a: {}", payload.ShortDebugString());
-		    TIME();
-            if (!Log::isBallotGreaterThan(highestBallot, payload.ballot())) {
-                PValue pValue;
-	            pValue.set_client(payload.client());
-                pValue.set_payload(payload.payload());
-                *pValue.mutable_ballot() = payload.ballot();
-                log[payload.slot()] = pValue;
-                highestBallot = payload.ballot();
-	            metricsVars->counters[metrics::NumProcessedMessages]->Increment();
-            }
-            else {
-	            metricsVars->counters[metrics::P2BPreempted]->Increment();
-            }
-            reply = message::createP2B(payload.messageid(), acceptorGroupId, highestBallot, payload.slot())
-            		.SerializeAsString();
-		    TIME();
-            break;
-        default: {}
-    }
-	proxyLeaders->sendToIp(ipAddress, reply);
+
+	for (const auto&[address, payloads] : addressToPayloads) {
+		for (const std::string& payload : payloads) {
+			proposerToAcceptor.ParseFromString(payload);
+			switch (proposerToAcceptor.type()) {
+				case ProposerToAcceptor_Type_p1a: {
+					BENCHMARK_LOG("Received p1a: {}, highestBallot: {}", proposerToAcceptor.ShortDebugString(),
+					              highestBallot.ShortDebugString());
+					if (Log::isBallotGreaterThan(proposerToAcceptor.ballot(), highestBallot)) {
+						highestBallot = proposerToAcceptor.ballot();
+						metricsVars->counters[metrics::P1BSuccess]->Increment();
+					}
+					else {
+						metricsVars->counters[metrics::P1BPreempted]->Increment();
+					}
+					reply = message::createP1B(proposerToAcceptor.messageid(), acceptorGroupId, highestBallot, log)
+							.SerializeAsString();
+					break;
+				}
+				case ProposerToAcceptor_Type_p2a:
+					LOG("Received p2a: {}", proposerToAcceptor.ShortDebugString());
+					TIME();
+					if (!Log::isBallotGreaterThan(highestBallot, proposerToAcceptor.ballot())) {
+						PValue pValue;
+						pValue.set_client(proposerToAcceptor.client());
+						pValue.set_payload(proposerToAcceptor.payload());
+						*pValue.mutable_ballot() = proposerToAcceptor.ballot();
+						log[proposerToAcceptor.slot()] = pValue;
+						highestBallot = proposerToAcceptor.ballot();
+						metricsVars->counters[metrics::NumProcessedMessages]->Increment();
+					}
+					else {
+						metricsVars->counters[metrics::P2BPreempted]->Increment();
+					}
+					reply = message::createP2B(proposerToAcceptor.messageid(), acceptorGroupId, highestBallot,
+								proposerToAcceptor.slot()).SerializeAsString();
+					TIME();
+					break;
+				default: {}
+			}
+			proxyLeaders->sendToIp(address, reply);
+			proposerToAcceptor.Clear();
+		}
+	}
 }
 
 int main(const int argc, const char** argv) {

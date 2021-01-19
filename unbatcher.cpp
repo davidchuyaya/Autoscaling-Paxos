@@ -17,45 +17,50 @@ unbatcher::unbatcher() {
 		BENCHMARK_LOG("Unbatcher connected to client at {}", address);
 	},[](const std::string& address, const time_t now) {
 		BENCHMARK_LOG("ERROR??: Unbatcher disconnected from client at {}", address);
-	}, [](const std::string& address, const std::string& payload, const time_t now) {
-		BENCHMARK_LOG("ERROR??: Client at {} sent unbatcher --{}--", address, payload);
+	}, [](const network::addressPayloadsMap& addressToPayloads, const time_t now) {
+		for (const auto&[address, payloads] : addressToPayloads)
+			BENCHMARK_LOG("ERROR??: Client at {} sent unbatcher something", address);
 	});
 
 	proxyLeaders = new server_component(zmqNetwork, config::UNBATCHER_PORT_FOR_PROXY_LEADERS, ProxyLeader,
 	                              [&](const std::string& address, const time_t now) {
 		BENCHMARK_LOG("Proxy leader from {} connected to unbatcher", address);
-	}, [&](const std::string& address, const std::string& payload, const time_t now) {
-		if (payload.empty())
-			return;
-		Batch batch;
-		batch.ParseFromString(payload);
-		listenToProxyLeaders(batch);
+	}, [&](const network::addressPayloadsMap& addressToPayloads, const time_t now) {
+		listenToProxyLeaders(addressToPayloads);
 	});
 	proxyLeaders->startHeartbeater();
 
 	zmqNetwork->poll();
 }
 
-void unbatcher::listenToProxyLeaders(const Batch& batch) {
-	LOG("Unbatcher received payload: {}", batch.ShortDebugString());
-	TIME();
-	metricsVars->counters[metrics::NumIncomingMessages]->Increment();
+void unbatcher::listenToProxyLeaders(const network::addressPayloadsMap& addressToPayloads) {
+	Batch batch;
+	for (const auto&[address, payloads] : addressToPayloads) {
+		metricsVars->counters[metrics::NumIncomingMessages]->Increment(payloads.size());
 
-	if (!clients->isConnected(batch.client())) {
-		clients->connectToNewMembers({{batch.client()},{}}, 0);
-		BENCHMARK_LOG("Unbatcher connecting to client at {}", batch.client());
+		for (const std::string& payload : payloads) {
+			batch.ParseFromString(payload);
+			LOG("Unbatcher received payload: {}", batch.ShortDebugString());
+			TIME();
+
+			if (!clients->isConnected(batch.client())) {
+				clients->connectToNewMembers({{batch.client()},{}}, 0);
+				BENCHMARK_LOG("Unbatcher connecting to client at {}", batch.client());
+			}
+
+			//split request
+			std::stringstream stream(batch.request());
+			std::string request;
+			while (std::getline(stream, request, config::REQUEST_DELIMITER[0])) {
+				LOG("Sending split request: {}", request);
+				clients->sendToIp(batch.client(), request);
+				metricsVars->counters[metrics::NumOutgoingMessages]->Increment();
+			}
+
+			TIME();
+			batch.Clear();
+		}
 	}
-
-	//split request
-	std::stringstream stream(batch.request());
-	std::string request;
-	while (std::getline(stream, request, config::REQUEST_DELIMITER[0])) {
-		LOG("Sending split request: {}", request);
-		clients->sendToIp(batch.client(), request);
-		metricsVars->counters[metrics::NumOutgoingMessages]->Increment();
-	}
-
-	TIME();
 }
 
 int main(const int argc, const char** argv) {

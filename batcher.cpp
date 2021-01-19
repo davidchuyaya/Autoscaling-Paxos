@@ -23,30 +23,15 @@ batcher::batcher() {
 		BENCHMARK_LOG("Batcher connected to proposer at {}", address);
 	},[](const std::string& address, const time_t now) {
 		BENCHMARK_LOG("ERROR??: Proposer disconnected from batcher at {}", address);
-	}, [&](const std::string& address, const std::string& payload, const time_t now) {
-		//hear new leader from proposer
-		Ballot ballot;
-		ballot.ParseFromString(payload);
-		if (Log::isBallotGreaterThan(ballot, leaderBallot)) {
-			leaderBallot = ballot;
-			leaderIP = address;
-		}
+	}, [&](const network::addressPayloadsMap& addressToPayloads, const time_t now) {
+		listenToProposers(addressToPayloads);
 	});
 
 	clients = new server_component(zmqNetwork, config::BATCHER_PORT_FOR_CLIENTS, Client,
 						  [&](const std::string& address, const time_t now) {
 		BENCHMARK_LOG("Client from {} connected to batcher", address);
-	}, [&](const std::string& address, const std::string& payload, const time_t now) {
-		if (payload.empty())
-			return;
-
-		LOG("Received --{}-- from client {}", payload, address);
-		TIME();
-		metricsVars->counters[metrics::NumIncomingMessages]->Increment();
-		clientToPayloads[address] += payload + config::REQUEST_DELIMITER;
-		numPayloads += 1;
-		if (numPayloads >= config::BATCH_SIZE)
-			sendBatch();
+	}, [&](const network::addressPayloadsMap& addressToPayloads, const time_t now) {
+		listenToClients(addressToPayloads);
 	});
 	clients->startHeartbeater();
 
@@ -60,14 +45,52 @@ batcher::batcher() {
 	zmqNetwork->poll();
 }
 
+void batcher::listenToProposers(const network::addressPayloadsMap& addressToPayloads) {
+	Ballot ballot;
+
+	for (const auto&[address, payloads] : addressToPayloads) {
+		for (const std::string& payload : payloads) {
+			//hear new leader from proposer
+			ballot.ParseFromString(payload);
+			if (Log::isBallotGreaterThan(ballot, leaderBallot)) {
+				BENCHMARK_LOG("New leader at batcher: {}", address);
+				leaderBallot = ballot;
+				leaderIP = address;
+			}
+			ballot.Clear();
+		}
+	}
+}
+
+void batcher::listenToClients(const network::addressPayloadsMap& addressToPayloads) {
+	for (const auto&[address, payloads] : addressToPayloads) {
+		metricsVars->counters[metrics::NumIncomingMessages]->Increment(payloads.size());
+		for (const std::string& payload : payloads) {
+			if (payload.empty())
+				continue;
+
+			LOG("Received --{}-- from client {}", payload, address);
+			TIME();
+
+			clientToPayloads[address] += payload + config::REQUEST_DELIMITER;
+			numPayloads += 1;
+			if (numPayloads >= config::BATCH_SIZE)
+				sendBatch();
+		}
+	}
+}
+
 void batcher::sendBatch() {
 	LOG("Sending batch");
-	for (const auto&[client, payloads] : clientToPayloads) {
-		if (leaderIP.empty()) //only send to the leader when one exists
+	if (leaderIP.empty()) {
+		for (const auto&[client, payloads] : clientToPayloads)
 			proposers->broadcast(message::createBatchMessage(client, payloads).SerializeAsString());
-		else
+	}
+	else {
+		for (const auto&[client, payloads] : clientToPayloads)
 			proposers->sendToIp(leaderIP, message::createBatchMessage(client, payloads).SerializeAsString());
 	}
+
 	metricsVars->counters[metrics::NumOutgoingMessages]->Increment(clientToPayloads.size());
 	TIME();
 	clientToPayloads.clear();

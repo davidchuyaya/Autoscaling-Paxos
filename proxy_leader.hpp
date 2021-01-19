@@ -43,8 +43,8 @@ private:
 
     void listenToAnna(const std::string& key, const two_p_set& twoPSet, time_t now);
     void processNewAcceptorGroup(const std::string& acceptorGroupId);
-    void listenToProposer(const ProposerToAcceptor& payload, const std::string& ipAddress);
-    void listenToAcceptor(const AcceptorToProxyLeader& payload);
+    void listenToProposer(const network::addressPayloadsMap& addressToPayloads);
+    void listenToAcceptor(const network::addressPayloadsMap& addressToPayloads);
 
     /**
      * Handle a p1b from an acceptor group.
@@ -62,6 +62,15 @@ private:
      * @param payload
      */
     void handleP2B(const AcceptorToProxyLeader& payload);
+    /**
+     * Broadcast messages to acceptors batch-by-batch, so ZMQ optimizes message sending.
+     *
+     * @param payloads Messages from the proposer
+     * @param acceptorGroupToPayloadIndices Key = acceptor group ID, values = indices in payloads of messages to be broadcasted
+     * to that acceptor group
+     */
+    void smartBroadcast(const std::vector<std::string>& payloads,
+						const std::unordered_map<std::string, std::vector<int>>& acceptorGroupToPayloadIndices);
 };
 
 
