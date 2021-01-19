@@ -23,6 +23,7 @@ public:
 	}
 	virtual int numConnections() const = 0;
 	virtual bool isConnected(const std::string& ipAddress) const = 0;
+	virtual std::unordered_set<std::string>& getAddresses() = 0;
 protected:
 	network* zmqNetwork;
 

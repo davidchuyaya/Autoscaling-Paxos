@@ -20,6 +20,7 @@ public:
 	void broadcast(const std::string& payload) override;
 	int numConnections() const override;
 	bool isConnected(const std::string& ipAddress) const override;
+	std::unordered_set<std::string>& getAddresses() override;
 private:
 	std::shared_ptr<socketInfo> serverSocket;
 	std::unordered_set<std::string> clientAddresses;

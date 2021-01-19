@@ -62,6 +62,15 @@ private:
      * @param payload
      */
     void handleP2B(const AcceptorToProxyLeader& payload);
+    /**
+     * Broadcast messages to acceptors batch-by-batch, so ZMQ optimizes message sending.
+     *
+     * @param payloads Messages from the proposer
+     * @param acceptorGroupToPayloadIndices Key = acceptor group ID, values = indices in payloads of messages to be broadcasted
+     * to that acceptor group
+     */
+    void smartBroadcast(const std::vector<std::string>& payloads,
+						const std::unordered_map<std::string, std::vector<int>>& acceptorGroupToPayloadIndices);
 };
 
 

@@ -22,6 +22,7 @@ void client_component::connectToNewMembers(const two_p_set& newMembers, const ti
 		if (ip == config::IP_ADDRESS) //Don't connect to yourself
 			continue;
 		sockets[ip] = zmqNetwork->connectToAddress(ip, port, type);
+		clientAddresses.emplace(ip);
 		onConnect(ip, now);
 	}
 
@@ -33,6 +34,7 @@ void client_component::removeConnection(const std::string& ipAddress, const time
 	LOG("Removing dead member: {}", ipAddress);
 	zmqNetwork->closeSocket(sockets[ipAddress]);
 	sockets.erase(ipAddress);
+	clientAddresses.erase(ipAddress);
 	onDisconnect(ipAddress, now);
 }
 
@@ -49,10 +51,13 @@ void client_component::broadcast(const std::string& payload) {
 }
 
 int client_component::numConnections() const {
-	return sockets.size();
+	return clientAddresses.size();
 }
 
 bool client_component::isConnected(const string& ipAddress) const {
-	return sockets.find(ipAddress) != sockets.end();
+	return clientAddresses.find(ipAddress) != clientAddresses.end();
 }
 
+std::unordered_set<std::string>& client_component::getAddresses() {
+	return clientAddresses;
+}

@@ -39,3 +39,7 @@ int server_component::numConnections() const {
 bool server_component::isConnected(const std::string& ipAddress) const {
 	return clientAddresses.find(ipAddress) != clientAddresses.end();
 }
+
+std::unordered_set<std::string>& server_component::getAddresses() {
+	return clientAddresses;
+}

@@ -100,8 +100,10 @@ void proxy_leader::processNewAcceptorGroup(const std::string& acceptorGroupId) {
 void proxy_leader::listenToProposer(const network::addressPayloadsMap& addressToPayloads) {
 	ProposerToAcceptor proposerToAcceptor;
 	for (const auto&[address, payloads] : addressToPayloads) {
-		for (const std::string& payload : payloads) {
-			proposerToAcceptor.ParseFromString(payload);
+		std::unordered_map<std::string, std::vector<int>> acceptorGroupToPayloadIndices;
+
+		for (int i = 0; i < payloads.size(); ++i) {
+			proposerToAcceptor.ParseFromString(payloads[i]);
 
 			LOG("Received from proposer: {}", proposerToAcceptor.ShortDebugString());
 			if (connectedAcceptorGroups.find(proposerToAcceptor.acceptorgroupid()) == connectedAcceptorGroups.end()) {
@@ -120,11 +122,12 @@ void proxy_leader::listenToProposer(const network::addressPayloadsMap& addressTo
 				default: {}
 			}
 			sentMessages[proposerToAcceptor.messageid()] = sentMetadata{proposerToAcceptor, address}; // keep track
-			acceptorGroups[proposerToAcceptor.acceptorgroupid()]->broadcast(payload);
-			TIME();
+			acceptorGroupToPayloadIndices[proposerToAcceptor.acceptorgroupid()].emplace_back(i);
 
 			proposerToAcceptor.Clear();
 		}
+
+		smartBroadcast(payloads, acceptorGroupToPayloadIndices);
 	}
 }
 
@@ -217,6 +220,18 @@ void proxy_leader::handleP2B(const AcceptorToProxyLeader& payload) {
 	        TIME();
         }
     }
+}
+
+void proxy_leader::smartBroadcast(const std::vector<std::string>& payloads,
+                                  const std::unordered_map<std::string, std::vector<int>>& acceptorGroupToPayloadIndices) {
+	for (const auto&[acceptorGroupId, payloadIndices] : acceptorGroupToPayloadIndices) {
+		client_component* acceptorGroup = acceptorGroups[acceptorGroupId];
+		for (const std::string& address : acceptorGroup->getAddresses()) { //broadcast all to 1 acceptor, then another, etc
+			for (const int payloadIndex : payloadIndices)
+				acceptorGroup->sendToIp(address, payloads[payloadIndex]);
+		}
+	}
+	TIME();
 }
 
 int main(int argc, char** argv) {
