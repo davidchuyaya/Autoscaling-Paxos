@@ -150,9 +150,9 @@ void proxy_leader::listenToAcceptor(const network::addressPayloadsMap& addressTo
 }
 
 void proxy_leader::handleP1B(const AcceptorToProxyLeader& payload) {
+	if (sentMessages.find(payload.messageid()) == sentMessages.end()) //p1b is arriving for a nonexistent sentValue
+		return;
     const sentMetadata& sentValue = sentMessages[payload.messageid()];
-    if (sentValue.value.ballot().ballotnum() == 0)  //p1b is arriving for a nonexistent sentValue
-        return;
 
     if (Log::isBallotGreaterThan(payload.ballot(), sentValue.value.ballot())) {
         //yikes, the proposer got preempted
@@ -186,9 +186,9 @@ void proxy_leader::handleP1B(const AcceptorToProxyLeader& payload) {
 }
 
 void proxy_leader::handleP2B(const AcceptorToProxyLeader& payload) {
-    const sentMetadata& sentValue = sentMessages[payload.messageid()];
-    if (sentValue.proposerAddress.empty()) //p2b is arriving for a nonexistent sentValue
-        return;
+	if (sentMessages.find(payload.messageid()) == sentMessages.end()) //p2b is arriving for a nonexistent sentValue
+		return;
+	const sentMetadata& sentValue = sentMessages[payload.messageid()];
 
     if (Log::isBallotGreaterThan(payload.ballot(), sentValue.value.ballot())) {
         //yikes, the proposer got preempted

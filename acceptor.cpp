@@ -49,7 +49,7 @@ void acceptor::listenToProxyLeaders(const network::addressPayloadsMap& addressTo
 					break;
 				}
 				case ProposerToAcceptor_Type_p2a:
-					LOG("Received p2a: {}", payload.ShortDebugString());
+					LOG("Received p2a: {}", proposerToAcceptor.ShortDebugString());
 					TIME();
 					if (!Log::isBallotGreaterThan(highestBallot, proposerToAcceptor.ballot())) {
 						PValue pValue;

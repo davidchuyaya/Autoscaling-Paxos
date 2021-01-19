@@ -53,6 +53,7 @@ void batcher::listenToProposers(const network::addressPayloadsMap& addressToPayl
 			//hear new leader from proposer
 			ballot.ParseFromString(payload);
 			if (Log::isBallotGreaterThan(ballot, leaderBallot)) {
+				BENCHMARK_LOG("New leader at batcher: {}", address);
 				leaderBallot = ballot;
 				leaderIP = address;
 			}
@@ -72,10 +73,10 @@ void batcher::listenToClients(const network::addressPayloadsMap& addressToPayloa
 			TIME();
 
 			clientToPayloads[address] += payload + config::REQUEST_DELIMITER;
+			numPayloads += 1;
+			if (numPayloads >= config::BATCH_SIZE)
+				sendBatch();
 		}
-		numPayloads += payloads.size(); //We're "kind of" batching if throughput is high enough. This isn't cheating, right?
-		if (numPayloads >= config::BATCH_SIZE)
-			sendBatch();
 	}
 }
 

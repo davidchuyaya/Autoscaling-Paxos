@@ -58,6 +58,7 @@ void mock::proposerForBatcher(bool isLeader) {
 		printf("Mock proposer cannot be sender of batcher\n");
 		exit(0);
 	}
+	annaClient = anna::writeOnly(zmqNetwork, {{config::KEY_PROPOSERS, config::IP_ADDRESS}});
 
 	//note: can't use customReceiver(), since we need to tell the batcher if we are the leader
 	extraSocket = zmqNetwork->startServerAtPort(config::PROPOSER_PORT_FOR_BATCHERS, Batcher);
@@ -245,10 +246,8 @@ void mock::customReceiver(ComponentType type, int port, bool heartbeat, const ne
 		for (const auto&[address, payloads] : addressToPayloads) {
 			if (clientAddress.empty())
 				clientAddress = address;
-			for (const std::string& payload : payloads) {
-				onReceive(addressToPayloads, now);
-			}
 		}
+		onReceive(addressToPayloads, now);
 	});
 
 	if (heartbeat) {
